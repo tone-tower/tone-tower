@@ -1,5 +1,6 @@
 import { cantoneseCatalog } from './runtime.mjs';
 import { buildMandarinCatalog } from '../content/mandarin.mjs';
+import { buildVietnameseCatalog } from '../content/vietnamese.mjs';
 import { mkdir } from 'node:fs/promises';
 import { stat } from 'node:fs/promises';
 import { atomicJSON, atomicText, readJSON } from '../lib/json.mjs';
@@ -249,5 +250,7 @@ export async function buildCatalogs(root = process.cwd()) {
   const yue = await buildCatalog(root);
   const cmn = await buildMandarinCatalog(root);
   await atomicText(path.join(root, 'catalogs/cmn.json'), JSON.stringify(cmn) + '\n');
-  return { yue, cmn };
+  const vi = await buildVietnameseCatalog(root);
+  await atomicText(path.join(root, 'catalogs/vi.json'), JSON.stringify(vi) + '\n');
+  return { yue, cmn, vi };
 }

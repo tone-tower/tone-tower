@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { pages, site, pageFromLocation } from '../../src/site.js';
-import { languages } from '../../src/languages/profiles.js';
+import { languages, guideName } from '../../src/languages/profiles.js';
 import { renderPage, sitemap } from '../../tools/publishing/pages.mjs';
 
 test('language pages have static content, independent navigation, metadata and project-relative assets', async () => {
@@ -17,7 +17,7 @@ test('language pages have static content, independent navigation, metadata and p
     assert.ok(html.includes('data-language="' + profile.id + '"'));
     assert.ok(html.includes('href="' + profile.slug + '/guide/"'));
     assert.ok(html.includes('href="./">Languages</a>'));
-    assert.ok(html.includes(profile.romanization + ' guide'));
+    assert.ok(html.includes('>' + guideName(profile) + '</a'));
     const base = new URL(
       html.match(/<base href="([^"]+)"/)[1],
       'https://example.org/a/renamed/' + metadata.path,
@@ -43,16 +43,31 @@ test('language pages have static content, independent navigation, metadata and p
     if (metadata.page === 'sounds')
       assert.ok(
         html.includes(
-          profile.id === 'cmn' ? 'Written tones and heard tones' : 'Syllable structure',
+          {
+            cmn: 'Written tones and heard tones',
+            vi: 'Six tones, five marks',
+          }[profile.id] ?? 'Syllable structure',
         ),
       );
   }
   assert.ok(!Object.values(pages).some((p) => ['guide/', 'about/', 'practice/'].includes(p.path)));
 });
-test('root chooser has links to both sites and loads no game JavaScript or recordings', async () => {
+test('a tone-only language describes its own game and voice instead of spelling or human speech', async () => {
+  const template = await readFile(new URL('../../src/shell.html', import.meta.url), 'utf8');
+  const home = renderPage(template, 'vi:home'),
+    about = renderPage(template, 'vi:about');
+  assert.ok(home.includes('<title>Tone Tower · Vietnamese tone games</title>'));
+  assert.ok(home.includes('Play Tone Tower to practise the six Vietnamese tones.'));
+  assert.doesNotMatch(home + about, /human|Skyrail|Quốc ngữ spelling|script-display/);
+  assert.match(about, /synthetic speech/);
+  assert.match(about, /practising\s+Vietnamese tones/);
+  assert.match(renderPage(template, 'yue:about'), /human speech from Wikimedia Commons/);
+  assert.match(renderPage(template, 'yue:about'), /Choose Skyrail settings/);
+});
+test('root chooser has links to every site and loads no game JavaScript or recordings', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
-  assert.ok(html.includes('href="cantonese/"'));
-  assert.ok(html.includes('href="mandarin/"'));
+  for (const profile of Object.values(languages))
+    assert.ok(html.includes('href="' + profile.slug + '/"'), profile.slug);
   assert.doesNotMatch(html, /<script|catalogs\/|<audio|\.mp3/);
 });
 test('clean language routes resolve directly under arbitrary project paths', () => {

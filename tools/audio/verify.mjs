@@ -3,7 +3,7 @@ import path from 'node:path';
 import { checkDistribution } from '../publishing/check.mjs';
 import { validateMP3 } from './convert.mjs';
 const catalogs = await Promise.all(
-  ['yue', 'cmn'].map(async (id) =>
+  ['yue', 'cmn', 'vi'].map(async (id) =>
     JSON.parse(await readFile('dist/catalogs/' + id + '.json', 'utf8')),
   ),
 );

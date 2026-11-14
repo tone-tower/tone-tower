@@ -1,4 +1,4 @@
-import { languages } from './languages/profiles.js';
+import { languages, guideName } from './languages/profiles.js';
 export const site = {
   siteUrl: 'https://tone-tower.github.io/tone-tower/',
   repository: 'https://github.com/tone-tower/tone-tower',
@@ -6,37 +6,42 @@ export const site = {
   maintainerUrl: 'https://github.com/john0107',
 };
 export function languagePages(profile) {
-  const root = profile.slug + '/';
+  const root = profile.slug + '/',
+    copy = profile.copy ?? {};
   return {
     home: {
       path: root,
-      title: 'Tone Tower · ' + profile.label + ' ' + profile.romanization + ' games',
+      title:
+        copy.homeTitle ?? 'Tone Tower · ' + profile.label + ' ' + profile.romanization + ' games',
       description:
+        copy.homeDescription ??
         'Train your ear for ' +
-        profile.label +
-        '. Play Tone Tower, Skyrail, and focused ' +
-        profile.romanization +
-        ' practice with human recordings.',
+          profile.label +
+          '. Play Tone Tower, Skyrail, and focused ' +
+          profile.romanization +
+          ' practice with human recordings.',
     },
     sounds: {
       path: root + 'guide/',
-      title: profile.romanization + ' guide · ' + profile.label + ' Tone Tower',
+      title: guideName(profile) + ' · ' + profile.label + ' Tone Tower',
       description:
+        copy.guideDescription ??
         'Learn ' +
-        profile.label +
-        ' sounds, tones, and ' +
-        profile.romanization +
-        ' spelling with playable pronunciation examples.',
+          profile.label +
+          ' sounds, tones, and ' +
+          profile.romanization +
+          ' spelling with playable pronunciation examples.',
     },
     practice: {
       path: root + 'practice/',
       title: 'Practice Workshop · ' + profile.label + ' Tone Tower',
       description:
+        copy.practiceDescription ??
         'Practise ' +
-        profile.label +
-        ' tones and ' +
-        profile.romanization +
-        ' spelling at your own pace, without a timer or lives.',
+          profile.label +
+          ' tones and ' +
+          profile.romanization +
+          ' spelling at your own pace, without a timer or lives.',
     },
     about: {
       path: root + 'about/',

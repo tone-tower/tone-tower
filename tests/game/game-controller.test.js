@@ -1,4 +1,4 @@
-import { cantonese, mandarin } from '../../src/languages/profiles.js';
+import { cantonese, mandarin, vietnamese } from '../../src/languages/profiles.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCountdown, createGameController } from '../../src/game/game-controller.js';
@@ -1169,5 +1169,136 @@ test('changing the Mandarin script during a run preserves input, timing, and sco
   assert.equal(h.controller.state.expected(), 'ma1 ma5');
   h.time.advance(1);
   assert.equal(h.controller.phase, 'review');
+  h.controller.dispose();
+});
+
+const vietnameseWords = [
+  ['được phép', ['nặng', 'sắc'], 'to be allowed'],
+  ['ma quỷ', ['ngang', 'hỏi'], 'ghosts and demons'],
+  ['mù mờ', ['huyền', 'huyền'], undefined],
+].map(([text, tones, gloss]) => ({
+  id: 'vi-' + text,
+  text,
+  transcription: text,
+  audio: text + '.mp3',
+  gloss,
+  syllables: text
+    .split(' ')
+    .map((part, i) => ({ text: part, transcription: part, tone: tones[i] })),
+}));
+test('Vietnamese hides every tone of the word until a door is chosen and shows its meaning throughout', async () => {
+  const h = harness({}, vietnameseWords, vietnamese);
+  h.controller.start({
+    challenge: 'tone',
+    practice: true,
+    focusIds: ['vi-được phép'],
+    tones: ['hỏi', 'nặng'],
+  });
+  h.audio();
+  await flush();
+  assert.equal(h.controller.state.word.tone, 'nặng');
+  assert.deepEqual(h.controller.state.targets, [0]);
+  assert.doesNotMatch(h.app.innerHTML, /được|ợ|phép|é/);
+  assert.match(h.app.innerHTML, /<p class="prompt-gloss">to be allowed<\/p>/);
+  // Both syllables are covered, on the letter that carries the mark.
+  assert.match(
+    h.app.innerHTML,
+    /đư<span class="tone-carrier is-horned">ơ<span class="tone-cover" aria-hidden="true">/,
+  );
+  assert.match(h.app.innerHTML, /ph<span class="tone-carrier">e<span class="tone-cover"/);
+  assert.equal(h.app.querySelectorAll('.tone-cover').length, 2);
+  assert.equal(h.app.querySelectorAll('.is-target').length, 1);
+  assert.match(h.app.innerHTML, /data-letters="8"/);
+  // The widest tone name holds the answer's place without being shown or read.
+  assert.match(
+    h.app.innerHTML,
+    /class="prompt-romanization is-reserved"\s+aria-hidden="true"\s*>dấu huyền</,
+  );
+  assert.match(h.app.querySelector('#tower-message').textContent, /choose its tone\.$/);
+  // Doors show the written mark and its name; number keys follow the tone order.
+  const doors = h.app.querySelectorAll('[data-tone]');
+  assert.deepEqual(doors.map((door) => door.dataset.tone).sort(), ['hỏi', 'nặng']);
+  assert.ok(doors.every((door) => door.classes.has('has-mark')));
+  assert.deepEqual(doors.map((door) => door.attrs['aria-label']).sort(), [
+    'Choose dấu hỏi',
+    'Choose dấu nặng',
+  ]);
+  assert.equal(h.app.querySelectorAll('.tone-mark').length, 2);
+  assert.match(h.app.innerHTML, /class="tone-name"\s*>dấu hỏi</);
+  h.document.fire('keydown', { key: '6', target: { tagName: 'BODY' } });
+  assert.equal(h.controller.phase, 'answering');
+  h.document.fire('keydown', { key: '3', target: { tagName: 'BODY' } });
+  assert.equal(h.controller.phase, 'review');
+  assert.match(h.app.innerHTML, /Not quite\. Dấu hỏi → dấu nặng\./);
+  // Every cover leaves once, revealing the word and the asked tone's name.
+  assert.match(
+    h.app.innerHTML,
+    /đư<span class="tone-carrier is-horned">ợ<span class="tone-cover is-leaving"/,
+  );
+  assert.match(
+    h.app.innerHTML,
+    /ph<span class="tone-carrier">é<span class="tone-cover is-leaving"/,
+  );
+  assert.match(h.app.innerHTML, /class="prompt-romanization "\s*>dấu nặng</);
+  assert.doesNotMatch(h.app.innerHTML, /dấu sắc<\/span\s*><\/span/);
+  assert.doesNotMatch(h.app.innerHTML, /is-reserved/);
+  assert.match(h.app.innerHTML, /to be allowed/);
+  h.controller.pause();
+  h.controller.resume();
+  assert.match(h.app.innerHTML, /đư<span class="tone-carrier is-horned">ợ<\/span>c/);
+  assert.doesNotMatch(h.app.innerHTML, /class="tone-cover/);
+  h.controller.dispose();
+});
+test('a syllable without a mark is still covered, and its door shows an empty slot', async () => {
+  const h = harness({}, vietnameseWords, vietnamese);
+  h.controller.start({
+    challenge: 'tone',
+    practice: true,
+    focusIds: ['vi-ma quỷ'],
+    tones: ['sắc', 'ngang'],
+  });
+  h.audio();
+  await flush();
+  assert.match(h.app.innerHTML, /m<span class="tone-carrier">a<span class="tone-cover"/);
+  assert.match(h.app.innerHTML, /qu<span class="tone-carrier is-deep">y<span class="tone-cover"/);
+  assert.match(h.app.innerHTML, /class="tone-mark is-blank"/);
+  assert.match(h.app.innerHTML, /class="tone-name"\s*>không dấu</);
+  h.document.fire('keydown', { key: '6', target: { tagName: 'BODY' } });
+  assert.equal(h.app.dataset.outcome, 'success');
+  assert.match(h.app.innerHTML, /class="prompt-romanization "\s*>không dấu</);
+  assert.match(h.app.innerHTML, /ghosts and demons/);
+  h.controller.dispose();
+});
+test('a Vietnamese word without a listed meaning keeps its place and ends a lost run by name', async () => {
+  const h = harness({}, vietnameseWords, vietnamese);
+  h.controller.start({
+    challenge: 'tone',
+    practice: true,
+    focusIds: ['vi-mù mờ'],
+    tones: ['sắc', 'huyền'],
+  });
+  h.audio();
+  await flush();
+  assert.match(h.app.innerHTML, /<p class="prompt-gloss">&nbsp;<\/p>/);
+  h.document.fire('keydown', { key: '2', target: { tagName: 'BODY' } });
+  assert.equal(h.app.dataset.outcome, 'success');
+  assert.match(h.app.innerHTML, /<p class="prompt-gloss">&nbsp;<\/p>/);
+  assert.doesNotMatch(h.app.innerHTML, /undefined/);
+  h.controller.dispose();
+});
+test('numbered languages keep their tone numbers on doors and in feedback', async () => {
+  const h = harness();
+  h.controller.start({ challenge: 'tone' });
+  h.audio();
+  await flush();
+  assert.equal(h.app.querySelector('.tone-mark'), null);
+  assert.equal(h.app.querySelector('.tone-cover'), null);
+  assert.equal(h.app.querySelector('.has-mark'), null);
+  assert.match(h.app.querySelector('#tower-message').textContent, /choose its tone number\.$/);
+  const right = h.controller.state.word.tone,
+    wrong = h.controller.state.choices.find((t) => t !== right);
+  assert.match(h.app.innerHTML, new RegExp('aria-label="Choose tone ' + right + '"'));
+  h.document.fire('keydown', { key: String(wrong), target: { tagName: 'BODY' } });
+  assert.match(h.app.innerHTML, new RegExp('Tone ' + wrong + ' → tone ' + right + '\\.'));
   h.controller.dispose();
 });

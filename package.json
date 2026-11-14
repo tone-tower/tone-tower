@@ -34,7 +34,9 @@
     "mandarin:review": "node tools/content/mandarin-cli.mjs review",
     "mandarin:import-review": "node tools/content/mandarin-cli.mjs import-review",
     "mandarin:status": "node tools/content/mandarin-cli.mjs status",
-    "mandarin:correct": "node tools/content/mandarin-cli.mjs correct"
+    "mandarin:correct": "node tools/content/mandarin-cli.mjs correct",
+    "vietnamese:import": "node tools/content/vietnamese-cli.mjs import",
+    "vietnamese:status": "node tools/content/vietnamese-cli.mjs status"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",

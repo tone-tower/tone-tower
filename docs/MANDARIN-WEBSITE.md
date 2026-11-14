@@ -1,7 +1,8 @@
 # Language sites and the Mandarin beta
 
 The root is a language chooser. Cantonese lives at `/cantonese/`; Mandarin lives
-at `/mandarin/`. Each has its own guide, practice, About page, and saved progress.
+at `/mandarin/`; [Vietnamese](VIETNAMESE.md) lives at `/vietnamese/`. Each has its
+own guide, practice, About page, and saved progress.
 There are no old root-level route aliases.
 
 ## Running the prototype
@@ -89,7 +90,7 @@ only its own catalog. Cantonese keeps its existing browser storage key and IDs;
 Mandarin has separate records and settings. Its simplified/traditional toggle
 changes presentation without changing pronunciation, timing, or score.
 
-`catalogs/yue.json` and `catalogs/cmn.json` use the common v2 format:
+`catalogs/yue.json`, `catalogs/cmn.json` and `catalogs/vi.json` use the common v2 format:
 `language`, `transcriptionSystem`, `entries`, `pronunciations`, `recordings`,
 and `references`. Entries own sourced forms and meanings; pronunciations own
 dictionary syllables; recordings own credited audio and spoken-tone annotations.

@@ -1,5 +1,5 @@
 import { recordingIssueUrl } from './ui/recording-report.js';
-import { languages, requireProfile, decodeTonePair } from './languages/profiles.js';
+import { languages, requireProfile, decodeTonePair, toneText } from './languages/profiles.js';
 import { site, languagePages, pageFromLocation } from './site.js';
 import { practiceSetupMarkup } from './ui/practice-setup.js';
 import { filterCredits, creditsPage } from './ui/credits.js';
@@ -36,6 +36,11 @@ const escape = (value) =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
   );
 const titleCase = (value) => value[0].toUpperCase() + value.slice(1);
+// Where the written word already is the spelling, it is not repeated beneath itself.
+const written = (row) => {
+  const spelling = profile.format(row.transcription);
+  return spelling === row.text ? '' : spelling;
+};
 const variantName = (world, variant) =>
   world === 'tone' ? titleCase(variant) : variant === 'full' ? 'With tones' : 'Without tones';
 const difficultyName = (d) => titleCase(d || 'normal');
@@ -168,6 +173,8 @@ function home(world, initialPractice = false) {
   if (initialPractice) setPageLocation('practice', true);
   progress = loadProgress(profile);
   const exampleText = profile.example.forms?.[progress.settings.script] ?? profile.example.written;
+  const exampleSpelling = profile.format(profile.example.syllable ?? profile.example.transcription);
+  const copy = profile.copy ?? {};
   const exampleRecording = data.find(
     (row) =>
       row.transcription === profile.example.transcription &&
@@ -175,14 +182,22 @@ function home(world, initialPractice = false) {
   );
   app.innerHTML = /* HTML */ `<header class="home-intro">
       <div>
-        <h1 tabindex="-1">Practise ${profile.romanization}.</h1>
+        <h1 tabindex="-1">${copy.heading ?? 'Practise ' + profile.romanization + '.'}</h1>
         <p>
-          ${profile.romanization} writes ${profile.label} pronunciation using Latin letters and
-          ${profile.usesToneMarks ? 'tone marks' : 'tone numbers'}.
+          ${
+            copy.introduction ??
+            profile.romanization +
+              ' writes ' +
+              profile.label +
+              ' pronunciation using Latin letters and ' +
+              (profile.usesToneMarks ? 'tone marks' : 'tone numbers') +
+              '.'
+          }
         </p>
       </div>
       <a class="intro-guide" href="${pages.sounds.path}" data-page="sounds"
-        ><span>New to ${profile.romanization}?</span>A short introduction →</a
+        ><span>${copy.guidePrompt ?? 'New to ' + profile.romanization + '?'}</span>A short
+        introduction →</a
       >
     </header>
     ${catalog?.availability?.ready === false ? '<aside class="content-preview" role="status"><strong>Mandarin is taking shape.</strong><p>We’re gathering enough recordings to open the games. Explore the Pinyin guide while the collection grows.</p></aside>' : catalog?.availability?.mode === 'beta' ? '<aside class="content-preview beta-notice"><strong>Mandarin beta</strong><p>Found a recording problem? Report it from the answer feedback or Voices &amp; credits.</p></aside>' : ''}
@@ -194,8 +209,12 @@ function home(world, initialPractice = false) {
         ><i aria-hidden="true">+</i> <span><b>${profile.example.tone}</b><small>tone</small></span
         ><i aria-hidden="true">=</i>
         <span class="syllable-result"
-          ><b>${profile.format(profile.example.transcription)}</b
-          ><small>${exampleText} · ${profile.example.gloss}</small></span
+          ><b>${exampleSpelling}</b
+          ><small
+            >${exampleText === exampleSpelling ? '' : exampleText + ' · '}${
+              profile.example.gloss
+            }</small
+          ></span
         >
       </div>
       <button
@@ -211,8 +230,13 @@ function home(world, initialPractice = false) {
     </div>
     <section class="mode-picker" aria-labelledby="mode-heading">
       <div class="mode-picker-heading">
-        <h2 id="mode-heading">Choose a game</h2>
-        <p><kbd>←</kbd> <kbd>→</kbd> choose · <kbd>Enter</kbd> start</p>
+        <h2 id="mode-heading">${profile.challenges.length > 1 ? 'Choose a game' : 'The game'}</h2>
+        <p>
+          ${profile.challenges.length > 1 ? '<kbd>←</kbd> <kbd>→</kbd> choose · ' : ''}<kbd
+            >Enter</kbd
+          >
+          start
+        </p>
       </div>
       <div class="mode-cards">
         <button
@@ -223,7 +247,11 @@ function home(world, initialPractice = false) {
           aria-describedby="tone-mode-description"
         >
           <strong>Tone Tower</strong
-          ><span id="tone-mode-description">Choose the tone number you hear.</span>
+          ><span id="tone-mode-description"
+            >Choose the
+            ${profile.tones.every((t) => typeof t === 'number') ? 'tone number' : 'tone'} you
+            hear.</span
+          >
         </button>
         <button
           type="button"
@@ -547,10 +575,10 @@ function showResults(run) {
         ? /* HTML */ `<div class="last-word feedback-card">
             <span class="eyebrow">One to listen to again</span>
             <div class="result-word">
-              ${syllables.map((s) => /* HTML */ `<span>${escape(s.text)}<small>${escape(profile.format(s.transcription))}</small></span>`).join('')}
+              ${syllables.map((s) => /* HTML */ `<span>${escape(s.text)}<small>${escape(written(s))}</small></span>`).join('')}
             </div>
             <p>${escape(run.word.gloss)}</p>
-            ${run.lastAnswer ? /* HTML */ `<p class="small">${run.world === 'tone' ? 'You chose' : 'You typed'}: ${escape(run.lastAnswer)}</p>` : ''}<button
+            ${run.lastAnswer ? /* HTML */ `<p class="small">${run.world === 'tone' ? 'You chose' : 'You typed'}: ${escape(run.world === 'tone' ? toneText(profile, run.lastAnswer) : run.lastAnswer)}</p>` : ''}<button
               id="last-word-audio"
               class="text-button"
               type="button"
@@ -656,7 +684,9 @@ function bindToneAudio(container) {
           await player.play(anchor.audio);
           if (current === request && status?.isConnected)
             status.textContent = button.dataset.guideWord
-              ? profile.format(anchor.transcription) + ' · ' + anchor.text
+              ? [profile.format(anchor.transcription), written(anchor) && anchor.text]
+                  .filter(Boolean)
+                  .join(' · ')
               : profile.format(anchor.transcription) +
                 ' · ' +
                 profile.toneDefinitions.find((t) => t.value === anchor.tone).description;
@@ -793,14 +823,23 @@ function showCredits() {
   openDialog(
     /* HTML */ `<div class="eyebrow">Sources & licences</div>
       <h2 id="dialog-title">Voices & credits</h2>
-      <p>Human recordings from Wikimedia Commons. Each recording keeps its source licence.</p>
+      <p>
+        ${escape(
+          profile.copy?.credits ??
+            'Human recordings from Wikimedia Commons. Each recording keeps its source licence.',
+        )}
+      </p>
       <details>
         <summary>Dictionary, typography & application credits</summary>
-        <p>
-          Readings and glosses include adaptations from
-          ${profile.dictionarySources.map((source) => '<a href="' + safeHref(source.url) + '" target="_blank" rel="noopener">' + escape(source.name) + '</a>' + (source.attribution ? ' · ' + escape(source.attribution) : '') + ' under <a href="' + safeHref(source.licenseUrl) + '">' + escape(source.license) + '</a>').join('; ')}.
-          Individual entries identify their dictionary sources.
-        </p>
+        ${
+          profile.dictionarySources.length
+            ? /* HTML */ `<p>
+                Readings and glosses include adaptations from
+                ${profile.dictionarySources.map((source) => '<a href="' + safeHref(source.url) + '" target="_blank" rel="noopener">' + escape(source.name) + '</a>' + (source.attribution ? ' · ' + escape(source.attribution) : '') + ' under <a href="' + safeHref(source.licenseUrl) + '">' + escape(source.license) + '</a>').join('; ')}.
+                Individual entries identify their dictionary sources.
+              </p>`
+            : ''
+        }
         <p>
           DM Sans: <a href="assets/fonts/DMSans-LICENSE.txt">Font licence</a>. Application code:
           <a href="LICENSE">MIT</a>. <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a>. No
@@ -811,7 +850,7 @@ function showCredits() {
         >Find a recording<input
           id="credit-search"
           type="search"
-          placeholder="Written form, ${profile.romanization}, creator…"
+          placeholder="${profile.challenges.includes('tide') ? 'Written form, ' + profile.romanization + ', creator…' : 'Written form, meaning, voice…'}"
           autocomplete="off"
       /></label>
       <div id="credit-results"></div>`,
@@ -860,16 +899,25 @@ function showCredits() {
               .map(
                 (w) =>
                   /* HTML */ `<tr>
-                    <td>
-                      ${escape(w.text)}<small>${escape(profile.format(w.transcription))}</small>
-                    </td>
+                    <td>${escape(w.text)}<small>${escape(written(w))}</small></td>
                     <td>${escape(w.author || 'See original')}</td>
                     <td>
-                      <a href="${safeHref(w.source)}" target="_blank" rel="noopener">Original ↗</a>
-                      ·
-                      <a href="${safeHref(w.licenseUrl)}" target="_blank" rel="noopener"
-                        >${escape(w.license)}</a
-                      >${w.conversion ? /* HTML */ `<small>${escape(w.conversion)}</small>` : ''}<small
+                      ${[
+                        w.source &&
+                          '<a href="' +
+                            safeHref(w.source) +
+                            '" target="_blank" rel="noopener">Original ↗</a>',
+                        w.license &&
+                          '<a href="' +
+                            safeHref(w.licenseUrl) +
+                            '" target="_blank" rel="noopener">' +
+                            escape(w.license) +
+                            '</a>',
+                      ]
+                        .filter(Boolean)
+                        .join(
+                          ' · ',
+                        )}${w.conversion ? /* HTML */ `<small>${escape(w.conversion)}</small>` : ''}<small
                         ><a
                           href="${escape(recordingIssueUrl(w, profile))}"
                           target="_blank"
@@ -908,7 +956,7 @@ function showCredits() {
 function showProgress() {
   openDialog(
     '<h2 id="dialog-title">Your records</h2><p class="small">Saved in this browser. Closing or reloading ends the current run.</p>' +
-      ['tone', 'tide']
+      profile.challenges
         .map(
           (world) =>
             '<h3>' +

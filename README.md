@@ -1,6 +1,6 @@
 # Tone Tower
 
-Browser games for Cantonese Jyutping and Mandarin Pinyin. Each language has its own site and progress. Tone Tower trains tone recognition; Skyrail trains spelling. Built with vanilla JavaScript and canvas, with no accounts, analytics, or runtime services.
+Browser games for Cantonese Jyutping, Mandarin Pinyin and Vietnamese tones. Each language has its own site and progress. Tone Tower trains tone recognition; Skyrail trains spelling. Vietnamese has Tone Tower only. Built with vanilla JavaScript and canvas, with no accounts, analytics, or runtime services.
 
 [Play Tone Tower](https://tone-tower.github.io/tone-tower/) · [Report a problem](https://github.com/tone-tower/tone-tower/issues/new?template=bug-report.yml) · [Suggest an idea](https://github.com/tone-tower/tone-tower/issues/new?template=idea.yml)
 
@@ -44,6 +44,7 @@ docs/               Gameplay, audio workflow, and publishing reference
 audio/              Credited speech recordings
 assets/             Fonts and their licences
 data/audio/         Imported inventory, stable word IDs, queue, and corrections
+data/content/       Mandarin dictionary matches and the Vietnamese word list
 ```
 
 The browser imports only `src/`. Pure rules live in `src/game/game-core.js`; `game-controller.js` coordinates input, audio, countdowns, and the game view. Rendering and animation live in `src/world/`. Progress and settings live in `src/persistence/progress.js`. Only the current save format is supported; older formats start fresh.
@@ -59,7 +60,7 @@ check it with `npm run audio:status:mandarin`. It resumes safely and preserves
 source credits across speakers. The playable Mandarin beta uses unambiguous dictionary matches and common tone changes; incorrect clips can be corrected or excluded afterward. Existing Cantonese recordings do not need to
 move. See [the Mandarin download instructions](docs/MANDARIN-DOWNLOAD.md).
 
-The root is a language chooser. Open `/cantonese/` or `/mandarin/` for the independent language sites. The Mandarin beta includes Tone Tower, Skyrail, practice, and a Pinyin guide using real downloaded audio. See [language architecture and Mandarin beta](docs/MANDARIN-WEBSITE.md) for the content workflow and future language integration.
+The root is a language chooser. Open `/cantonese/`, `/mandarin/` or `/vietnamese/` for the independent language sites. Vietnamese uses a synthetic voice and shows each word without its tone marks until a door is chosen; see [Vietnamese tones](docs/VIETNAMESE.md). The Mandarin beta includes Tone Tower, Skyrail, practice, and a Pinyin guide using real downloaded audio. See [language architecture and Mandarin beta](docs/MANDARIN-WEBSITE.md) for the content workflow and future language integration.
 
 ## Checks
 
@@ -96,6 +97,7 @@ See [publishing](docs/PUBLISHING.md) for setup and release checks. Stop audio do
 - [Audio catalog and manual corrections](docs/AUDIO-CATALOG.md)
 - [Downloading recordings](docs/AUDIO-DOWNLOAD.md)
 - [Language architecture and Mandarin beta](docs/MANDARIN-WEBSITE.md)
+- [Vietnamese tones, word list, and synthetic voice](docs/VIETNAMESE.md)
 - [Downloading the separate Mandarin archive](docs/MANDARIN-DOWNLOAD.md)
 - [Mandarin sources and multilingual audio design](docs/MULTILINGUAL-AUDIO.md)
 - [Publishing and rollback](docs/PUBLISHING.md)

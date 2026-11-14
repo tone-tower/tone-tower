@@ -1,5 +1,5 @@
 import { pages, site, languagePages } from '../../src/site.js';
-import { languages } from '../../src/languages/profiles.js';
+import { languages, guideName } from '../../src/languages/profiles.js';
 import { aboutPageMarkup, soundPageMarkup } from '../../src/ui/info-pages.js';
 import { catalogRows, referenceRows } from '../../src/content/catalog.js';
 const escape = (value) =>
@@ -58,16 +58,17 @@ export function renderPage(template, key, catalog) {
     '<nav aria-label="Main navigation">',
     '<nav aria-label="Main navigation"><a class="nav-link language-link" href="./">Languages</a>',
   );
-  html = html.replace('>Jyutping guide</a', '>' + profile.romanization + ' guide</a');
+  html = html.replace('>Jyutping guide</a', '>' + guideName(profile) + '</a');
   html = html
     .replaceAll('Train your ear for Cantonese.', 'Train your ear for ' + profile.label + '.')
     .replace(
       'Play Tone Tower and Skyrail to practise Cantonese tones and Jyutping spelling.',
-      'Play Tone Tower and Skyrail to practise ' +
-        profile.label +
-        ' tones and ' +
-        profile.romanization +
-        ' spelling.',
+      profile.copy?.loading ??
+        'Play Tone Tower and Skyrail to practise ' +
+          profile.label +
+          ' tones and ' +
+          profile.romanization +
+          ' spelling.',
     );
   if (profile.scripts.length > 1)
     html = html.replace(

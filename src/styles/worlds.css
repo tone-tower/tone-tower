@@ -2038,3 +2038,188 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
     display: none;
   }
 }
+
+/* The written tone stays under a dust creature until a door is chosen. */
+.tone-door .tone-mark {
+  width: 2.3em;
+  height: 2.3em;
+  filter: drop-shadow(2px 2px 0 #172b38);
+}
+.tone-door.has-mark {
+  gap: 2px;
+}
+.tone-door.has-mark .tone-name {
+  font:
+    700 15px/1.2 'Segoe UI',
+    'Noto Sans',
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  letter-spacing: 0;
+  text-shadow: 1px 1px #172b38;
+}
+.tone-door.has-mark .door-key {
+  margin-top: 5px;
+}
+.world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .tone-name {
+  font-size: 12px;
+}
+.world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .door-key {
+  margin-top: 1px;
+}
+.tone-door.has-mark .tone-name {
+  white-space: nowrap;
+}
+/* The mark and its name leave no room for a pitch line on the smaller doors. */
+.world-scene:is([data-count='4'], [data-count='5'], [data-count='6'])
+  .has-mark
+  .practice-tone-contour {
+  display: none;
+}
+@media (max-width: 700px) {
+  .tone-door .tone-mark {
+    width: 1.9em;
+    height: 1.9em;
+  }
+  .tone-door.has-mark .tone-name {
+    font-size: 11px;
+  }
+  .world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .tone-name {
+    font-size: 8px;
+  }
+  .tone-door.has-mark .door-key {
+    margin-top: 1px;
+  }
+  /* Small touch doors keep the mark and its name; the number-key hint would not fit. */
+  .world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .door-key,
+  .tone-door.has-mark .practice-tone-contour {
+    display: none;
+  }
+  .world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .tone-door .tone-mark {
+    width: 1.75em;
+    height: 1.75em;
+  }
+}
+.prompt-syllable.has-tone-cover {
+  padding-top: 36px;
+}
+.tone-carrier {
+  position: relative;
+  display: inline-block;
+}
+.tone-cover {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tone-cover svg {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+}
+.tone-cover-top {
+  bottom: 71%;
+  width: 0.62em;
+  animation: tone-cover-bob 1.4s steps(2, jump-none) infinite;
+}
+.is-horned > .tone-cover .tone-cover-top {
+  bottom: 75%;
+}
+.is-tall > .tone-cover .tone-cover-top {
+  bottom: 85%;
+}
+.tone-cover-bottom {
+  top: 87%;
+  width: 0.34em;
+}
+.is-deep > .tone-cover .tone-cover-bottom {
+  top: 104%;
+}
+.tone-cover.is-leaving .tone-cover-top {
+  animation: tone-cover-hop 0.45s ease-in both;
+}
+.tone-cover.is-leaving .tone-cover-bottom {
+  animation: tone-cover-drop 0.45s ease-in both;
+}
+@keyframes tone-cover-bob {
+  to {
+    transform: translateY(-2px);
+  }
+}
+@keyframes tone-cover-hop {
+  35% {
+    transform: translate(4px, -9px);
+    opacity: 1;
+  }
+  to {
+    transform: translate(22px, -4px) scale(0.6);
+    opacity: 0;
+  }
+}
+@keyframes tone-cover-drop {
+  to {
+    transform: translate(-12px, 9px) scale(0.6);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tone-cover-top {
+    animation: none;
+  }
+  .tone-cover.is-leaving {
+    display: none;
+  }
+}
+
+/* A written word is as wide as its letters, so its size follows their count. */
+#app[data-world='tone'] .word-prompt[data-letters] .prompt-character {
+  font-size: clamp(
+    13px,
+    calc((min(600px, 100vw - 176px) - var(--syllables) * 24px) / var(--letters) / 0.58),
+    38px
+  );
+}
+#app[data-world='tone'] .word-prompt[data-letters] .prompt-syllable {
+  min-width: 0;
+  flex-shrink: 0;
+  padding-inline: 10px;
+}
+/* A syllable never breaks around its covered letter. */
+.word-prompt[data-letters] .prompt-character {
+  white-space: nowrap;
+}
+#app[data-world='tone'] .word-prompt[data-letters] .prompt-romanization {
+  font-size: 14px;
+  min-height: 20px;
+  white-space: nowrap;
+}
+.prompt-romanization.is-reserved {
+  visibility: hidden;
+}
+@media (max-width: 700px) {
+  #app[data-world='tone'] .word-prompt[data-letters] .prompt-syllable {
+    padding-inline: 5px;
+  }
+  #app[data-world='tone'] .word-prompt[data-letters][data-long] .prompt-syllable {
+    padding-inline: 2px;
+  }
+  #app[data-world='tone'] .word-prompt[data-letters] .prompt-character {
+    font-size: clamp(
+      11px,
+      calc((100vw - 186px - var(--syllables) * 14px) / var(--letters) / 0.58),
+      34px
+    );
+  }
+  #app[data-world='tone'] .word-prompt[data-letters] .prompt-romanization {
+    font-size: 11px;
+    min-height: 16px;
+  }
+}
+@media (max-height: 540px) and (min-width: 560px) {
+  #app[data-world='tone'] .word-prompt[data-letters] .prompt-character {
+    font-size: clamp(13px, calc((380px - var(--syllables) * 24px) / var(--letters) / 0.58), 25px);
+  }
+  .prompt-syllable.has-tone-cover {
+    padding-top: 26px;
+  }
+}

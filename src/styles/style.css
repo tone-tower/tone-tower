@@ -2238,7 +2238,7 @@ input[type='number'] {
 }
 .language-cards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 1.4rem;
   margin: 2.5rem 0;
 }
@@ -2323,6 +2323,72 @@ html[data-language='cmn'] .home-intro h1 {
   min-width: 36px;
   min-height: 36px;
   font-size: 0.85rem;
+}
+/* Vietnamese letters are missing from the interface font; keep each word in one typeface. */
+[lang='vi'],
+html[data-language='vi']
+  :is(
+    .tone-name,
+    .prompt-romanization,
+    #tower-message,
+    .syllable-parts b,
+    .syllable-result small,
+    .practice-tone-options,
+    .result-word,
+    .last-word,
+    .ending-word,
+    .credits-table td:first-child
+  ) {
+  font-family: 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+}
+.language-card--vietnamese {
+  border-color: #c9a85f;
+  background: #3a3527;
+  box-shadow: 0 10px 0 #262318;
+}
+html[data-language='vi'] .primary {
+  background: #a9792c;
+  color: #fff8ec;
+}
+html[data-language='vi'] .site-header {
+  border-bottom-color: #c9a85f;
+}
+html[data-language='vi'] .home-intro h1 {
+  color: #e4c27a;
+}
+/* A written tone mark: on a door, in the guide and in practice settings. */
+.tone-mark {
+  display: block;
+  width: 1.35em;
+  height: 1.35em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tone-mark.is-blank {
+  stroke-width: 3;
+  opacity: 0.7;
+}
+.guide-tone .tone-mark,
+.practice-tone-options .tone-mark {
+  width: 34px;
+  height: 34px;
+  stroke-width: 5;
+}
+.guide-tone .tone-mark.is-blank,
+.practice-tone-options .tone-mark.is-blank {
+  stroke-width: 3;
+}
+.guide-tones--marks .guide-tone strong {
+  font-size: 15px;
+}
+.guide-tones--marks .guide-tone mark {
+  background: none;
+  color: var(--cream);
+  font-size: 17px;
+  font-weight: 700;
 }
 @media (max-width: 600px) {
   .language-welcome {

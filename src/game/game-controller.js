@@ -1,5 +1,6 @@
 import { recordingIssueUrl } from '../ui/recording-report.js';
-import { requireProfile } from '../languages/profiles.js';
+import { requireProfile, toneText } from '../languages/profiles.js';
+import { toneCoverMarkup, toneMarkMarkup } from '../ui/tone-marks.js';
 import { createRun, challenges } from './game-core.js';
 import { worldScene, districts, doorSlots } from '../world/worlds.js';
 import { animateWorld } from '../world/world-runtime.js';
@@ -125,6 +126,11 @@ export function createGameController({
     sceneAnimator = null,
     entryVisual = false;
   const boundTyping = new WeakSet();
+  // The cover leaves once, on the render that reveals the answer.
+  let unveiling = false;
+  const numbered = profile.tones.every((t) => typeof t === 'number');
+  const definition = (tone) => profile.toneDefinitions.find((def) => def.value === tone);
+  const said = (tone) => toneText(profile, tone);
   const q = (selector) => app.querySelector(selector);
   const qa = (selector) => Array.from(app.querySelectorAll(selector));
   const isTide = () => run?.config.challenge === 'tide';
@@ -245,7 +251,9 @@ export function createGameController({
         : run.targets.length === 1
           ? 'Type the highlighted syllable.'
           : 'Type the whole word.'
-      : 'Listen to the highlighted syllable and choose its tone number.';
+      : 'Listen to the highlighted syllable and choose its ' +
+          (numbered ? 'tone number' : 'tone') +
+          '.';
   }
   function progressMarkup() {
     const drill = run.config.practice && run.config.format === 'drill',
@@ -287,35 +295,70 @@ export function createGameController({
       '</span>'
     );
   }
+  function concealedMarkup(text, index, reveal) {
+    const letters = [...text],
+      plain = profile.withoutTones(letters[index]);
+    return (
+      escape(letters.slice(0, index).join('')) +
+      // The cover clears a hat, a horn or the dot of an i, and the tail of a y.
+      '<span class="tone-carrier' +
+      ('ăâêôi'.includes(plain) ? ' is-tall' : 'ơư'.includes(plain) ? ' is-horned' : '') +
+      (plain === 'y' ? ' is-deep' : '') +
+      '">' +
+      escape(letters[index]) +
+      (!reveal || unveiling ? toneCoverMarkup(reveal) : '') +
+      '</span>' +
+      escape(letters.slice(index + 1).join(''))
+    );
+  }
   function promptMarkup(reveal = false) {
+    // Every syllable of a word hides its tone, so its neighbours give nothing away.
+    const concealed = (i) =>
+      isTide() ? null : (profile.concealTone?.(run.word.syllables[i].text) ?? null);
+    const covered = run.word.syllables.some((_, i) => concealed(i));
+    // A written word is as wide as its letters; its size follows their count.
+    const letters = run.word.syllables.reduce((n, s) => n + [...s.text].length, 0);
+    // The longest tone name holds the answer's place, so revealing it moves nothing.
+    const reserved = profile.toneDefinitions
+      .map((def) => def.label)
+      .reduce((a, b) => (b.length > a.length ? b : a));
     return /* HTML */ `<div
       class="word-prompt"
       data-length="${run.word.syllables.length}"
       ${run.word.syllables.length >= 4 ? 'data-long="true"' : ''}
-      style="--syllables:${run.word.syllables.length}"
+      ${covered ? 'data-letters="' + letters + '"' : ''}
+      style="--syllables:${run.word.syllables.length}${covered ? ';--letters:' + letters : ''}"
     >
       <div class="prompt-syllables">
         ${run.word.syllables
           .map((s, i) => {
             const target = run.targets.includes(i),
-              spelling = reveal
-                ? profile.format(s.transcription)
-                : !isTide()
-                  ? profile.withoutTones(s.transcription)
-                  : '';
-            return /* HTML */ `<span class="prompt-syllable ${target ? 'is-target' : ''}"
+              hidden = concealed(i),
+              spelling = hidden
+                ? target && reveal
+                  ? definition(s.tone).label
+                  : ''
+                : reveal
+                  ? profile.format(s.transcription)
+                  : !isTide()
+                    ? profile.withoutTones(s.transcription)
+                    : '';
+            return /* HTML */ `<span
+              class="prompt-syllable ${target ? 'is-target' : ''} ${hidden ? 'has-tone-cover' : ''}"
               >${target && run.targets.length === 1 ? '<span class="target-label">Listen here</span>' : ''}<span
                 class="prompt-character"
-                >${escape(s.text)}</span
-              ><span class="prompt-romanization"
-                >${spelling ? escape(spelling) : '&nbsp;'}</span
+                >${hidden ? concealedMarkup(reveal ? s.text : hidden.base, hidden.index, reveal) : escape(s.text)}</span
+              ><span
+                class="prompt-romanization ${hidden && target && !reveal ? 'is-reserved' : ''}"
+                ${hidden && target && !reveal ? 'aria-hidden="true"' : ''}
+                >${spelling ? escape(spelling) : hidden && target ? escape(reserved) : '&nbsp;'}</span
               ></span
             >`;
           })
           .join('')}
       </div>
       ${reveal && run.word.syllables.some((s) => s.dictionaryTone !== undefined && s.dictionaryTone !== s.tone) ? '<p class="tone-explanation">Heard tones: ' + escape(run.word.syllables.map((s) => profile.toneDefinitions.find((d) => d.value === s.tone)?.label).join(' · ')) + '. Dictionary spelling: ' + escape(profile.format(run.word.transcription || run.word.syllables.map((s) => s.transcription).join(' '))) + '. Tone Tower follows this recording; Skyrail uses dictionary spelling.</p>' : ''}
-      <p class="prompt-gloss">${escape(run.word.gloss)}</p>
+      <p class="prompt-gloss">${run.word.gloss ? escape(run.word.gloss) : '&nbsp;'}</p>
     </div>`;
   }
   function toneButtons() {
@@ -325,19 +368,19 @@ export function createGameController({
           /* HTML */ `<button
             style="${doorSlots(run.choices.length).map(([x, y, w, h]) => `left:${x / 4.8}%;top:${y / 2.4}%;width:${w / 4.8}%;height:${h / 2.4}%`)[index]}"
             type="button"
-            class="tone-door ${(phase === 'correct' || phase === 'landing') && t === run.word.tone ? 'is-correct' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
-            data-tone="${t}"
-            aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: tone ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: tone ' : 'Choose tone '}${t}"
+            class="tone-door ${definition(t).mark === undefined ? '' : 'has-mark'} ${(phase === 'correct' || phase === 'landing') && t === run.word.tone ? 'is-correct' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
+            data-tone="${escape(t)}"
+            aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: ' : 'Choose '}${escape(said(t))}"
             ${!answering() ? 'disabled' : ''}
           >
             ${phase === 'review' && t === run.word.tone ? '<span class="answer-mark" aria-hidden="true">✓</span>' : ''}<span
               class="tone-number"
-              >${t}</span
+              >${definition(t).mark === undefined ? t : toneMarkMarkup(definition(t))}</span
             >${run.config.practice ? '<svg class="practice-tone-contour" viewBox="0 0 100 36" aria-hidden="true"><path d="' + profile.toneDefinitions.find((def) => def.value === t).path + '"/></svg>' : ''}<span
               class="tone-name"
               >${phase === 'review' && t === run.lastAnswer ? '✕ Your choice' : phase === 'review' && t === run.word.tone ? 'CORRECT' : escape(profile.toneDefinitions.find((def) => def.value === t).label)}</span
             ><kbd class="door-key"
-              >${run.choices.length === 2 ? (run.choices.indexOf(t) === 0 ? '←' : '→') : run.choices.length === 3 ? ['←', '↑ ↓', '→'][run.choices.indexOf(t)] : run.choices.length === 4 ? ['↑', '←', '→', '↓'][run.choices.indexOf(t)] : t}</kbd
+              >${run.choices.length === 2 ? (run.choices.indexOf(t) === 0 ? '←' : '→') : run.choices.length === 3 ? ['←', '↑ ↓', '→'][run.choices.indexOf(t)] : run.choices.length === 4 ? ['↑', '←', '→', '↓'][run.choices.indexOf(t)] : profile.tones.indexOf(t) + 1}</kbd
             >
           </button>`,
       )
@@ -485,7 +528,11 @@ export function createGameController({
       '</p>' +
       (!won
         ? '<p class="ending-word">' +
-          escape(run.word.syllables.map((s) => s.text + ' ' + s.transcription).join(' · ')) +
+          escape(
+            run.word.syllables.every((s) => s.text === s.transcription)
+              ? run.word.syllables.map((s) => s.text).join(' ')
+              : run.word.syllables.map((s) => s.text + ' ' + s.transcription).join(' · '),
+          ) +
           ' <button class="text-button" id="ending-replay" type="button">▶ Listen again <kbd>Space</kbd></button></p>'
         : '') +
       '<div class="results-actions"><button class="primary" id="retry-run" type="button" ' +
@@ -601,15 +648,17 @@ export function createGameController({
         ? run.status === 'won'
           ? '✓ The last door opens. The summit is waiting.'
           : run.status === 'lost'
-            ? 'No lives remain. The correct tone is ' + run.word.tone + '.'
+            ? 'No lives remain. The correct tone is ' +
+              (numbered ? run.word.tone : said(run.word.tone)) +
+              '.'
             : '✓ Practice complete.'
         : review
           ? 'Not quite' +
             (run.lives === null ? '' : ' — 1 life lost') +
-            '. Tone ' +
-            run.lastAnswer +
-            ' → tone ' +
-            run.word.tone +
+            '. ' +
+            said(run.lastAnswer).replace(/^./, (first) => first.toUpperCase()) +
+            ' → ' +
+            said(run.word.tone) +
             '. The bright door is the correct tone.'
           : landing
             ? run.opened + ' floors lit · A rest landing. ' + next.name + ' is next.' + restored
@@ -790,7 +839,7 @@ export function createGameController({
         </p>
         <div id="audio-error" class="error" role="alert"></div>
         <p class="small keyboard">
-          ${isTide() ? (run.config.practice ? 'Enter checks spelling · Space / R replays' : 'Enter builds · Space / R replays') : (run.choices.length <= 4 ? 'Arrow keys choose · ' : '') + profile.tones.join(' / ') + ' choose a tone · Space / R replays'}
+          ${isTide() ? (run.config.practice ? 'Enter checks spelling · Space / R replays' : 'Enter builds · Space / R replays') : (run.choices.length <= 4 ? 'Arrow keys choose · ' : '') + profile.tones.map((_, i) => i + 1).join(' / ') + ' choose a tone · Space / R replays'}
           · Esc pauses${['review', 'landing'].includes(phase) ? ' · Enter continues' : ''}
         </p>
       </div>
@@ -1011,7 +1060,9 @@ export function createGameController({
       const error = q('#audio-error');
       if (error) error.textContent = '';
       if (status)
-        status.textContent = isTide() ? 'Type your answer.' : 'Choose the tone number you heard.';
+        status.textContent = isTide()
+          ? 'Type your answer.'
+          : 'Choose the ' + (numbered ? 'tone number' : 'tone') + ' you heard.';
       const instructionNode = q('.game-instruction');
       if (instructionNode) instructionNode.textContent = instruction();
       if (isTide()) setRailNotice(message || instruction(), message ? 'retry' : 'neutral');
@@ -1141,7 +1192,9 @@ export function createGameController({
     outcome = result;
     phase = result.correct ? (result.landing ? 'landing' : 'correct') : 'review';
     towerReady = !towerStop();
+    unveiling = true;
     render();
+    unveiling = false;
     if (terminal()) onFinish(run);
     if (towerStop()) unlockTowerStop();
     else if (result.correct && phase === 'correct') scheduleAdvance();
@@ -1168,7 +1221,9 @@ export function createGameController({
     message = '';
     phase = 'review';
     towerReady = !towerStop();
+    unveiling = true;
     render();
+    unveiling = false;
     if (terminal()) onFinish(run);
     if (towerStop()) unlockTowerStop();
   }
@@ -1313,9 +1368,11 @@ export function createGameController({
       return;
     }
     if (!isTide() && answering()) {
-      if (profile.tones.some((t) => String(t) === event.key)) {
+      // Number keys follow the profile's tone order, whether tones are numbered or named.
+      const keyed = /^[1-9]$/.test(event.key) ? profile.tones[Number(event.key) - 1] : undefined;
+      if (keyed !== undefined) {
         event.preventDefault();
-        choose(profile.tones.find((t) => String(t) === event.key));
+        choose(keyed);
       } else {
         const index = arrowChoiceIndex(run.choices.length, event.key);
         if (index !== null) {
