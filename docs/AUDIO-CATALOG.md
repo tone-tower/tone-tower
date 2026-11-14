@@ -12,7 +12,7 @@ players can report recording problems through prefilled GitHub issue links; sour
   existing words or changing their IDs.
 - `data/audio/corrections.json`: our manual corrections. The downloader never writes it.
   Commit it. Every correction requires a reason.
-- `catalogs/yue.json` and `catalogs/cmn.json`: generated common browser catalogs with
+- `catalogs/yue.json`, `catalogs/cmn.json` and `catalogs/vi.json`: generated common browser catalogs with
   separate entries, pronunciations, recordings, and tone references. Do not edit it; it is ignored by Git.
 - `dist/`: generated website ready to publish. Do not edit it; rebuilding replaces it.
 

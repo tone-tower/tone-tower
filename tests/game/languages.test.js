@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cantonese, mandarin } from '../../src/languages/profiles.js';
+import { cantonese, mandarin, vietnamese, toneText } from '../../src/languages/profiles.js';
+import { splitTone, toneCarrier } from '../../src/languages/vietnamese.js';
 import { parsePinyin, formatPinyin, pinyinSpelling } from '../../src/languages/pinyin.js';
 import { createRun, defaultPractice, validatePractice } from '../../src/game/game-core.js';
 import { catalogRows, referenceRows } from '../../src/content/catalog.js';
@@ -231,4 +232,105 @@ test('tone exercises skip ineligible targets without losing their spelling pract
     { profile: mandarin },
   );
   assert.equal(spelling.answer('wo3 hen3 hao3').correct, true);
+});
+
+test('Vietnamese spelling separates the tone from the letters and finds the marked vowel', () => {
+  for (const [written, base, tone, carrier] of [
+    ['được', 'đươc', 'nặng', 'ơ'],
+    ['ma', 'ma', 'ngang', 'a'],
+    ['quyển', 'quyên', 'hỏi', 'ê'],
+    ['quả', 'qua', 'hỏi', 'a'],
+    ['gì', 'gi', 'huyền', 'i'],
+    ['giữa', 'giưa', 'ngã', 'ư'],
+    ['hòa', 'hoa', 'huyền', 'o'],
+    ['thủy', 'thuy', 'hỏi', 'u'],
+    ['toán', 'toan', 'sắc', 'a'],
+    ['ngoài', 'ngoai', 'huyền', 'a'],
+    ['người', 'ngươi', 'huyền', 'ơ'],
+    ['ĐƯỢC', 'đươc', 'nặng', 'ơ'],
+  ]) {
+    assert.deepEqual(splitTone(written), { base, tone }, written);
+    assert.equal([...base][toneCarrier(base)], carrier, written);
+    assert.equal(vietnamese.withoutTones(written), base);
+  }
+  // Decomposed input and the toneless spelling point at the same letter as the marked word.
+  assert.deepEqual(vietnamese.concealTone('được'.normalize('NFD')), { base: 'đươc', index: 2 });
+  assert.deepEqual(vietnamese.concealTone('đươc'), vietnamese.concealTone('được'));
+  for (const invalid of ['', 'ma1', 'mạ́', 'xin chào'])
+    assert.equal(vietnamese.concealTone(invalid), null);
+  assert.equal(vietnamese.evaluate('Được', ['được'], true), true);
+  assert.equal(vietnamese.evaluate('đươc', ['được'], true), false);
+  assert.equal(vietnamese.evaluate('đươc', ['được']), true);
+  assert.equal(vietnamese.evaluate('', ['được']), null);
+  assert.equal(toneText(vietnamese, 'ngang'), 'không dấu');
+  assert.equal(toneText(cantonese, 3), 'tone 3');
+});
+
+function vietnameseWords() {
+  return Array.from({ length: 180 }, (_, i) => {
+    const parts = [['má', 'mà', 'mả', 'mã', 'mạ', 'ma'][i % 6], ['mơ', 'mờ', 'mở'][i % 3]];
+    return {
+      id: 'vi-' + i,
+      pronunciationId: 'reading-' + i,
+      text: parts.join(' '),
+      audio: 'fixture.mp3',
+      syllables: parts.map((text) => ({ text, transcription: text, tone: splitTone(text).tone })),
+    };
+  });
+}
+test('a Vietnamese climb uses named tones, two to six doors, and offers only the tower', () => {
+  const run = createRun({ challenge: 'tone' }, vietnameseWords(), {
+    profile: vietnamese,
+    random: () => 0.31,
+  });
+  for (let i = 0; i < 100; i++) {
+    assert.equal(run.choices.length, [2, 3, 4, 6, 6][Math.floor(i / 20)]);
+    assert.ok(run.choices.every((tone) => vietnamese.tones.includes(tone)));
+    assert.equal(run.word.syllables.length, 2);
+    assert.equal(run.word.tone, splitTone(run.word.syllables[run.targets[0]].text).tone);
+    if (run.choices.length > 2)
+      assert.deepEqual(
+        run.choices,
+        vietnamese.tones.filter((tone) => run.choices.includes(tone)),
+      );
+    assert.equal(run.answer(run.word.tone).correct, true);
+    if (i < 99) run.next();
+  }
+  assert.equal(run.status, 'won');
+  assert.throws(
+    () => createRun({ challenge: 'tide' }, vietnameseWords(), { profile: vietnamese }),
+    /Choose a challenge/,
+  );
+  // Practice draws on the same whole words as the climb.
+  assert.equal(defaultPractice('tone', vietnamese).content, 'mixed');
+  assert.equal(
+    validatePractice(defaultPractice('tone', vietnamese), vietnameseWords(), vietnamese).valid,
+    true,
+  );
+  assert.deepEqual(
+    vietnamese.toneDefinitions.map((tone) => tone.value),
+    vietnamese.tones,
+  );
+  // Five tones have a written mark; the level tone shows an empty slot.
+  assert.deepEqual(
+    vietnamese.toneDefinitions.map((tone) => Boolean(tone.mark)),
+    [true, true, true, true, true, false],
+  );
+});
+
+test('Vietnamese records keep named tone confusions apart from other languages', () => {
+  const data = new Map(),
+    storage = { getItem: (key) => data.get(key), setItem: (key, value) => data.set(key, value) };
+  const run = createRun(
+    { ...defaultPractice('tone', vietnamese), tones: ['hỏi', 'ngã'] },
+    vietnameseWords(),
+    { profile: vietnamese, random: () => 0 },
+  );
+  run.answer(run.choices.find((tone) => tone !== run.word.tone));
+  const progress = emptyProgress(vietnamese);
+  Object.assign(progress.confusions, run.confusions, { '2-5': 4 });
+  saveProgress(vietnamese, progress, storage);
+  assert.deepEqual(loadProgress(vietnamese, storage).confusions, { '["hỏi","ngã"]': 1 });
+  assert.deepEqual(loadProgress(cantonese, storage).confusions, {});
+  assert.equal(loadProgress(vietnamese, storage).settings.script, 'latin');
 });

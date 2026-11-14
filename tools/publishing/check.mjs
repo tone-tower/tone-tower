@@ -19,7 +19,7 @@ async function listFiles(root, prefix = '') {
 export async function checkDistribution(root = path.resolve('dist')) {
   const catalogs = Object.fromEntries(
     await Promise.all(
-      ['yue', 'cmn'].map(async (id) => [
+      ['yue', 'cmn', 'vi'].map(async (id) => [
         id,
         JSON.parse(await readFile(path.join(root, 'catalogs', id + '.json'), 'utf8')),
       ]),

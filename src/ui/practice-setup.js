@@ -1,4 +1,5 @@
-import { requireProfile } from '../languages/profiles.js';
+import { requireProfile, toneText } from '../languages/profiles.js';
+import { toneMarkMarkup } from './tone-marks.js';
 
 export function practiceSetupMarkup(config, profile) {
   requireProfile(profile);
@@ -29,11 +30,19 @@ export function practiceSetupMarkup(config, profile) {
                       /* HTML */ `<button
                         type="button"
                         data-practice-tone="${t}"
-                        aria-label="Tone ${t}"
+                        aria-label="${toneText(profile, t).replace(/^./, (c) => c.toUpperCase())}"
                         aria-pressed="${config.tones.includes(t)}"
                         ${config.tones.length === 2 && config.tones.includes(t) ? 'disabled' : ''}
                       >
-                        <span>${t}</span
+                        <span
+                          >${
+                            profile.toneDefinitions.find((def) => def.value === t).mark ===
+                            undefined
+                              ? t
+                              : toneMarkMarkup(
+                                  profile.toneDefinitions.find((def) => def.value === t),
+                                )
+                          }</span
                         ><svg viewBox="0 0 100 36" aria-hidden="true">
                           <path
                             d="${profile.toneDefinitions.find((def) => def.value === t).path}"

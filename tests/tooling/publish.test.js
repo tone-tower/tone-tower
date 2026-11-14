@@ -98,6 +98,7 @@ test('publication follows runtime dependencies, includes credits, and excludes l
   const catalogs = {
     yue: catalog,
     cmn: JSON.parse(await readFile(path.join(root, 'dist/catalogs/cmn.json'), 'utf8')),
+    vi: JSON.parse(await readFile(path.join(root, 'dist/catalogs/vi.json'), 'utf8')),
   };
   assert.ok(!files.includes('audio/cmn/unreviewed.mp3'));
   assert.ok(!files.includes('src/shell.html'));

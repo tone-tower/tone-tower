@@ -123,7 +123,7 @@ References: [Pages setup](https://docs.github.com/en/pages/getting-started-with-
 
 ## Public identity, sharing and feedback
 
-The build emits real directory pages under `/cantonese/` and `/mandarin/`, each with
+The build emits real directory pages under `/cantonese/`, `/mandarin/` and `/vietnamese/`, each with
 its own title, description, canonical URL and Open Graph / social card metadata.
 GitHub Pages can serve these directly; no rewrite or 404 redirect is needed.
 The guide and About content are included in the initial HTML for crawlers.

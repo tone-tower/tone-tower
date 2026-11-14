@@ -3,10 +3,13 @@ import {
   compactGuideMarkup as cantoneseCompact,
 } from '../languages/cantonese-guide.js';
 import { mandarinGuide } from '../languages/mandarin-guide.js';
+import { vietnameseGuide } from '../languages/vietnamese-guide.js';
+import { guideName } from '../languages/profiles.js';
 import { site } from '../site.js';
 const guides = {
   yue: { full: cantoneseGuide, compact: cantoneseCompact },
   cmn: { full: (a, d) => mandarinGuide(a, d), compact: (a, d) => mandarinGuide(a, d, true) },
+  vi: { full: (a, d) => vietnameseGuide(a, d), compact: (a, d) => vietnameseGuide(a, d, true) },
 };
 export function soundPageMarkup(anchors, definitions, rows, profile) {
   return guides[profile.id].full(anchors, definitions, rows);
@@ -23,28 +26,51 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
     Number.isSafeInteger(recordingCount) && recordingCount > 0
       ? recordingCount.toLocaleString('en') + ' '
       : '';
+  // A language without Skyrail practises tones only.
+  const spelling = profile.challenges.includes('tide');
+  const guideLink = /* HTML */ `<button
+    class="text-button inline-link"
+    data-page="sounds"
+    type="button"
+  >
+    ${guideName(profile)}
+  </button>`;
   return /* HTML */ `<article class="info-page about-page">
     <header class="page-heading">
       <button class="text-button back-link" data-page="home" type="button">← World map</button>
       <h1 tabindex="-1">About Tone Tower</h1>
-      <p class="lead">Tone Tower is a browser game for practising ${profile.romanization}.</p>
+      <p class="lead">
+        Tone Tower is a browser game for practising
+        ${spelling ? profile.romanization : profile.label + ' tones'}.
+      </p>
     </header>
     <section class="info-section" aria-labelledby="purpose-heading">
       <h2 id="purpose-heading">What you can practise</h2>
-      <p>
-        The exercises connect ${profile.label} pronunciation with its written representation in
-        ${profile.romanization}. You listen to a recording, then identify a tone or type the sounds
-        you hear. Answers advance you through a tower or a railway, depending on the game.
-      </p>
-      <p>
-        The games are suitable for learners of ${profile.label} and for ${profile.label} speakers
-        learning ${profile.romanization}. You can play using the pronunciation spelling before you
-        can read the written words. The
-        <button class="text-button inline-link" data-page="sounds" type="button">
-          ${profile.romanization} guide
-        </button>
-        explains the notation and includes examples of the ${toneDescription}.
-      </p>
+      ${
+        spelling
+          ? /* HTML */ `<p>
+                The exercises connect ${profile.label} pronunciation with its written representation
+                in ${profile.romanization}. You listen to a recording, then identify a tone or type
+                the sounds you hear. Answers advance you through a tower or a railway, depending on
+                the game.
+              </p>
+              <p>
+                The games are suitable for learners of ${profile.label} and for ${profile.label}
+                speakers learning ${profile.romanization}. You can play using the pronunciation
+                spelling before you can read the written words. The ${guideLink} explains the
+                notation and includes examples of the ${toneDescription}.
+              </p>`
+          : /* HTML */ `<p>
+                The exercises train your ear for the ${toneDescription} of ${profile.label}. You
+                listen to a recording, then choose the tone you heard. Each correct answer takes you
+                one floor up the tower.
+              </p>
+              <p>
+                The game is suitable for learners of ${profile.label} at any level: you do not need
+                to know the words. The ${guideLink} explains how the tones are written and includes
+                an example of each.
+              </p>`
+      }
       <p>
         The exercises supplement pronunciation study. If you are learning the sounds for the first
         time, start with ${learningResources}.
@@ -63,27 +89,33 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
             Choose Tower difficulty →
           </button>
         </div>
-        <div class="info-card">
-          <h3>Skyrail</h3>
-          <p>
-            Type the recording’s ${profile.romanization} within the time limit to build the track.
-            Spelling practises initials and finals; With tones also requires
-            ${profile.usesToneMarks ? 'tone marks or tone numbers' : 'tone numbers'}.
-          </p>
-          <button class="text-button" data-start-world="tide" type="button">
-            Choose Skyrail settings →
-          </button>
-        </div>
+        ${
+          spelling
+            ? /* HTML */ `<div class="info-card">
+                <h3>Skyrail</h3>
+                <p>
+                  Type the recording’s ${profile.romanization} within the time limit to build the
+                  track. Spelling practises initials and finals; With tones also requires
+                  ${profile.usesToneMarks ? 'tone marks or tone numbers' : 'tone numbers'}.
+                </p>
+                <button class="text-button" data-start-world="tide" type="button">
+                  Choose Skyrail settings →
+                </button>
+              </div>`
+            : ''
+        }
       </div>
       <p>
         For focused exercises without a timer or lives, use
         <button class="text-button inline-link" data-info-action="practice" type="button">
           Practice</button
-        >. Choose a tone pair or work on initials, finals and spelling. Practice results stay
-        separate from adventure records.
+        >. Choose a tone pair
+        ${spelling ? 'or work on initials, finals and spelling' : 'or a larger set of tones'}.
+        Practice results stay separate from adventure records.
       </p>
       <p class="small">
-        Tone Tower trains listening recognition and ${profile.romanization} spelling. It does not
+        Tone Tower trains listening
+        recognition${spelling ? ' and ' + profile.romanization + ' spelling' : ''}. It does not
         assess your spoken pronunciation. Use it alongside conversation, vocabulary and a fuller
         ${profile.label} course.
       </p>
@@ -92,9 +124,15 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
       ${availability?.mode === 'beta' ? '<p class="beta-source-note">Mandarin is in beta. Source labels and dictionary readings provide the starting content; reported problems can be corrected without replacing the original recordings.</p>' : ''}
       <h2 id="recordings-heading">Recordings and sources</h2>
       <p>
-        The ${count}recordings are human speech from Wikimedia Commons, each with its own source,
-        creator and licence. Readings and English meanings include credited dictionary sources such
-        as ${profile.dictionarySources.map((source) => source.name).join(' and ')}.
+        ${
+          profile.copy?.recordings
+            ? 'The ' + count + profile.copy.recordings
+            : 'The ' +
+              count +
+              'recordings are human speech from Wikimedia Commons, each with its own source, creator and licence. Readings and English meanings include credited dictionary sources such as ' +
+              profile.dictionarySources.map((source) => source.name).join(' and ') +
+              '.'
+        }
       </p>
       <p>
         Pronunciation can vary between speakers and regions. Dictionary readings and the included
@@ -129,7 +167,8 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
       <h2 id="feedback-heading">Help make it better</h2>
       <p>
         Found a bug, heard a recording that seems wrong, or have an idea? Share it on GitHub. For a
-        recording issue, include the written word and ${profile.romanization} so it is easy to find.
+        recording issue, include the written word${spelling ? ' and ' + profile.romanization : ''}
+        so it is easy to find.
       </p>
       <div class="feedback-links">
         <a
@@ -155,9 +194,7 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
     </section>
     <div class="info-actions">
       <button class="primary" data-page="home" type="button">Go to the games →</button
-      ><button class="text-button" data-page="sounds" type="button">
-        ${profile.romanization} guide
-      </button>
+      ><button class="text-button" data-page="sounds" type="button">${guideName(profile)}</button>
     </div>
   </article>`;
 }

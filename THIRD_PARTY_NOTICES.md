@@ -27,6 +27,16 @@ Accepted licences are CC0 1.0, CC BY 4.0 and CC BY-SA 4.0, as identified for eac
 recording. Share-alike audio derivatives retain their indicated licence. The
 publication build includes only the clips referenced in its playable catalog; the application's MIT licence does not replace audio licences.
 
+## Synthetic speech recordings
+
+The Vietnamese word recordings in audio/vi/ are synthetic speech. No person
+recorded them: each clip was generated with ElevenLabs (model Eleven v4) using the
+voice named in data/content/vi/words.json, and is published unchanged. That file
+lists every clip with its size and SHA-256 hash. The game's Voices & credits dialog
+and About page identify these clips as synthetic. The Vietnamese word list, its
+frequency ranks and its English meanings were supplied with the recordings by the
+contributor who generated them.
+
 ## Dictionary readings and meanings
 
 Readings and English glosses include adaptations from:
