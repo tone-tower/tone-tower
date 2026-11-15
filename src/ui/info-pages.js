@@ -154,8 +154,8 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
         browser storage removes them; closing or reloading the page ends the current run.
       </p>
       <p>
-        Your best tower climb lights its windows at home. Each completed difficulty adds a flower
-        display, a cat, an ornament or a dragon. Decorations
+        Your best tower climb lights its windows at home. Each completed difficulty adds a butterfly
+        garden, a roaming cat, a banner, a moon heron or a dragon. Decorations
         accumulate${spelling ? ', and either Skyrail answer style earns its difficulty’s reward' : ''}.
       </p>
       <button class="text-button section-link" data-info-action="reset" type="button">

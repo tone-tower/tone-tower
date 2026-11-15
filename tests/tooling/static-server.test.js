@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { serveSite } from '../../tools/publishing/vite.mjs';
 import { createStaticServer } from '../../tools/server/static-server.mjs';
 
 test('preview serves only its configured project path and returns real asset failures', async (t) => {
@@ -43,4 +44,47 @@ test('preview serves only its configured project path and returns real asset fai
     () => createStaticServer({ root, base: '/missing-trailing-slash' }),
     /Base must/,
   );
+});
+
+test('development chooser serves and reloads the current source without restarting', async (t) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'tone-tower-server-'));
+  t.after(async () => {
+    if (path.dirname(root) !== tmpdir() || !path.basename(root).startsWith('tone-tower-server-'))
+      throw Error('Unsafe cleanup');
+    await rm(root, { recursive: true, force: true });
+  });
+  await mkdir(path.join(root, 'src'), { recursive: true });
+  await mkdir(path.join(root, 'assets/brand'), { recursive: true });
+  await writeFile(path.join(root, 'src/shell.html'), '<html><body>{{language}}</body></html>');
+  await writeFile(path.join(root, 'favicon.ico'), 'fixture');
+  await writeFile(
+    path.join(root, 'index.html'),
+    '<html><head><link rel="icon" href="favicon.ico"></head><body><h1>Old chooser</h1></body></html>',
+  );
+  const server = await serveSite(root, {}, 0);
+  t.after(() => server.close());
+  const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
+  assert.match(await (await fetch(origin + '/')).text(), /Old chooser/);
+  const reloaded = new Promise((resolve) => {
+    const send = server.ws.send.bind(server.ws);
+    server.ws.send = (payload, ...args) => {
+      if (payload?.type === 'full-reload') resolve();
+      return send(payload, ...args);
+    };
+  });
+  await writeFile(
+    path.join(root, 'index.html'),
+    '<html><head><link rel="icon" href="favicon.ico"></head><body><h1>Choose a language</h1><p>Mandarin, Cantonese, Vietnamese</p></body></html>',
+  );
+  for (const route of ['/', '/index.html']) {
+    const html = await (await fetch(origin + route)).text();
+    assert.match(html, /Choose a language/);
+    assert.match(html, /Mandarin, Cantonese, Vietnamese/);
+    assert.match(html, /href="\/favicon.ico"/);
+    assert.doesNotMatch(html, /Old chooser/);
+  }
+  await reloaded;
+  const head = await fetch(origin + '/', { method: 'HEAD' });
+  assert.match(head.headers.get('content-type'), /^text\/html/);
+  assert.equal(await head.text(), '');
 });

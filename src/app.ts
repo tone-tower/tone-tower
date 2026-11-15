@@ -35,7 +35,7 @@ import { soundPageMarkup, aboutPageMarkup, compactGuideMarkup } from './ui/info-
 import { bindMapNavigation } from './ui/map-navigation.js';
 import { bindLanguageSwitcher } from './ui/site-controls.ts';
 import { textLanguage } from './languages/text-language.ts';
-import { homeRewards, homeDifficulties, rewardNames } from './ui/home-rewards.ts';
+import { homeRewards, homeDifficulties, rewardNames, friendDialogue } from './ui/home-rewards.ts';
 
 const profile = requireProfile(languages[document.documentElement.dataset.language ?? '']);
 const pages = languagePages(profile);
@@ -196,6 +196,17 @@ function home(world?: Challenge, initialPractice = false) {
   progress = loadProgress(profile);
   const rewards = homeRewards(progress);
   app.innerHTML = /* HTML */ ` ${catalog?.availability?.ready === false ? '<aside class="content-preview" role="status"><strong>' + escape(profile.label) + ' is taking shape.</strong><p>We’re gathering enough recordings to open the games. Explore the ' + escape(profile.romanization) + ' guide while the collection grows.</p></aside>' : ''}
+    <section class="home-intro" aria-label="Introduction">
+      <p class="home-intro-title">
+        Practice
+        ${profile.challenges.includes('tide') ? profile.romanization : profile.label + ' tones'}
+      </p>
+      <a class="home-guide-link" href="${pages.sounds.path}" data-page="sounds"
+        >New to
+        ${profile.challenges.includes('tide') ? profile.romanization : profile.label + ' tones'}?
+        →</a
+      >
+    </section>
     <section class="mode-picker" aria-labelledby="mode-heading">
       <div class="mode-picker-heading">
         <h1 id="mode-heading" tabindex="-1">
@@ -240,16 +251,13 @@ function home(world?: Challenge, initialPractice = false) {
             height="400"
             aria-label="Tone Tower and Skyrail above the clouds"
           ></canvas>
-          <div class="targets">
-            <span class="place tower-place" aria-hidden="true">TONE TOWER</span>
-            <span class="place rail-place" aria-hidden="true">SKYRAIL</span>
-          </div>
           <div class="home-reward-interactions" aria-label="Friends at home">
             ${(
               [
                 ['tone', 'normal', 'Pet the rooftop cat'],
                 ['tone', 'extreme', 'Wake the spire dragon'],
                 ['tide', 'normal', 'Pet the station cat'],
+                ['tide', 'hard', 'Talk to the moon heron'],
                 ['tide', 'extreme', 'Wake the golden dragon'],
               ] as const
             )
@@ -307,21 +315,38 @@ function home(world?: Challenge, initialPractice = false) {
     rewards,
     count: 2,
     actor: mapActor,
+    onHomeFriends: (positions: Record<string, { x: number; y: number; direction?: number }>) => {
+      queryAll(app, '[data-home-friend]').forEach((button) => {
+        const key = button.dataset.homeFriend ?? '';
+        const position = positions[key];
+        if (!position) return;
+        const cat = key.endsWith('-normal');
+        button.style.left =
+          ((position.x + (cat ? 9 * (position.direction ?? 1) : 0)) / 480) * 100 + '%';
+        button.style.top = ((position.y + 56 - (cat ? 9 : 7)) / 400) * 100 + '%';
+      });
+    },
   });
+  const dialogueTurns = new Map<string, number>();
+  const friends = required(app, '.home-reward-interactions');
+  const pauseFriends = () =>
+    worldAnimation?.update({
+      friendsPaused: friends.matches(':hover') || friends.contains(document.activeElement),
+    });
+  friends.addEventListener('pointerenter', pauseFriends);
+  friends.addEventListener('pointerleave', pauseFriends);
+  friends.addEventListener('focusin', pauseFriends);
+  friends.addEventListener('focusout', () => queueMicrotask(pauseFriends));
   queryAll(app, '[data-home-friend]').forEach((button) => {
     button.onclick = () => {
-      const friend = button.dataset.homeFriend;
+      const friend = button.dataset.homeFriend ?? '';
       worldAnimation?.update({ rewardInteraction: friend });
       const status = required(app, '#home-reward-status');
       status.hidden = false;
-      status.textContent =
-        friend === 'tone-normal'
-          ? 'The rooftop cat stretches and purrs.'
-          : friend === 'tide-normal'
-            ? 'The station cat opens a sleepy eye. Prrr…'
-            : friend === 'tone-extreme'
-              ? 'The spire dragon opens one eye. You have earned its trust.'
-              : 'The golden dragon wakes with a little sparkle.';
+      const lines = friendDialogue[friend];
+      const turn = dialogueTurns.get(friend) ?? 0;
+      status.textContent = lines[turn % lines.length];
+      dialogueTurns.set(friend, turn + 1);
     };
   });
   function select(value: string) {

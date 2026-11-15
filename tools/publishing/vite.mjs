@@ -16,6 +16,13 @@ import { renderPage, sitemap } from './pages.mjs';
 import { createStaticServer } from '../server/static-server.mjs';
 import { createContentAllowlist } from '../server/content-allowlist.mjs';
 
+async function readChooser(root) {
+  return (await readFile(path.join(root, 'index.html'), 'utf8')).replace(
+    /\b(href|src)="((?:src|assets)\/[^"#]+|favicon\.ico)"/g,
+    '$1="/$2"',
+  );
+}
+
 export async function prepareSite(root, catalogs) {
   const stage = await mkdtemp(path.join(os.tmpdir(), 'tone-tower-site-'));
   const dispose = async () => {
@@ -33,11 +40,7 @@ export async function prepareSite(root, catalogs) {
       await writeFile(path.join(stage, name), text);
     };
     const template = await readFile(path.join(root, 'src/shell.html'), 'utf8');
-    const chooser = (await readFile(path.join(root, 'index.html'), 'utf8')).replace(
-      /\b(href|src)="((?:src|assets)\/[^"#]+|favicon\.ico)"/g,
-      '$1="/$2"',
-    );
-    await put('index.html', chooser);
+    await put('index.html', await readChooser(root));
     for (const [key, p] of Object.entries(pages))
       await put(p.path + 'index.html', renderPage(template, key, catalogs[p.language]));
     for (const dir of ['assets/brand']) {
@@ -96,9 +99,24 @@ export async function serveSite(root, catalogs, port) {
         {
           name: 'tone-tower-content',
           configureServer(vite) {
+            const chooserPath = path.resolve(root, 'index.html');
+            vite.watcher.add(chooserPath);
+            vite.watcher.on('change', (file) => {
+              if (path.resolve(file) === chooserPath)
+                vite.ws.send({ type: 'full-reload', path: '*' });
+            });
             vite.middlewares.use(async (req, res, next) => {
               try {
                 const pathname = new URL(req.url, 'http://localhost').pathname.slice(1);
+                if (
+                  (pathname === '' || pathname === 'index.html') &&
+                  ['GET', 'HEAD'].includes(req.method)
+                ) {
+                  const html = await vite.transformIndexHtml(req.url, await readChooser(root));
+                  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                  res.end(req.method === 'HEAD' ? undefined : html);
+                  return;
+                }
                 const content = pathname.startsWith('catalogs/') || pathname.startsWith('audio/');
                 if (
                   (content && (await contentAllowed(pathname))) ||

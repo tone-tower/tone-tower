@@ -1,3 +1,4 @@
+import { homeFriendPositions } from './home-rewards.js';
 import { drawFinale } from './world-finale.js';
 import { P } from './pixel-world.js';
 import { createRailJourney } from './rail-journey.js';
@@ -27,6 +28,7 @@ export function animateWorld(canvas, initial = {}) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let state = { scene: 'hub', progress: 0, count: 2, actor: { ...destinations.tone }, ...initial },
     time = 0,
+    homeTime = 0,
     last = 0,
     effect = 0,
     entry = 0,
@@ -78,7 +80,10 @@ export function animateWorld(canvas, initial = {}) {
     const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
     last = now;
     if (!state.paused) {
-      if (!reduced.matches) time += dt;
+      if (!reduced.matches) {
+        time += dt;
+        if (!state.friendsPaused) homeTime += dt;
+      }
       effect += dt;
       entry += dt;
       if (target) {
@@ -124,6 +129,7 @@ export function animateWorld(canvas, initial = {}) {
       scene: entering ? 'tower-entry' : state.scene,
       entry: Math.min(1, entry / 1.65),
       time,
+      homeTime,
       actor,
       direction,
       walking: Boolean(target),
@@ -135,6 +141,7 @@ export function animateWorld(canvas, initial = {}) {
       approach: state.approach || 0,
       towerCamera: climb?.camera || 0,
     };
+    if (state.scene === 'hub') state.onHomeFriends?.(homeFriendPositions(snapshot));
     const resting =
       state.scene === 'tone' && state.phase === 'landing' && (reduced.matches || effect >= 1.25);
     if (canvas.parentElement) canvas.parentElement.dataset.resting = String(resting);

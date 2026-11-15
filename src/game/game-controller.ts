@@ -433,7 +433,7 @@ export function createGameController({
     if (panel) panel.dataset.feedback = kind;
   }
   const towerTerminal = () => !isTide() && run.status !== 'playing';
-  const towerStop = () => phase === 'landing' || terminal() || towerTerminal();
+  const towerStop = () => !isTide() && (phase === 'landing' || terminal() || towerTerminal());
   function towerContinue(label: string) {
     return (
       '<button class="primary" id="continue-game" type="button" ' +

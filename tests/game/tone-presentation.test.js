@@ -8,8 +8,9 @@ import { applyPinyinTone } from '../../src/languages/pinyin.ts';
 
 test('tone presentation follows explicit profile metadata, including named tones and unmarked neutral', () => {
   assert.match(toneSymbolMarkup(cantonese, 5), /is-number[^>]*>5</);
-  assert.match(toneSymbolMarkup(mandarin, 3), /is-mark[^>]*>ˇ</);
-  assert.match(toneSymbolMarkup(mandarin, 5), /is-unmarked[^>]*>Neutral</);
+  assert.match(toneSymbolMarkup(mandarin, 3), /tone-mark/);
+  assert.match(toneSymbolMarkup(mandarin, 3), /M10 13 L20 27 L30 13/);
+  assert.match(toneSymbolMarkup(mandarin, 5), /tone-mark is-blank/);
   assert.equal(toneLabel(mandarin, 2), 'Tone 2 · Rising');
   const other = {
     ...cantonese,

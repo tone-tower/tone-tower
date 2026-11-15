@@ -1335,37 +1335,6 @@ html {
   aspect-ratio: 5/3;
   background: #263f58;
 }
-.home-world .tower-place {
-  left: 50%;
-  top: 33%;
-  transform: translateX(-50%);
-}
-.home-world .rail-place {
-  left: 73%;
-  top: 38%;
-}
-.home-world .place {
-  font-size: 11px;
-  padding: 9px 13px;
-  letter-spacing: 1px;
-  background: #19293de8;
-  border-color: #748787;
-  transition:
-    border-color 0.2s,
-    background 0.2s;
-}
-.home-world .place small {
-  margin: 4px 0 0;
-  font-size: 10px;
-  letter-spacing: 0;
-}
-.home-world .place[aria-pressed='true'] {
-  border-color: var(--gold);
-  background: #3e4a51;
-  box-shadow:
-    0 3px #172b38,
-    0 0 22px #d7a65c24;
-}
 .home-world .game-hud {
   border-bottom: 1px solid #647b7c;
 }
@@ -1596,23 +1565,6 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
   }
 }
 @media (max-width: 700px) {
-  .home-world .tower-place {
-    top: 30%;
-  }
-  .home-world .rail-place {
-    left: auto;
-    right: 4%;
-    top: 40%;
-  }
-  .home-world .place {
-    font-size: 8px;
-    letter-spacing: 0;
-    padding: 6px 7px;
-    min-height: 38px;
-  }
-  .home-world .place small {
-    font-size: 7px;
-  }
   .home-world .dock {
     grid-template-columns: 1fr;
     padding: 19px 17px;
@@ -1919,18 +1871,6 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
   #app[data-practice='true'] .game-progress-label {
     font-size: 9px;
   }
-}
-
-.home-world .home-map-layout .tower-place {
-  left: 30%;
-  top: 40%;
-  transform: translateX(-50%);
-}
-.home-world .home-map-layout .rail-place {
-  left: 70%;
-  right: auto;
-  top: 40%;
-  transform: translateX(-50%);
 }
 
 .practice-tone-contour {

@@ -40,3 +40,19 @@ test('completing a practice rehearsal never awards a home decoration', () => {
   expect(progress.practice.completed).toBe(1);
   expect(Object.values(homeRewards(progress)).flatMap(Object.values)).not.toContain(true);
 });
+
+test('roaming cats use two perches and respect reduced motion', async () => {
+  const { homeFriendPositions } = await import('../../src/world/home-rewards.js');
+  const first = homeFriendPositions({ homeTime: 0 });
+  const second = homeFriendPositions({ homeTime: 15 });
+  expect(first['tone-normal'].x).not.toBe(second['tone-normal'].x);
+  expect(first['tide-normal'].x).not.toBe(second['tide-normal'].x);
+  for (const homeTime of [0, 7, 10, 15, 21, 27]) {
+    const friends = homeFriendPositions({ homeTime });
+    expect(friends['tone-normal'].x).toBeGreaterThanOrEqual(116);
+    expect(friends['tone-normal'].x).toBeLessThanOrEqual(168);
+    expect(friends['tide-normal'].x).toBeGreaterThanOrEqual(302);
+    expect(friends['tide-normal'].x).toBeLessThanOrEqual(360);
+    expect(homeFriendPositions({ homeTime, reduced: true })).toEqual(first);
+  }
+});

@@ -1,3 +1,26 @@
+// Coordinates share the canvas pixel grid; hit targets use these same positions.
+export function homeFriendPositions(s = {}) {
+  const time = s.reduced ? 0 : s.homeTime || 0;
+  function patrol(left, right, y, offset = 0) {
+    const phase = (time + offset) % 24;
+    const fraction =
+      phase < 7 ? 0 : phase < 12 ? (phase - 7) / 5 : phase < 19 ? 1 : 1 - (phase - 19) / 5;
+    return {
+      x: left + (right - left) * fraction,
+      y,
+      direction: phase < 19 ? 1 : -1,
+      walking: (phase >= 7 && phase < 12) || phase >= 19,
+    };
+  }
+  return {
+    'tone-normal': patrol(116, 168, 97),
+    'tide-normal': patrol(302, 360, 140, 4),
+    'tide-hard': { x: 414, y: 105 },
+    'tone-extreme': { x: 144, y: 13 },
+    'tide-extreme': { x: 428, y: 190 },
+  };
+}
+
 // Permanent home decorations only consume the earned flags supplied by the app.
 export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
   const rewards = s.rewards;
@@ -6,6 +29,8 @@ export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
     ctx.fillStyle = color;
     ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
   };
+  const friends = homeFriendPositions(s);
+  const time = s.reduced ? 0 : s.homeTime || 0;
   const reacting = (key) => s.rewardInteraction === key && (s.elapsed || 0) < 1.8;
   function flowers(x, y, box = false) {
     if (box) {
@@ -23,9 +48,26 @@ export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
       r(xx, yy - 6, 1, 1, P.gold);
     }
   }
-  function cat(x, y, key, sleepy = false) {
+  function butterflies(x, y) {
+    for (let k = 0; k < 3; k++) {
+      const phase = time * 0.8 + k * 2.1;
+      const xx = x + Math.sin(phase) * 24;
+      const yy = y + Math.cos(phase * 1.3) * 9;
+      const wing = s.reduced ? 3 : 1 + Math.round((Math.sin(time * 9 + k) + 1) * 2);
+      r(xx - wing, yy - 2, wing, 5, k % 2 ? P.red : P.teal);
+      r(xx + 1, yy - 2, wing, 5, k % 2 ? P.gold : P.glass);
+      r(xx, yy - 1, 1, 4, P.deep);
+    }
+  }
+  function cat(key, sleepy = false) {
     const awake = reacting(key),
       stretch = awake && !s.reduced;
+    const pose = friends[key];
+    ctx.save();
+    ctx.translate(Math.round(pose.x), Math.round(pose.y));
+    ctx.scale(pose.direction, 1);
+    const x = 0,
+      y = pose.walking && !s.reduced ? Math.floor(time * 7) % 2 : 0;
     const fur = sleepy ? P.brick : P.cream;
     r(x - 3, y + 1, 26, 3, P.deep);
     r(x, y - 8, stretch ? 22 : 16, 10, fur);
@@ -51,6 +93,7 @@ export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
       r(x + 11, y - 24, 5, 2, P.red);
       r(x + 12, y - 22, 3, 2, P.red);
     }
+    ctx.restore();
   }
   function dragon(x, y, key, gold = false) {
     const awake = reacting(key),
@@ -86,10 +129,12 @@ export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
     if (rewards.tone.easy) {
       flowers(101, 205);
       flowers(164, 205);
+      butterflies(145, 185);
     }
     if (rewards.tide.easy) {
       flowers(297, 196, true);
       flowers(357, 196, true);
+      butterflies(337, 178);
     }
     return;
   }
@@ -106,21 +151,32 @@ export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
     r(206, 106, 7, 5, P.red);
   }
   if (rewards.tide.hard) {
-    r(322, 143, 27, 27, P.gold);
-    r(324, 145, 23, 23, P.wood);
-    r(326, 147, 19, 19, P.cream);
-    r(334, 150, 2, 9, P.deep);
-    r(334, 157, 7, 2, P.deep);
-    for (const x of [323, 345]) {
-      r(x, 137, 3, 6, P.gold);
-      r(x - 2, 134, 7, 3, P.gold);
-      r(x, 169, 3, 6, P.gold);
+    const { x, y } = friends['tide-hard'];
+    const spread = reacting('tide-hard') ? 13 : 5 + Math.round(Math.sin(time * 1.4) * 2);
+    // A moon heron: long legs, a luminous crescent crest and a slow feather fan.
+    r(x - 1, y + 6, 2, 17, P.gold);
+    r(x + 6, y + 6, 2, 17, P.gold);
+    r(x - 4, y + 22, 7, 2, P.gold);
+    r(x + 5, y + 22, 7, 2, P.gold);
+    r(x - 13, y + 25, 34, 3, P.gold);
+    r(x - 9, y + 28, 26, 2, P.teal);
+    r(x - 9, y - 3, 23, 14, P.glass);
+    r(x - 8 - spread, y, spread + 12, 4, P.teal);
+    r(x - 6 - spread, y + 4, spread + 9, 3, P.water);
+    r(x + 6, y - 19, 5, 23, P.cream);
+    r(x + 4, y - 22, 13, 8, P.glass);
+    r(x + 13, y - 19, 2, 2, P.dark);
+    r(x + 17, y - 18, 12, 2, P.gold);
+    r(x + 3, y - 28, 3, 10, P.gold);
+    r(x + 6, y - 30, 7, 3, P.gold);
+    r(x + 10, y - 29, 4, 2, P.cream);
+    for (let k = 0; k < 3; k++) {
+      const yy = y - 9 - ((time * 7 + k * 11) % 30);
+      r(x - 13 + k * 8, yy, 2, 2, P.gold);
     }
-    r(333, 171, 4, 9, P.gold);
-    r(330, 178, 10, 3, P.gold);
   }
-  if (rewards.tone.normal) cat(168, 97, 'tone-normal');
-  if (rewards.tide.normal) cat(306, 147, 'tide-normal', true);
+  if (rewards.tone.normal) cat('tone-normal');
+  if (rewards.tide.normal) cat('tide-normal', true);
   if (rewards.tone.extreme) dragon(144, 13, 'tone-extreme');
   if (rewards.tide.extreme) dragon(428, 190, 'tide-extreme', true);
 }

@@ -49,6 +49,7 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
     {
       value: 1,
       symbol: 'ˉ',
+      markPath: 'M10 20 H30',
       label: 'Tone 1',
       name: 'Level',
       description: 'High and level',
@@ -57,6 +58,7 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
     {
       value: 2,
       symbol: 'ˊ',
+      markPath: 'M14 29 L26 11',
       label: 'Tone 2',
       name: 'Rising',
       description: 'Rising',
@@ -65,6 +67,7 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
     {
       value: 3,
       symbol: 'ˇ',
+      markPath: 'M10 13 L20 27 L30 13',
       label: 'Tone 3',
       name: 'Low / dipping',
       description: 'Low or dipping',
@@ -73,6 +76,7 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
     {
       value: 4,
       symbol: 'ˋ',
+      markPath: 'M14 11 L26 29',
       label: 'Tone 4',
       name: 'Falling',
       description: 'Falling',
@@ -81,6 +85,7 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
     {
       value: 5,
       symbol: '',
+      markPath: '',
       label: 'Neutral',
       name: 'Unmarked',
       description: 'Short and unstressed; pitch depends on context',

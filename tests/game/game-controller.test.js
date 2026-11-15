@@ -350,6 +350,36 @@ test('switching runs rejects delayed audio callbacks from the previous prompt', 
   assert.strictEqual(h.time.pending, 0);
 });
 
+test.each(['click', 'Enter'])(
+  'Skyrail checkpoints depart on the first %s without a Tower delay',
+  async (action) => {
+    const recordings = Array.from({ length: 120 }, (_, i) => ({
+      ...words[i % words.length],
+      id: 'checkpoint-' + i,
+    }));
+    const h = harness({}, recordings);
+    h.controller.start({ challenge: 'tide', variant: 'spelling' });
+    for (let span = 1; span <= 20; span++) {
+      h.audio();
+      await flush();
+      const input = h.app.querySelector('#transcription-answer');
+      input.value = h.controller.state.expectedParts().map(cantonese.withoutTones).join(' ');
+      fire(input, 'input');
+      if (span < 20) h.time.advance(900);
+    }
+    assert.strictEqual(h.controller.phase, 'landing');
+    const depart = h.app.querySelector('#continue-game');
+    assert.strictEqual(depart.disabled, false);
+    const requests = h.requests.length;
+    if (action === 'click') depart.click();
+    else fire(depart, 'keydown', { key: 'Enter' });
+    assert.strictEqual(h.controller.phase, 'listening');
+    assert.strictEqual(h.controller.state.opened, 20);
+    assert.strictEqual(h.requests.length, requests + 1);
+    assert.strictEqual(h.app.querySelector('#continue-game'), null);
+  },
+);
+
 test('Skyrail landings and progress describe spans', async () => {
   const h = harness();
   h.controller.start({ challenge: 'tide', practice: true, format: 'rehearsal', start: 20 });
