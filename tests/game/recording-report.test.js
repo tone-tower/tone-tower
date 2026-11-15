@@ -1,7 +1,7 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { recordingIssueUrl } from '../../src/ui/recording-report.js';
-import { mandarin } from '../../src/languages/profiles.js';
+import { recordingIssueUrl } from '../../src/ui/recording-report.ts';
+import { mandarin } from '../../src/languages/profiles.ts';
 
 test('recording reports prefill the exact language, recording, reading and source', () => {
   const url = new URL(

@@ -1,6 +1,6 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { Player } from '../../src/audio/audio.js';
+import { Player } from '../../src/audio/audio.ts';
 test('replay interrupts the earlier clip and releases its pending promise', async () => {
   globalThis.Audio = class {
     constructor(src) {
@@ -58,4 +58,36 @@ test('blocked playback and missing recordings reject cleanly and can be retried'
   p.current.onerror();
   await assert.rejects(missing, /Recording unavailable/);
   p.stop();
+});
+
+test('audio cache is bounded, releases evicted media, and protects the current recording', async () => {
+  const released = [];
+  globalThis.Audio = class {
+    constructor(src) {
+      this.src = src;
+      this.currentTime = 0;
+    }
+    load() {}
+    pause() {}
+    removeAttribute(name) {
+      if (name === 'src') {
+        released.push(this.src);
+        this.src = '';
+      }
+    }
+    play() {
+      return Promise.resolve();
+    }
+  };
+  const player = new Player(8);
+  const active = player.play('active');
+  await Promise.resolve();
+  player.preload(Array.from({ length: 20 }, (_, i) => 'word-' + i));
+  assert.equal(player.cache.size, 8);
+  assert.ok(player.cache.has('active'));
+  assert.ok(released.length >= 13);
+  assert.equal(player.current.src, 'active');
+  player.stop();
+  await active;
+  assert.equal(player.cache.size, 8);
 });

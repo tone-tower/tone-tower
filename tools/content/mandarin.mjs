@@ -1,15 +1,26 @@
+import { withCurationLock } from './curation-lock.mjs';
+import { activeReview, contentFingerprint, loadListeningReviews } from './listening-state.mjs';
+import { applyCatalogReviews } from './listening-items.mjs';
+import { enrichCatalog } from '../catalog/enrichment.mjs';
+import { validateInventory } from '../audio/inventory.mjs';
+import { validateCatalog } from '../../src/content/catalog.ts';
+import { mandarin } from '../../src/languages/profiles.ts';
 import {
   displayMandarinGloss,
   estimateMandarinTones,
   uniqueReading,
   chooseBetaReferences,
 } from './mandarin-beta.mjs';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { listeningPage } from './listening-page.mjs';
+import { qualityIssues } from './listening-state.mjs';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { atomicJSON } from '../lib/json.mjs';
-import { parsePinyin } from '../../src/languages/pinyin.js';
+import { parsePinyin } from '../../src/languages/pinyin.ts';
+import { loadToneExamples, toneExampleForms, toneSource } from './tone-examples.mjs';
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const directory = (root) => path.join(root, 'data/content/cmn');
@@ -30,12 +41,14 @@ export const emptyMandarin = () => ({
   recordings: [],
   references: [],
 });
-export async function archive(root) {
+async function archive(root) {
   const inventory = await json(path.join(root, 'data/audio/collections/cmn/recordings.json'), {
+    version: 1,
+    collectionId: 'cmn',
+    language: 'cmn',
     recordings: [],
   });
-  if (!Array.isArray(inventory.recordings)) throw Error('Invalid Mandarin recording archive.');
-  return inventory.recordings;
+  return validateInventory(inventory, 'cmn', 'cmn').recordings;
 }
 
 export function parseCedict(text, edition = 'v1') {
@@ -73,12 +86,18 @@ export function parseCedict(text, edition = 'v1') {
   return rows;
 }
 
-export async function importDictionary(root, file, edition = 'v1') {
+async function importDictionaryUnlocked(root, file, edition = 'v1') {
   const bytes = await readFile(file);
   const raw = file.endsWith('.gz') ? gunzipSync(bytes) : bytes;
   const text = raw.toString('utf8');
   const recordings = await archive(root);
   const texts = new Set(recordings.map((r) => r.sourceText));
+  const teachingSource = await json(path.join(directory(root), 'tone-example-segments.json'), null);
+  if (teachingSource) {
+    if (teachingSource.version !== 1 || teachingSource.sourceSha1 !== toneSource.sha1)
+      throw Error('Invalid Mandarin teaching source.');
+    for (const forms of toneExampleForms) for (const form of forms) texts.add(form);
+  }
   const previous = await json(path.join(directory(root), 'dictionary.json'), null);
   // Keep prior matches when an archive is temporarily smaller; never touch review decisions.
   for (const row of previous?.entries ?? []) {
@@ -110,7 +129,7 @@ export async function importDictionary(root, file, edition = 'v1') {
   };
 }
 
-export async function prepareMandarin(root) {
+async function prepareMandarinUnlocked(root) {
   const dictionary = await json(path.join(directory(root), 'dictionary.json'), null);
   if (!dictionary) throw Error('Import a pinned dictionary first with mandarin:dictionary.');
   const entries = dictionary.entries.map((row) => ({
@@ -140,7 +159,7 @@ export async function prepareMandarin(root) {
   return { entries: entries.length, pronunciations: pronunciations.length };
 }
 
-export async function reviewQueue(root) {
+export async function mandarinReviewItems(root) {
   const recordings = await archive(root);
   const entries = (await json(path.join(directory(root), 'entries.json'), { entries: [] })).entries;
   const pronunciations = (
@@ -150,25 +169,57 @@ export async function reviewQueue(root) {
     version: 1,
     annotations: {},
   });
-  return recordings.map((recording) => ({
-    recordingId: recording.id,
-    text: recording.sourceText,
-    audio: recording.audio.file,
-    speaker: recording.speaker?.name ?? 'Unidentified speaker',
-    source: recording.source.pageUrl,
-    recordingSha256: recording.audio.sha256,
-    candidates: entries
-      .filter((e) => Object.values(e.forms).includes(recording.sourceText))
-      .map((entry) => ({
-        pronunciationId: entry.id,
-        forms: entry.forms,
-        gloss: entry.gloss,
-        dictionarySha256: entry.dictionarySource.sha256,
-        syllables: pronunciations.find((p) => p.id === entry.id)?.syllables ?? [],
-      })),
-    annotation: saved.annotations[recording.id] ?? null,
-  }));
+  const corrections = await json(path.join(directory(root), 'corrections.json'), {
+    version: 1,
+    recordings: {},
+  });
+  return recordings.map((recording) => {
+    const item = {
+      recordingId: recording.id,
+      text: recording.sourceText,
+      audio: recording.audio.file,
+      speaker: recording.speaker?.name ?? 'Unidentified speaker',
+      speakerId: recording.speaker?.id,
+      source: recording.source.pageUrl,
+      recordingSha256: recording.audio.sha256,
+      candidates: entries
+        .filter((e) => Object.values(e.forms).includes(recording.sourceText))
+        .map((entry) => ({
+          pronunciationId: entry.id,
+          forms: entry.forms,
+          gloss: entry.gloss,
+          dictionarySha256: entry.dictionarySource.sha256,
+          syllables: pronunciations.find((p) => p.id === entry.id)?.syllables ?? [],
+        })),
+      annotation: saved.annotations[recording.id] ?? null,
+    };
+    const patch = corrections.recordings[recording.id] ?? null;
+    const legacy = item.annotation ?? null;
+    item.contentSha256 = contentFingerprint(item.candidates, {
+      patch,
+      legacy,
+      source: recording.source.pageUrl,
+      audio: recording.audio.file,
+    });
+    const candidate =
+      item.candidates.find(
+        (c) => c.pronunciationId === (patch?.pronunciationId ?? legacy?.pronunciationId),
+      ) ?? uniqueReading(item.candidates);
+    item.pronunciationId = candidate?.pronunciationId;
+    if (candidate) {
+      const estimate = estimateMandarinTones(candidate, { forms: candidate.forms });
+      item.realizedTones = patch?.realizedTones ?? legacy?.realizedTones ?? estimate.realizedTones;
+      item.toneTargets =
+        patch?.realizedTones || legacy?.status === 'approved'
+          ? item.realizedTones.map((_, i) => i)
+          : estimate.toneTargets;
+    }
+    item.excluded = patch?.excluded === true || legacy?.status === 'rejected';
+    return item;
+  });
 }
+
+const reviewQueueUnlocked = mandarinReviewItems;
 
 function validateAnnotation(annotation, item) {
   if (
@@ -204,11 +255,11 @@ function validateAnnotation(annotation, item) {
   }
 }
 
-export async function importReviews(root, file) {
+async function importReviewsUnlocked(root, file) {
   const decisions = await json(file, null);
   if (decisions?.version !== 1 || !decisions.annotations || Array.isArray(decisions.annotations))
     throw Error('Expected a version 1 annotations object.');
-  const queue = new Map((await reviewQueue(root)).map((item) => [item.recordingId, item]));
+  const queue = new Map((await reviewQueueUnlocked(root)).map((item) => [item.recordingId, item]));
   const previous = await json(path.join(directory(root), 'annotations.json'), {
     version: 1,
     annotations: {},
@@ -252,10 +303,10 @@ function validateCorrection(patch, item) {
     throw Error('Corrected tones must match an unambiguous pronunciation: ' + item.recordingId);
 }
 
-export async function correctMandarin(root, { recordingId, ...patch }) {
+async function correctMandarinUnlocked(root, { recordingId, ...patch }) {
   if (typeof patch.reason !== 'string' || !patch.reason.trim())
     throw Error('A correction needs a reason.');
-  const item = (await reviewQueue(root)).find((item) => item.recordingId === recordingId);
+  const item = (await reviewQueueUnlocked(root)).find((item) => item.recordingId === recordingId);
   if (!item) throw Error('Unknown recording: ' + recordingId);
   const previous = await json(path.join(directory(root), 'corrections.json'), {
     version: 1,
@@ -298,14 +349,15 @@ export function coverage(catalog) {
   return { ready: !missing.length, singles, multi, tones, missing };
 }
 
-export async function buildMandarinCatalog(root, { reviewedOnly = false } = {}) {
+export async function buildMandarinCatalogUnlocked(root, { reviewedOnly = false } = {}) {
   const result = emptyMandarin();
   const entries = (await json(path.join(directory(root), 'entries.json'), { entries: [] })).entries;
   const pronunciations = (
     await json(path.join(directory(root), 'pronunciations.json'), { pronunciations: [] })
   ).pronunciations;
+  validateCatalog({ ...emptyMandarin(), entries, pronunciations }, mandarin);
   const recordings = new Map((await archive(root)).map((r) => [r.id, r]));
-  const queue = new Map((await reviewQueue(root)).map((item) => [item.recordingId, item]));
+  const queue = new Map((await reviewQueueUnlocked(root)).map((item) => [item.recordingId, item]));
   const decisions = await json(path.join(directory(root), 'annotations.json'), {
     version: 1,
     annotations: {},
@@ -314,6 +366,7 @@ export async function buildMandarinCatalog(root, { reviewedOnly = false } = {}) 
     version: 1,
     recordings: {},
   });
+  const listening = await loadListeningReviews(root, 'cmn');
   if (corrections.version !== 1 || !corrections.recordings || Array.isArray(corrections.recordings))
     throw Error('Invalid Mandarin corrections.');
   const byPronunciation = new Map(pronunciations.map((p) => [p.id, p]));
@@ -341,10 +394,18 @@ export async function buildMandarinCatalog(root, { reviewedOnly = false } = {}) 
       stats.excluded++;
       continue;
     }
-    const reviewed = annotation?.status === 'approved';
+    const decision = activeReview(item, listening.recordings[id], 'cmn');
+    if (decision?.status === 'rejected') {
+      stats.excluded++;
+      continue;
+    }
+    const reviewed =
+      decision?.status === 'approved' || (!decision && annotation?.status === 'approved');
     if (reviewedOnly && !reviewed) continue;
     let candidate = item.candidates.find(
-      (c) => c.pronunciationId === (patch?.pronunciationId ?? annotation?.pronunciationId),
+      (c) =>
+        c.pronunciationId ===
+        (decision?.pronunciationId ?? patch?.pronunciationId ?? annotation?.pronunciationId),
     );
     if (!candidate) candidate = uniqueReading(item.candidates);
     if (!candidate) {
@@ -369,7 +430,9 @@ export async function buildMandarinCatalog(root, { reviewedOnly = false } = {}) 
     }
     const estimate = estimateMandarinTones(pronunciation, entry);
     const realizedTones =
-      patch?.realizedTones ?? (reviewed ? annotation.realizedTones : estimate.realizedTones);
+      decision?.realizedTones ??
+      patch?.realizedTones ??
+      (reviewed ? annotation.realizedTones : estimate.realizedTones);
     if (!result.entries.some((e) => e.id === entry.id))
       result.entries.push({
         ...entry,
@@ -384,14 +447,29 @@ export async function buildMandarinCatalog(root, { reviewedOnly = false } = {}) 
       audio: row.audio.file,
       realizedTones,
       toneTargets:
-        patch?.realizedTones || reviewed ? realizedTones.map((_, i) => i) : estimate.toneTargets,
+        decision?.status === 'uncertain'
+          ? []
+          : (decision?.toneTargets ??
+            (patch?.realizedTones || reviewed
+              ? realizedTones.map((_, i) => i)
+              : estimate.toneTargets)),
       toneEvidence: {
-        status: patch?.realizedTones ? 'corrected' : reviewed ? 'reviewed' : 'assumed',
-        basis:
-          patch?.reason ??
-          (reviewed
-            ? annotation.reason
-            : 'Source label, dictionary reading, and common tone sandhi'),
+        status:
+          decision?.status === 'approved'
+            ? 'reviewed'
+            : patch?.realizedTones
+              ? 'corrected'
+              : reviewed
+                ? 'reviewed'
+                : 'assumed',
+        basis: decision
+          ? decision.status === 'approved'
+            ? 'Human listening review'
+            : 'Listening marked uncertain; tone targets omitted'
+          : (patch?.reason ??
+            (reviewed
+              ? annotation.reason
+              : 'Source label, dictionary reading, and common tone sandhi')),
       },
       speakerId: row.speaker?.id,
       author: row.attribution.author,
@@ -401,7 +479,16 @@ export async function buildMandarinCatalog(root, { reviewedOnly = false } = {}) 
       conversion: row.audio.processing,
     });
     stats[reviewed ? 'reviewed' : 'assumed']++;
-    if (
+    if (decision?.status === 'approved') {
+      result.references.push(
+        ...(decision.referenceTargets ?? []).map((targetIndex) => ({
+          recordingId: id,
+          targetIndex,
+          tone: realizedTones[targetIndex],
+        })),
+      );
+    } else if (
+      !decision &&
       reviewed &&
       (!patch?.pronunciationId || patch.pronunciationId === annotation.pronunciationId)
     )
@@ -411,25 +498,86 @@ export async function buildMandarinCatalog(root, { reviewedOnly = false } = {}) 
           .map((reference) => ({ ...reference, recordingId: id })),
       );
   }
+  // Several clips can be reference-quality, while the public catalog selects one per tone.
+  result.references = [...new Map(result.references.map((r) => [r.tone, r])).values()];
   if (!reviewedOnly) chooseBetaReferences(result);
+  {
+    const examples = await loadToneExamples(root);
+    if (examples) {
+      const reviewedExamples = await applyCatalogReviews(root, { ...emptyMandarin(), ...examples });
+      if (reviewedOnly) {
+        reviewedExamples.recordings = reviewedExamples.recordings.filter(
+          (r) => r.toneEvidence?.status === 'reviewed',
+        );
+        const ids = new Set(reviewedExamples.recordings.map((r) => r.id));
+        reviewedExamples.references = reviewedExamples.references.filter((r) =>
+          ids.has(r.recordingId),
+        );
+        const pronunciations = new Set(reviewedExamples.recordings.map((r) => r.pronunciationId));
+        reviewedExamples.pronunciations = reviewedExamples.pronunciations.filter((p) =>
+          pronunciations.has(p.id),
+        );
+        const entries = new Set(reviewedExamples.pronunciations.map((p) => p.entryId));
+        reviewedExamples.entries = reviewedExamples.entries.filter((e) => entries.has(e.id));
+      }
+      result.entries.push(...reviewedExamples.entries);
+      result.pronunciations.push(...reviewedExamples.pronunciations);
+      result.recordings.push(...reviewedExamples.recordings);
+      result.references = [
+        ...reviewedExamples.references,
+        ...result.references.filter(
+          (reference) =>
+            !reviewedExamples.references.some((example) => example.tone === reference.tone),
+        ),
+      ];
+    }
+  }
   if (new Set(result.references.map((r) => r.tone)).size !== result.references.length)
     throw Error('Choose one reference per Mandarin tone.');
   result.availability = { ...coverage(result), mode: reviewedOnly ? 'reviewed' : 'beta', ...stats };
-  return result;
+  validateCatalog(result, mandarin, { publication: true });
+  return enrichCatalog(result, mandarin);
 }
 
+const curate = (root, task) => withCurationLock(root, 'cmn', task);
+export function importDictionary(root, ...args) {
+  return curate(root, () => importDictionaryUnlocked(root, ...args));
+}
+export function prepareMandarin(root, ...args) {
+  return curate(root, () => prepareMandarinUnlocked(root, ...args));
+}
+export function reviewQueue(root, ...args) {
+  return curate(root, () => reviewQueueUnlocked(root, ...args));
+}
+export function importReviews(root, ...args) {
+  return curate(root, () => importReviewsUnlocked(root, ...args));
+}
+export function correctMandarin(root, ...args) {
+  return curate(root, () => correctMandarinUnlocked(root, ...args));
+}
+export function buildMandarinCatalog(root, ...args) {
+  return curate(root, () => buildMandarinCatalogUnlocked(root, ...args));
+}
 export async function exportReview(root, destination) {
-  const queue = await reviewQueue(root);
-  const data = JSON.stringify(queue).replace(/</g, '\\u003c');
-  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Mandarin listening review</title>
-<style>body{font:16px system-ui;max-width:950px;margin:2em auto;padding:1em;background:#f6f5f0;color:#19293d}article{background:white;padding:1em;margin:1em 0;border:1px solid #bbb}input,select,button{font:inherit;padding:.4em;max-width:100%}label{display:block;margin:.6em 0}audio{width:100%}.note{color:#555}</style>
-<h1>Mandarin listening review</h1><p>Listen to each recording. Confirm the dictionary reading and annotate the tones actually heard. Dictionary matching and successful download do not establish pronunciation accuracy. Use 5 for neutral tone. Do not approve uncertain readings.</p>
-<label>Reviewer <input id="reviewer" autocomplete="name"></label><label>Find text or speaker <input id="search"></label><button id="previous">Previous</button> <span id="count"></span> <button id="next">Next</button> <button id="save">Export edited reviews</button><p role="status" id="status"></p><main id="items"></main>
-<script>const queue=${data};const edits={};let page=0;const q=s=>document.querySelector(s);const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function draw(){const needle=q('#search').value.trim();const rows=queue.filter(r=>!needle||r.text.includes(needle)||r.speaker.includes(needle));page=Math.max(0,Math.min(page,Math.ceil(rows.length/20)-1));q('#count').textContent=(page+1)+' / '+Math.max(1,Math.ceil(rows.length/20))+' · '+rows.length+' recordings';q('#items').innerHTML=rows.slice(page*20,page*20+20).map(r=>{const a=edits[r.recordingId]||r.annotation||{};return '<article data-id="'+r.recordingId+'"><h2>'+escape(r.text)+' · '+escape(r.speaker)+'</h2><a target="_blank" rel="noopener" href="'+escape(r.source)+'">Original source</a><audio controls preload="none" src="../../'+escape(r.audio)+'"></audio><label>Decision <select data-field="status"><option value="">Unreviewed</option><option '+(a.status==='approved'?'selected':'')+' value="approved">Approve</option><option '+(a.status==='rejected'?'selected':'')+' value="rejected">Reject</option></select></label><label>Dictionary reading <select data-field="pronunciationId"><option value="">Choose a reading</option>'+r.candidates.map(c=>'<option value="'+c.pronunciationId+'" '+(a.pronunciationId===c.pronunciationId?'selected':'')+'>'+escape(c.syllables.map(s=>s.transcription).join(' ')+' · '+c.gloss)+'</option>').join('')+'</select></label><label>Spoken tones, in order <input data-field="tones" placeholder="2 3" value="'+escape((a.realizedTones||[]).join(' '))+'"></label><label>Reference target indices (zero based), only for reference-quality clips <input data-field="references" placeholder="e.g. 0" value="'+escape((a.references||[]).map(r=>r.targetIndex).join(' '))+'"></label><label>Review reason <input data-field="reason" value="'+escape(a.reason||'')+'"></label>'+(r.candidates.length?'':'<p class="note">No aligned dictionary candidate. Leave unreviewed or reject.</p>')+'</article>'}).join('');}
-q('#items').addEventListener('change',e=>{const card=e.target.closest('article');if(!card)return;const r=queue.find(r=>r.recordingId===card.dataset.id);const value=f=>card.querySelector('[data-field="'+f+'"]').value;const c=r.candidates.find(c=>c.pronunciationId===value('pronunciationId'));const tones=value('tones').trim().split(/\\s+/).filter(Boolean).map(Number);edits[r.recordingId]={status:value('status'),pronunciationId:c?.pronunciationId,dictionarySha256:c?.dictionarySha256,recordingSha256:r.recordingSha256,realizedTones:tones,references:value('references').trim().split(/\\s+/).filter(Boolean).map(Number).map(i=>({targetIndex:i,tone:tones[i]})),reason:value('reason')};});
-q('#previous').onclick=()=>{page--;draw()};q('#next').onclick=()=>{page++;draw()};q('#search').oninput=()=>{page=0;draw()};q('#save').onclick=()=>{if(!q('#reviewer').value.trim()){q('#status').textContent='Enter a reviewer name.';return}const annotations=Object.fromEntries(Object.entries(edits).filter(([id,a])=>a.status).map(([id,a])=>[id,{...a,reviewer:q('#reviewer').value.trim(),reviewedAt:new Date().toISOString()}]));const blob=new Blob([JSON.stringify({version:1,annotations},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='mandarin-reviews.json';a.click();URL.revokeObjectURL(url);q('#status').textContent='Exported '+Object.keys(annotations).length+' decisions. Import the file with mandarin:import-review.'};draw();</script></html>`;
-  await mkdir(path.dirname(destination), { recursive: true });
-  await writeFile(destination, html);
-  return { file: destination, recordings: queue.length };
+  const { listeningItems } = await import('./listening-workflow.mjs');
+  const { atomicText } = await import('../lib/json.mjs');
+  const items = await listeningItems(root, 'cmn');
+  await atomicText(
+    destination,
+    listeningPage({
+      language: 'cmn',
+      items,
+      qualityIssues,
+      maxTone: 5,
+      audioBase: pathToFileURL(root + path.sep).href,
+    }),
+  );
+  return { file: destination, recordings: items.length };
+}
+export function refreshMandarinDictionary(root, file, edition) {
+  return curate(root, async () => {
+    const result = await importDictionaryUnlocked(root, file, edition);
+    await prepareMandarinUnlocked(root);
+    return result;
+  });
 }

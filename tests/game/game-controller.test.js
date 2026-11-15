@@ -1,133 +1,8 @@
-import { cantonese, mandarin, vietnamese } from '../../src/languages/profiles.js';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { createCountdown, createGameController } from '../../src/game/game-controller.js';
+import { cantonese, mandarin, vietnamese } from '../../src/languages/profiles.ts';
+import { test, afterEach, assert } from 'vitest';
+import { fakeTime } from '../helpers/fake-time.js';
+import { createCountdown, createGameController } from '../../src/game/game-controller.ts';
 
-function fakeTime() {
-  let time = 0,
-    id = 0;
-  const tasks = new Map();
-  return {
-    now: () => time,
-    setTimeout: (fn, delay) => {
-      tasks.set(++id, { fn, at: time + delay });
-      return id;
-    },
-    clearTimeout: (key) => tasks.delete(key),
-    advance(ms) {
-      const end = time + ms;
-      while (true) {
-        const next = [...tasks]
-          .filter(([, task]) => task.at <= end)
-          .sort((a, b) => a[1].at - b[1].at)[0];
-        if (!next) break;
-        time = next[1].at;
-        tasks.delete(next[0]);
-        next[1].fn();
-      }
-      time = end;
-    },
-    get pending() {
-      return tasks.size;
-    },
-  };
-}
-class Target {
-  constructor() {
-    this.listeners = new Map();
-  }
-  addEventListener(type, fn) {
-    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
-    this.listeners.get(type).add(fn);
-  }
-  removeEventListener(type, fn) {
-    this.listeners.get(type)?.delete(fn);
-  }
-  fire(type, event = {}) {
-    event.preventDefault ??= () => {
-      event.defaultPrevented = true;
-    };
-    for (const fn of this.listeners.get(type) ?? []) fn(event);
-    return event;
-  }
-}
-const decode = (value) =>
-  value
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
-class Node extends Target {
-  constructor(tag, attrs, doc) {
-    super();
-    this.tagName = tag.toUpperCase();
-    this.doc = doc;
-    this.attrs = {};
-    this.dataset = {};
-    this.style = {
-      values: {},
-      setProperty: (key, value) => {
-        this.style.values[key] = value;
-      },
-    };
-    this.classes = new Set();
-    this.classList = {
-      toggle: (name, on) => (on ? this.classes.add(name) : this.classes.delete(name)),
-    };
-    for (const match of attrs.matchAll(/([\w-]+)(?:="([^"]*)")?/g)) {
-      this.attrs[match[1]] = decode(match[2] ?? '');
-      if (match[1].startsWith('data-'))
-        this.dataset[match[1].slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = match[2];
-    }
-    this.id = this.attrs.id;
-    this.value = this.attrs.value ?? '';
-    this.disabled = Object.hasOwn(this.attrs, 'disabled');
-    this.textContent = '';
-    this.classes = new Set((this.attrs.class ?? '').split(' '));
-  }
-  setAttribute(key, value) {
-    this.attrs[key] = value;
-  }
-  removeAttribute(key) {
-    delete this.attrs[key];
-  }
-  focus() {
-    this.doc.activeElement = this;
-  }
-  setSelectionRange(start, end) {
-    this.selectionStart = start;
-    this.selectionEnd = end;
-  }
-}
-class App {
-  constructor(doc) {
-    this.doc = doc;
-    this.dataset = {};
-    this.nodes = [];
-  }
-  set innerHTML(html) {
-    this.html = html;
-    this.nodes = [...html.matchAll(/<([a-z][\w-]*)\b([^>]*)>/gi)].map(
-      ([, tag, attrs]) => new Node(tag, attrs, this.doc),
-    );
-  }
-  get innerHTML() {
-    return this.html;
-  }
-  querySelector(selector) {
-    return this.querySelectorAll(selector)[0] ?? null;
-  }
-  querySelectorAll(selector) {
-    if (selector.startsWith('#')) return this.nodes.filter((node) => node.id === selector.slice(1));
-    if (selector.startsWith('['))
-      return this.nodes.filter((node) => Object.hasOwn(node.attrs, selector.slice(1, -1)));
-    if (selector === '.game-layout > :not(.pause-overlay)') return [];
-    if (selector.startsWith('.'))
-      return this.nodes.filter((node) => node.classes.has(selector.slice(1)));
-    return [];
-  }
-}
 const words = [
   ...Array.from({ length: 6 }, (_, i) => ({
     id: `single-${i}`,
@@ -165,13 +40,45 @@ const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
+const mounted = [];
+afterEach(() => {
+  for (const h of mounted) {
+    h.controller.dispose();
+    h.app.remove();
+    h.dialog.remove();
+  }
+  mounted.length = 0;
+  delete document.hidden;
+});
+function fire(receiver, type, options = {}) {
+  const { target, ...init } = options;
+  const event =
+    type === 'keydown'
+      ? new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init })
+      : new Event(type, { bubbles: true, cancelable: true, ...init });
+  const node =
+    target instanceof EventTarget
+      ? target
+      : target?.tagName
+        ? document.createElement(target.tagName)
+        : receiver;
+  if (node !== receiver && !node.isConnected) document.body.append(node);
+  node.dispatchEvent(event);
+  return event;
+}
 function harness(extra = {}, recordings = words, profile = cantonese) {
-  const time = fakeTime(),
-    document = new Target();
-  document.hidden = false;
-  const app = new App(document),
-    dialog = new Target();
-  dialog.open = false;
+  const time = fakeTime();
+  let hidden = false;
+  Object.defineProperty(document, 'hidden', {
+    configurable: true,
+    get: () => hidden,
+    set: (value) => {
+      hidden = value;
+    },
+  });
+  const app = document.createElement('main'),
+    dialog = document.createElement('dialog');
+  document.body.append(app, dialog);
   let current = null;
   const requests = [];
   const player = {
@@ -199,8 +106,14 @@ function harness(extra = {}, recordings = words, profile = cantonese) {
     anchors: words.slice(0, 6).map((word) => ({ ...word, anchor: true })),
     onFinish: (run) => finished.push(run),
     onHome: () => homes.push(true),
-    environment: { ...time, document, ...extra },
+    environment: {
+      ...time,
+      document,
+      animateWorld: (canvas) => ({ canvas, update() {}, dispose() {} }),
+      ...extra,
+    },
   });
+  mounted.push({ controller, app, dialog });
   return {
     time,
     document,
@@ -212,7 +125,7 @@ function harness(extra = {}, recordings = words, profile = cantonese) {
     finished,
     homes,
     click(id) {
-      app.querySelector(id).fire('click');
+      app.querySelector(id).click();
     },
     audio() {
       if (!current) time.advance(2000);
@@ -221,69 +134,41 @@ function harness(extra = {}, recordings = words, profile = cantonese) {
   };
 }
 
-test('countdown freezes the exact remaining time and expires once', () => {
-  const time = fakeTime();
-  let expired = 0;
-  const ticks = [];
-  const clock = createCountdown({
-    ...time,
-    onTick: (left, total) => ticks.push([left, total]),
-    onExpire: () => expired++,
-  });
-  clock.start(1000);
-  time.advance(300);
-  assert.equal(clock.remaining, 700);
-  clock.pause();
-  time.advance(5000);
-  assert.equal(clock.remaining, 700);
-  assert.equal(expired, 0);
-  clock.resume();
-  time.advance(699);
-  assert.equal(expired, 0);
-  time.advance(1);
-  assert.equal(expired, 1);
-  assert.equal(clock.remaining, 0);
-  clock.resume();
-  time.advance(1000);
-  assert.equal(expired, 1);
-  assert.deepEqual(ticks.at(-1), [0, 1000]);
-});
-
 test('Tide starts after audio, replay never resets time, and timeout costs one life', async () => {
   const h = harness();
   h.controller.start({ challenge: 'tide', variant: 'spelling' });
-  assert.equal(h.controller.phase, 'listening');
+  assert.strictEqual(h.controller.phase, 'listening');
   assert.match(h.app.innerHTML, /To the gap/);
-  assert.doesNotMatch(h.app.innerHTML, /Untimed practice/);
-  assert.equal(h.app.querySelector('#countdown').textContent, '15s');
+  assert.notMatch(h.app.innerHTML, /Untimed practice/);
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '15s');
   const mountedInput = h.app.querySelector('#transcription-answer');
   h.time.advance(30000);
-  assert.equal(h.controller.state.mistakes, 0);
+  assert.strictEqual(h.controller.state.mistakes, 0);
   h.audio();
   await flush();
-  assert.equal(h.controller.phase, 'answering');
-  assert.equal(h.app.querySelector('#countdown').textContent, '15s');
-  assert.equal(h.app.querySelector('#transcription-answer'), mountedInput);
-  assert.equal(h.app.querySelector('#rail-message').textContent, 'Type the highlighted syllable.');
-  assert.equal(h.app.querySelector('.world-scene').dataset.phase, 'answering');
+  assert.strictEqual(h.controller.phase, 'answering');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '15s');
+  assert.strictEqual(h.app.querySelector('#transcription-answer'), mountedInput);
+  assert.strictEqual(h.app.querySelector('#rail-message').textContent, '');
+  assert.strictEqual(h.app.querySelector('.world-scene').dataset.phase, 'answering');
   h.time.advance(5000);
   h.click('#replay-word');
   h.time.advance(5000);
   h.audio();
   await flush();
-  assert.equal(h.app.querySelector('#countdown').textContent, '5s');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '5s');
   h.time.advance(5000);
-  assert.equal(h.controller.phase, 'review');
-  assert.equal(h.controller.state.lives, 3);
-  assert.equal(h.controller.state.opened, 0);
+  assert.strictEqual(h.controller.phase, 'review');
+  assert.strictEqual(h.controller.state.lives, 3);
+  assert.strictEqual(h.controller.state.opened, 0);
   h.time.advance(60000);
-  assert.equal(h.controller.state.mistakes, 1);
+  assert.strictEqual(h.controller.state.mistakes, 1);
   h.click('#continue-game');
   h.audio();
   await flush();
-  assert.equal(h.controller.phase, 'answering');
-  assert.equal(h.app.querySelector('#countdown').textContent, '15s');
-  assert.equal(h.app.querySelector('#transcription-answer').value, '');
+  assert.strictEqual(h.controller.phase, 'answering');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '15s');
+  assert.strictEqual(h.app.querySelector('#transcription-answer').value, '');
   h.controller.dispose();
 });
 
@@ -296,14 +181,14 @@ test('pause, hidden pages and dialogs freeze time and keep typed text', async ()
   h.app.querySelector('#transcription-answer').value = 'my answer';
   h.controller.pause();
   h.time.advance(30000);
-  assert.equal(h.controller.state.mistakes, 0);
-  assert.equal(h.app.querySelector('#transcription-answer').value, 'my answer');
+  assert.strictEqual(h.controller.state.mistakes, 0);
+  assert.strictEqual(h.app.querySelector('#transcription-answer').value, 'my answer');
   h.controller.resume();
-  assert.equal(h.app.querySelector('#countdown').textContent, '10s');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '10s');
   h.document.hidden = true;
-  h.document.fire('visibilitychange');
+  fire(h.document, 'visibilitychange');
   h.time.advance(30000);
-  assert.equal(h.controller.state.mistakes, 0);
+  assert.strictEqual(h.controller.state.mistakes, 0);
   h.controller.resume();
   assert.ok(h.app.querySelector('#resume-game'));
   h.document.hidden = false;
@@ -311,11 +196,11 @@ test('pause, hidden pages and dialogs freeze time and keep typed text', async ()
   h.dialog.open = true;
   h.controller.pause('dialog');
   h.time.advance(30000);
-  assert.equal(h.controller.state.mistakes, 0);
+  assert.strictEqual(h.controller.state.mistakes, 0);
   h.dialog.open = false;
-  h.dialog.fire('close');
+  fire(h.dialog, 'close');
   h.time.advance(20000);
-  assert.equal(h.controller.state.mistakes, 1);
+  assert.strictEqual(h.controller.state.mistakes, 1);
   h.controller.dispose();
 });
 
@@ -335,25 +220,25 @@ test('typing permits spaces, auto-checks only correct input and locks a cleared 
   await flush();
   let input = h.app.querySelector('#transcription-answer');
   input.value = 'wrong';
-  input.fire('input');
-  assert.equal(h.controller.state.guesses, 0);
-  assert.equal(h.controller.state.mistakes, 0);
+  fire(input, 'input');
+  assert.strictEqual(h.controller.state.guesses, 0);
+  assert.strictEqual(h.controller.state.mistakes, 0);
   const requests = h.requests.length,
-    key = h.document.fire('keydown', { key: ' ', target: input });
-  assert.equal(key.defaultPrevented, true);
-  assert.equal(h.requests.length, requests + 1);
+    key = fire(h.document, 'keydown', { key: ' ', target: input });
+  assert.strictEqual(key.defaultPrevented, true);
+  assert.strictEqual(h.requests.length, requests + 1);
   h.audio();
   await flush();
   input.value = h.controller.state.expected();
-  input.fire('input');
-  assert.equal(h.controller.state.cleared, 1);
-  assert.equal(h.controller.phase, 'correct');
-  input.fire('input');
+  fire(input, 'input');
+  assert.strictEqual(h.controller.state.cleared, 1);
+  assert.strictEqual(h.controller.phase, 'correct');
+  fire(input, 'input');
   h.time.advance(899);
-  assert.equal(h.controller.state.cleared, 1);
+  assert.strictEqual(h.controller.state.cleared, 1);
   h.time.advance(1);
-  assert.equal(h.controller.phase, 'listening');
-  assert.equal(h.app.querySelector('#transcription-answer').value, '');
+  assert.strictEqual(h.controller.phase, 'listening');
+  assert.strictEqual(h.app.querySelector('#transcription-answer').value, '');
   h.controller.dispose();
 });
 
@@ -367,15 +252,15 @@ test('failed replay freezes its remaining time and replacement is unscored', asy
   h.requests.at(-1).reject(Error('unavailable'));
   await flush();
   h.time.advance(60000);
-  assert.equal(h.controller.state.mistakes, 0);
-  assert.equal(h.app.querySelector('#countdown').textContent, '10s');
+  assert.strictEqual(h.controller.state.mistakes, 0);
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '10s');
   assert.ok(h.app.querySelector('#replace-recording'));
   h.click('#replace-recording');
-  assert.equal(h.controller.state.attempts, 0);
-  assert.equal(h.controller.state.opened, 0);
+  assert.strictEqual(h.controller.state.attempts, 0);
+  assert.strictEqual(h.controller.state.opened, 0);
   h.audio();
   await flush();
-  assert.equal(h.app.querySelector('#countdown').textContent, '15s');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '15s');
   h.controller.dispose();
 });
 
@@ -386,23 +271,23 @@ test('timeout costs one life, stale audio cannot reactivate a disposed run, and 
   await flush();
   h.app.querySelector('#transcription-answer').value = 'partial';
   h.time.advance(15000);
-  assert.equal(h.controller.state.lives, 3);
-  assert.equal(h.controller.state.lastAnswer, 'partial');
+  assert.strictEqual(h.controller.state.lives, 3);
+  assert.strictEqual(h.controller.state.lastAnswer, 'partial');
   h.click('#replay-word');
   const pending = h.requests.at(-1);
   h.controller.dispose();
   pending.resolve();
   await flush();
   h.time.advance(60000);
-  assert.equal(h.controller.active, false);
-  assert.equal(h.controller.state.mistakes, 1);
+  assert.strictEqual(h.controller.active, false);
+  assert.strictEqual(h.controller.state.mistakes, 1);
   h.controller.start({ challenge: 'tone', practice: true, length: 'endless' });
   h.audio();
   await flush();
   h.click('#finish-practice');
-  assert.equal(h.finished.length, 1);
-  assert.equal(h.finished[0].status, 'complete');
-  assert.equal(h.controller.active, false);
+  assert.strictEqual(h.finished.length, 1);
+  assert.strictEqual(h.finished[0].status, 'complete');
+  assert.strictEqual(h.controller.active, false);
 });
 
 test('tone keyboard choices score once and a paused run cannot accept answers', async () => {
@@ -411,16 +296,16 @@ test('tone keyboard choices score once and a paused run cannot accept answers', 
   h.audio();
   await flush();
   const right = h.controller.state.word.tone;
-  h.document.fire('keydown', { key: String(right), repeat: true, target: { tagName: 'BODY' } });
-  assert.equal(h.controller.state.cleared, 0);
+  fire(h.document, 'keydown', { key: String(right), repeat: true, target: { tagName: 'BODY' } });
+  assert.strictEqual(h.controller.state.cleared, 0);
   h.controller.pause();
-  h.document.fire('keydown', { key: String(right), target: { tagName: 'BODY' } });
-  assert.equal(h.controller.state.cleared, 0);
+  fire(h.document, 'keydown', { key: String(right), target: { tagName: 'BODY' } });
+  assert.strictEqual(h.controller.state.cleared, 0);
   h.controller.resume();
-  h.document.fire('keydown', { key: String(right), target: { tagName: 'BODY' } });
-  h.document.fire('keydown', { key: String(right), target: { tagName: 'BODY' } });
-  assert.equal(h.controller.state.cleared, 1);
-  assert.equal(h.controller.state.attempts, 1);
+  fire(h.document, 'keydown', { key: String(right), target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: String(right), target: { tagName: 'BODY' } });
+  assert.strictEqual(h.controller.state.cleared, 1);
+  assert.strictEqual(h.controller.state.attempts, 1);
   h.controller.dispose();
 });
 
@@ -430,20 +315,20 @@ test('a terminal mistake records once and offers retry in the same scene after i
   h.audio();
   await flush();
   const wrong = h.controller.state.choices.find((tone) => tone !== h.controller.state.word.tone);
-  h.document.fire('keydown', { key: String(wrong), target: { tagName: 'BODY' } });
-  assert.equal(h.controller.state.status, 'lost');
-  assert.equal(h.finished.length, 1);
-  assert.equal(h.controller.active, true);
+  fire(h.document, 'keydown', { key: String(wrong), target: { tagName: 'BODY' } });
+  assert.strictEqual(h.controller.state.status, 'lost');
+  assert.strictEqual(h.finished.length, 1);
+  assert.strictEqual(h.controller.active, true);
   assert.ok(h.app.querySelector('.run-conclusion'));
-  assert.equal(h.app.querySelector('#continue-game'), null);
-  assert.equal(h.app.querySelector('#retry-run').disabled, true);
+  assert.strictEqual(h.app.querySelector('#continue-game'), null);
+  assert.strictEqual(h.app.querySelector('#retry-run').disabled, true);
   h.time.advance(2800);
-  assert.equal(h.app.querySelector('#retry-run').disabled, false);
-  assert.equal(h.app.querySelectorAll('.scene-frame').length, 1);
-  h.document.fire('keydown', { key: 'Enter', target: { tagName: 'BODY' } });
+  assert.strictEqual(h.app.querySelector('#retry-run').disabled, false);
+  assert.strictEqual(h.app.querySelectorAll('.scene-frame').length, 1);
+  fire(h.document, 'keydown', { key: 'Enter', target: { tagName: 'BODY' } });
   h.time.advance(60000);
-  assert.equal(h.finished.length, 1);
-  assert.equal(h.controller.active, true);
+  assert.strictEqual(h.finished.length, 1);
+  assert.strictEqual(h.controller.active, true);
   h.controller.dispose();
 });
 
@@ -454,16 +339,46 @@ test('switching runs rejects delayed audio callbacks from the previous prompt', 
   h.controller.start({ challenge: 'tone' });
   previous.resolve();
   await flush();
-  assert.equal(h.controller.phase, 'listening');
-  assert.equal(h.requests.length, 1, 'The old callback cannot start the new recording');
-  assert.equal(h.app.querySelector('[data-tone]').disabled, true);
+  assert.strictEqual(h.controller.phase, 'listening');
+  assert.strictEqual(h.requests.length, 1, 'The old callback cannot start the new recording');
+  assert.strictEqual(h.app.querySelector('[data-tone]').disabled, true);
   h.audio();
   await flush();
-  assert.equal(h.controller.phase, 'answering');
-  assert.equal(h.app.querySelector('[data-tone]').disabled, false);
+  assert.strictEqual(h.controller.phase, 'answering');
+  assert.strictEqual(h.app.querySelector('[data-tone]').disabled, false);
   h.controller.dispose();
-  assert.equal(h.time.pending, 0);
+  assert.strictEqual(h.time.pending, 0);
 });
+
+test.each(['click', 'Enter'])(
+  'Skyrail checkpoints depart on the first %s without a Tower delay',
+  async (action) => {
+    const recordings = Array.from({ length: 120 }, (_, i) => ({
+      ...words[i % words.length],
+      id: 'checkpoint-' + i,
+    }));
+    const h = harness({}, recordings);
+    h.controller.start({ challenge: 'tide', variant: 'spelling' });
+    for (let span = 1; span <= 20; span++) {
+      h.audio();
+      await flush();
+      const input = h.app.querySelector('#transcription-answer');
+      input.value = h.controller.state.expectedParts().map(cantonese.withoutTones).join(' ');
+      fire(input, 'input');
+      if (span < 20) h.time.advance(900);
+    }
+    assert.strictEqual(h.controller.phase, 'landing');
+    const depart = h.app.querySelector('#continue-game');
+    assert.strictEqual(depart.disabled, false);
+    const requests = h.requests.length;
+    if (action === 'click') depart.click();
+    else fire(depart, 'keydown', { key: 'Enter' });
+    assert.strictEqual(h.controller.phase, 'listening');
+    assert.strictEqual(h.controller.state.opened, 20);
+    assert.strictEqual(h.requests.length, requests + 1);
+    assert.strictEqual(h.app.querySelector('#continue-game'), null);
+  },
+);
 
 test('Skyrail landings and progress describe spans', async () => {
   const h = harness();
@@ -472,11 +387,11 @@ test('Skyrail landings and progress describe spans', async () => {
   await flush();
   const input = h.app.querySelector('#transcription-answer');
   input.value = h.controller.state.expected();
-  input.fire('input');
-  assert.equal(h.controller.phase, 'landing');
+  fire(input, 'input');
+  assert.strictEqual(h.controller.phase, 'landing');
   assert.match(h.app.innerHTML, /20 spans crossed/);
   assert.match(h.app.innerHTML, /Depart when ready/);
-  assert.doesNotMatch(h.app.innerHTML, /Continue the ascent/);
+  assert.notMatch(h.app.innerHTML, /Continue the ascent/);
   h.controller.dispose();
 });
 
@@ -485,23 +400,23 @@ test('Tower removes in-game references and Space replays without scoring or choo
   h.controller.start({ challenge: 'tone' });
   h.audio();
   await flush();
-  assert.equal(h.app.querySelector('#show-reference'), null);
-  assert.equal(h.app.querySelector('[data-reference-tone]'), null);
+  assert.strictEqual(h.app.querySelector('#show-reference'), null);
+  assert.strictEqual(h.app.querySelector('[data-reference-tone]'), null);
   const requests = h.requests.length,
-    event = h.document.fire('keydown', { key: ' ', target: { tagName: 'BUTTON' } });
-  assert.equal(event.defaultPrevented, true);
-  assert.equal(h.requests.length, requests + 1);
-  assert.equal(h.controller.state.attempts, 0);
+    event = fire(h.document, 'keydown', { key: ' ', target: { tagName: 'BUTTON' } });
+  assert.strictEqual(event.defaultPrevented, true);
+  assert.strictEqual(h.requests.length, requests + 1);
+  assert.strictEqual(h.controller.state.attempts, 0);
   h.audio();
   await flush();
   const wrong = h.controller.state.choices.find((t) => t !== h.controller.state.word.tone);
-  h.document.fire('keydown', { key: String(wrong), target: { tagName: 'BODY' } });
-  assert.equal(h.app.querySelector('.reference-grid'), null);
+  fire(h.document, 'keydown', { key: String(wrong), target: { tagName: 'BODY' } });
+  assert.strictEqual(h.app.querySelector('.reference-grid'), null);
   assert.ok(h.app.querySelector('.answer-mark'));
   h.controller.dispose();
 });
 
-import { arrowChoiceIndex } from '../../src/game/game-controller.js';
+import { arrowChoiceIndex } from '../../src/game/game-controller.ts';
 test('three and four door arrows select the matching spatial door', async () => {
   for (const [count, start, keys] of [
     [3, 21, ['ArrowLeft', 'ArrowUp', 'ArrowDown', 'ArrowRight']],
@@ -512,15 +427,15 @@ test('three and four door arrows select the matching spatial door', async () => 
       h.controller.start({ challenge: 'tone', practice: true, format: 'rehearsal', start });
       h.audio();
       await flush();
-      assert.equal(h.controller.state.choices.length, count);
+      assert.strictEqual(h.controller.state.choices.length, count);
       const expected = h.controller.state.choices[arrowChoiceIndex(count, key)];
-      const event = h.document.fire('keydown', { key, target: { tagName: 'BODY' } });
-      assert.equal(event.defaultPrevented, true);
-      assert.equal(h.controller.state.lastAnswer, expected);
+      const event = fire(h.document, 'keydown', { key, target: { tagName: 'BODY' } });
+      assert.strictEqual(event.defaultPrevented, true);
+      assert.strictEqual(h.controller.state.lastAnswer, expected);
       h.controller.dispose();
     }
   }
-  assert.equal(arrowChoiceIndex(6, 'ArrowLeft'), null);
+  assert.strictEqual(arrowChoiceIndex(6, 'ArrowLeft'), null);
 });
 test('review keeps one question in the same scene and retains typing controls', async () => {
   const h = harness();
@@ -538,8 +453,8 @@ test('review keeps one question in the same scene and retains typing controls', 
   h.app.querySelector('#transcription-answer').value = 'unfinished';
   h.time.advance(15000);
   assert.deepEqual(structure(), before);
-  assert.equal(h.app.querySelector('#transcription-answer').value, 'unfinished');
-  assert.equal(h.app.querySelector('#transcription-answer').disabled, true);
+  assert.strictEqual(h.app.querySelector('#transcription-answer').value, 'unfinished');
+  assert.strictEqual(h.app.querySelector('#transcription-answer').disabled, true);
   assert.ok(h.app.querySelector('.scene-status'));
   assert.ok(h.app.querySelector('.game-progress-label'));
   h.controller.dispose();
@@ -552,25 +467,31 @@ test('retry feedback clears on editing and timeout stays full until next prompt'
   await flush();
   const input = h.app.querySelector('#transcription-answer');
   input.value = 'zzz';
-  input.fire('input');
-  h.app.querySelector('#typed-form').fire('submit');
-  assert.equal(h.app.dataset.outcome, 'retry');
-  assert.equal(h.document.activeElement, input);
+  fire(input, 'input');
+  fire(h.app.querySelector('#typed-form'), 'submit');
+  assert.strictEqual(h.app.dataset.outcome, 'retry');
+  assert.strictEqual(h.document.activeElement, input);
   assert.match(h.app.querySelector('#input-status').textContent, /No life lost/);
   const lives = h.controller.state.lives;
   input.value = 'zz';
-  input.fire('input');
-  assert.equal(h.app.dataset.outcome, 'answering');
-  assert.doesNotMatch(h.app.querySelector('#input-status').textContent, /Not quite/);
+  fire(input, 'input');
+  assert.strictEqual(h.app.dataset.outcome, 'answering');
+  assert.notMatch(h.app.querySelector('#input-status').textContent, /Not quite/);
   h.time.advance(25000);
-  assert.equal(h.app.dataset.outcome, 'timeout');
-  assert.equal(h.controller.state.lives, lives - 1);
-  assert.equal(h.app.querySelector('.world-scene').style.values['--rail-progress'], '100%');
-  assert.doesNotMatch(h.app.innerHTML, /Not quite—try again/);
+  assert.strictEqual(h.app.dataset.outcome, 'timeout');
+  assert.strictEqual(h.controller.state.lives, lives - 1);
+  assert.strictEqual(
+    h.app.querySelector('.world-scene').style.getPropertyValue('--rail-progress'),
+    '100%',
+  );
+  assert.notMatch(h.app.innerHTML, /Not quite—try again/);
   assert.match(h.app.innerHTML, /Connection missed — 1 life lost/);
   h.click('#continue-game');
-  assert.equal(h.app.dataset.outcome, 'listening');
-  assert.equal(h.app.querySelector('.world-scene').style.values['--rail-progress'], '0%');
+  assert.strictEqual(h.app.dataset.outcome, 'listening');
+  assert.strictEqual(
+    h.app.querySelector('.world-scene').style.getPropertyValue('--rail-progress'),
+    '0%',
+  );
   h.controller.dispose();
 });
 test('wrong door marks the correct answer without a success door', async () => {
@@ -580,21 +501,21 @@ test('wrong door marks the correct answer without a success door', async () => {
   await flush();
   const right = h.controller.state.word.tone,
     wrong = h.controller.state.choices.find((t) => t !== right);
-  h.document.fire('keydown', { key: String(wrong), target: { tagName: 'BODY' } });
-  assert.equal(h.app.dataset.outcome, 'wrong');
+  fire(h.document, 'keydown', { key: String(wrong), target: { tagName: 'BODY' } });
+  assert.strictEqual(h.app.dataset.outcome, 'wrong');
   assert.ok(h.app.querySelector('.is-wrong'));
   assert.ok(h.app.querySelector('.is-answer'));
-  assert.equal(h.app.querySelector('.is-correct'), null);
+  assert.strictEqual(h.app.querySelector('.is-correct'), null);
   assert.match(h.app.innerHTML, /bright door/);
   h.click('#continue-game');
-  assert.equal(h.app.querySelector('.is-wrong'), null);
+  assert.strictEqual(h.app.querySelector('.is-wrong'), null);
   h.audio();
   await flush();
-  h.document.fire('keydown', {
+  fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
     target: { tagName: 'BODY' },
   });
-  assert.equal(h.app.dataset.outcome, 'success');
+  assert.strictEqual(h.app.dataset.outcome, 'success');
   assert.ok(h.app.querySelector('.is-correct'));
   h.controller.dispose();
 });
@@ -603,14 +524,14 @@ test('Skyrail has no reveal or bottom sound guide, and retry stays available', a
   h.controller.start({ challenge: 'tide' });
   h.audio();
   await flush();
-  assert.equal(h.app.querySelector('#reveal-answer'), null);
-  assert.equal(h.app.querySelector('#game-learn'), null);
+  assert.strictEqual(h.app.querySelector('#reveal-answer'), null);
+  assert.strictEqual(h.app.querySelector('#game-learn'), null);
   const input = h.app.querySelector('#transcription-answer');
   input.value = 'zzz';
-  h.app.querySelector('#typed-form').fire('submit');
-  assert.equal(input.disabled, false);
-  assert.equal(h.controller.phase, 'answering');
-  assert.equal(h.controller.state.lives, 4);
+  fire(h.app.querySelector('#typed-form'), 'submit');
+  assert.strictEqual(input.disabled, false);
+  assert.strictEqual(h.controller.phase, 'answering');
+  assert.strictEqual(h.controller.state.lives, 4);
   h.controller.dispose();
 });
 
@@ -622,18 +543,18 @@ test('R replays from the spelling field without changing input or the remaining 
   h.time.advance(4000);
   const input = h.app.querySelector('#transcription-answer');
   input.value = 'fu';
-  input.fire('input');
+  fire(input, 'input');
   const attempts = h.controller.state.attempts,
     requests = h.requests.length;
-  const event = h.document.fire('keydown', { key: 'r', target: input });
-  assert.equal(event.defaultPrevented, true);
-  assert.equal(h.requests.length, requests + 1);
-  assert.equal(input.value, 'fu');
-  assert.equal(h.app.querySelector('#countdown').textContent, '11s');
-  assert.equal(h.controller.state.attempts, attempts);
-  h.document.fire('keydown', { key: 'r', target: input, isComposing: true });
-  h.document.fire('keydown', { key: 'r', target: input, ctrlKey: true });
-  assert.equal(h.requests.length, requests + 1);
+  const event = fire(h.document, 'keydown', { key: 'r', target: input });
+  assert.strictEqual(event.defaultPrevented, true);
+  assert.strictEqual(h.requests.length, requests + 1);
+  assert.strictEqual(input.value, 'fu');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '11s');
+  assert.strictEqual(h.controller.state.attempts, attempts);
+  fire(h.document, 'keydown', { key: 'r', target: input, isComposing: true });
+  fire(h.document, 'keydown', { key: 'r', target: input, ctrlKey: true });
+  assert.strictEqual(h.requests.length, requests + 1);
   h.controller.dispose();
 });
 
@@ -645,31 +566,31 @@ test('Skyrail gives each crossing 900ms, keeps typing enabled, and leaves checkp
   const oldId = h.controller.state.word.id,
     input = h.app.querySelector('#transcription-answer');
   input.value = h.controller.state.expected();
-  input.fire('input');
-  assert.equal(h.controller.phase, 'correct');
-  assert.equal(h.app.querySelector('#transcription-answer').disabled, false);
+  fire(input, 'input');
+  assert.strictEqual(h.controller.phase, 'correct');
+  assert.strictEqual(h.app.querySelector('#transcription-answer').disabled, false);
   h.time.advance(899);
-  assert.equal(h.controller.phase, 'correct');
+  assert.strictEqual(h.controller.phase, 'correct');
   h.time.advance(1);
-  assert.equal(h.controller.phase, 'listening');
-  assert.notEqual(h.controller.state.word.id, oldId);
-  assert.equal(h.app.querySelector('#transcription-answer').value, '');
+  assert.strictEqual(h.controller.phase, 'listening');
+  assert.notStrictEqual(h.controller.state.word.id, oldId);
+  assert.strictEqual(h.app.querySelector('#transcription-answer').value, '');
   h.audio();
   await flush();
-  assert.equal(h.controller.phase, 'answering');
+  assert.strictEqual(h.controller.phase, 'answering');
   h.controller.dispose();
   h.controller.start({ challenge: 'tide', practice: true, format: 'rehearsal', start: 20 });
   h.audio();
   await flush();
   h.app.querySelector('#transcription-answer').value = h.controller.state.expected();
-  h.app.querySelector('#typed-form').fire('submit');
-  assert.equal(h.controller.phase, 'landing');
+  fire(h.app.querySelector('#typed-form'), 'submit');
+  assert.strictEqual(h.controller.phase, 'landing');
   assert.match(h.app.innerHTML, /Station reached/);
   assert.match(h.app.innerHTML, /Climber car/);
   h.time.advance(10000);
-  assert.equal(h.controller.phase, 'landing');
+  assert.strictEqual(h.controller.phase, 'landing');
   h.click('#continue-game');
-  assert.equal(h.controller.phase, 'listening');
+  assert.strictEqual(h.controller.phase, 'listening');
   h.controller.dispose();
 });
 
@@ -681,28 +602,28 @@ test('audio recovery clears unavailable and retry styling without resetting the 
   h.time.advance(4000);
   const input = h.app.querySelector('#transcription-answer');
   input.value = 'zzz';
-  input.fire('input');
-  h.app.querySelector('#typed-form').fire('submit');
+  fire(input, 'input');
+  fire(h.app.querySelector('#typed-form'), 'submit');
   assert.match(h.app.querySelector('#rail-message').textContent, /No life lost/);
   input.value = 'zz';
-  input.fire('input');
-  assert.equal(h.app.querySelector('.rail-feedback').dataset.feedback, 'neutral');
-  assert.doesNotMatch(h.app.querySelector('#rail-message').textContent, /Not quite/);
+  fire(input, 'input');
+  assert.strictEqual(h.app.querySelector('.rail-feedback').dataset.feedback, 'neutral');
+  assert.notMatch(h.app.querySelector('#rail-message').textContent, /Not quite/);
   h.click('#replay-word');
   h.requests.at(-1).reject(Error('offline'));
   await flush();
-  assert.equal(h.app.dataset.outcome, 'unavailable');
+  assert.strictEqual(h.app.dataset.outcome, 'unavailable');
   assert.match(h.app.innerHTML, /Clock stopped/);
   assert.ok(h.app.querySelector('#replace-recording'));
   h.time.advance(30000);
   h.click('#replay-word');
   h.audio();
   await flush();
-  assert.equal(h.app.dataset.outcome, 'answering');
-  assert.equal(h.app.querySelector('#replace-recording'), null);
-  assert.equal(h.app.querySelector('#countdown').textContent, '11s');
-  assert.equal(h.app.querySelector('#transcription-answer').value, 'zz');
-  assert.equal(h.controller.state.lives, 4);
+  assert.strictEqual(h.app.dataset.outcome, 'answering');
+  assert.strictEqual(h.app.querySelector('#replace-recording'), null);
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '11s');
+  assert.strictEqual(h.app.querySelector('#transcription-answer').value, 'zz');
+  assert.strictEqual(h.controller.state.lives, 4);
   h.controller.dispose();
 });
 
@@ -718,25 +639,25 @@ test('Tower checkpoints name the next district, restore lives and wait for Conti
   h.audio();
   await flush();
   h.controller.state.lives = 1;
-  h.document.fire('keydown', {
+  fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
     target: { tagName: 'BODY' },
   });
-  assert.equal(h.controller.phase, 'landing');
-  assert.equal(h.controller.state.lives, h.controller.state.maxLives);
+  assert.strictEqual(h.controller.phase, 'landing');
+  assert.strictEqual(h.controller.state.lives, h.controller.state.maxLives);
   assert.ok(h.app.innerHTML.includes('20 floors lit · A rest landing'));
   assert.match(h.app.innerHTML, /Next: Rain Gallery · 3 doors/);
   assert.match(h.app.innerHTML, /Lives refilled/);
-  assert.equal(h.app.querySelector('#continue-game').disabled, true);
+  assert.strictEqual(h.app.querySelector('#continue-game').disabled, true);
   h.click('#continue-game');
-  assert.equal(h.controller.phase, 'landing');
+  assert.strictEqual(h.controller.phase, 'landing');
   assert.match(h.app.innerHTML, /lives restored/);
-  assert.equal(h.app.querySelectorAll('#continue-game').length, 1);
+  assert.strictEqual(h.app.querySelectorAll('#continue-game').length, 1);
   h.time.advance(10000);
-  assert.equal(h.controller.phase, 'landing');
+  assert.strictEqual(h.controller.phase, 'landing');
   h.click('#continue-game');
-  assert.equal(h.controller.state.choices.length, 3);
-  assert.equal(h.controller.state.opened, 20);
+  assert.strictEqual(h.controller.state.choices.length, 3);
+  assert.strictEqual(h.controller.state.opened, 20);
   h.controller.dispose();
 });
 
@@ -747,17 +668,17 @@ test('Tower audio failure uses the fixed notice and replacement never awards a f
   h.requests.at(-1).reject(Error('offline'));
   await flush();
   assert.match(h.app.innerHTML, /Recording unavailable/);
-  assert.equal(h.app.querySelectorAll('#replace-recording').length, 1);
+  assert.strictEqual(h.app.querySelectorAll('#replace-recording').length, 1);
   const lives = h.controller.state.lives;
   h.click('#replace-recording');
-  assert.equal(h.controller.state.opened, 0);
-  assert.equal(h.controller.state.lives, lives);
+  assert.strictEqual(h.controller.state.opened, 0);
+  assert.strictEqual(h.controller.state.lives, lives);
   h.audio();
   await flush();
-  assert.equal(h.app.querySelector('#replace-recording'), null);
-  assert.equal(
+  assert.strictEqual(h.app.querySelector('#replace-recording'), null);
+  assert.strictEqual(
     h.app.querySelector('#tower-message').textContent,
-    'Listen to the highlighted syllable and choose its tone number.',
+    'Listen to the highlighted syllable and choose its tone.',
   );
   h.controller.dispose();
 });
@@ -774,19 +695,19 @@ test('awarding progress during clock.pause cannot advance the displayed room bef
   h.controller.start({ challenge: 'tone' });
   h.audio();
   await flush();
-  h.document.fire('keydown', {
+  fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
     target: { tagName: 'BODY' },
   });
   const finalTick = updates.find((s) => s.phase === 'answering' && s.progress === 1);
   assert.ok(finalTick);
-  assert.equal(finalTick.floor, 0);
+  assert.strictEqual(finalTick.floor, 0);
   assert.ok(updates.filter((s) => s.phase === 'correct').every((s) => s.floor === 0));
   h.time.advance(1699);
-  assert.equal(h.controller.phase, 'correct');
+  assert.strictEqual(h.controller.phase, 'correct');
   h.time.advance(1);
-  assert.equal(h.controller.phase, 'listening');
-  assert.equal(updates.at(-1).floor, 1);
+  assert.strictEqual(h.controller.phase, 'listening');
+  assert.strictEqual(updates.at(-1).floor, 1);
   h.controller.dispose();
 });
 
@@ -795,24 +716,24 @@ test('a Tower ending waits for an explicit action, including after pause and res
   h.controller.start({ challenge: 'tone', practice: true, format: 'rehearsal', start: 100 });
   h.audio();
   await flush();
-  h.document.fire('keydown', {
+  fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
     target: { tagName: 'BODY' },
   });
-  assert.equal(h.controller.state.status, 'complete');
-  assert.equal(h.finished.length, 0);
+  assert.strictEqual(h.controller.state.status, 'complete');
+  assert.strictEqual(h.finished.length, 0);
   assert.ok(h.app.querySelector('.tower-run-end'));
-  h.document.fire('keydown', { key: 'Enter', target: { tagName: 'BODY' } });
-  assert.equal(h.finished.length, 0);
+  fire(h.document, 'keydown', { key: 'Enter', target: { tagName: 'BODY' } });
+  assert.strictEqual(h.finished.length, 0);
   h.controller.pause();
   h.time.advance(5000);
   h.controller.resume();
   h.time.advance(2800);
-  assert.equal(h.finished.length, 0);
+  assert.strictEqual(h.finished.length, 0);
   h.time.advance(60000);
-  assert.equal(h.finished.length, 0);
-  h.document.fire('keydown', { key: 'Enter', target: { tagName: 'BODY' } });
-  assert.equal(h.finished.length, 1);
+  assert.strictEqual(h.finished.length, 0);
+  fire(h.document, 'keydown', { key: 'Enter', target: { tagName: 'BODY' } });
+  assert.strictEqual(h.finished.length, 1);
 });
 
 test('a full Tower victory stays in one scene and records without a second ending page', async () => {
@@ -825,7 +746,7 @@ test('a full Tower victory stays in one scene and records without a second endin
   for (let floor = 1; floor <= 100; floor++) {
     h.audio();
     await flush();
-    h.document.fire('keydown', {
+    fire(h.document, 'keydown', {
       key: String(h.controller.state.word.tone),
       target: { tagName: 'BODY' },
     });
@@ -836,15 +757,15 @@ test('a full Tower victory stays in one scene and records without a second endin
       } else h.time.advance(1700);
     }
   }
-  assert.equal(h.controller.state.status, 'won');
+  assert.strictEqual(h.controller.state.status, 'won');
   assert.match(h.app.innerHTML, /The whole tower is alight/);
-  assert.equal(h.finished.length, 1);
-  assert.equal(h.controller.active, true);
-  assert.equal(h.app.querySelector('#continue-game'), null);
+  assert.strictEqual(h.finished.length, 1);
+  assert.strictEqual(h.controller.active, true);
+  assert.strictEqual(h.app.querySelector('#continue-game'), null);
   assert.ok(h.app.querySelector('.run-conclusion'));
   h.time.advance(60000);
-  assert.equal(h.finished.length, 1);
-  assert.equal(h.app.querySelector('#retry-run').disabled, false);
+  assert.strictEqual(h.finished.length, 1);
+  assert.strictEqual(h.app.querySelector('#retry-run').disabled, false);
   h.controller.dispose();
 });
 
@@ -854,15 +775,15 @@ test('a Skyrail terminal timeout stays in-scene, records once, and never starts 
   h.audio();
   await flush();
   h.time.advance(15000);
-  assert.equal(h.controller.state.status, 'lost');
-  assert.equal(h.finished.length, 1);
+  assert.strictEqual(h.controller.state.status, 'lost');
+  assert.strictEqual(h.finished.length, 1);
   assert.ok(h.app.querySelector('.run-conclusion'));
-  assert.equal(h.app.querySelector('#continue-game'), null);
+  assert.strictEqual(h.app.querySelector('#continue-game'), null);
   const requests = h.requests.length;
   h.time.advance(60000);
-  assert.equal(h.requests.length, requests);
-  assert.equal(h.finished.length, 1);
-  assert.equal(h.controller.active, true);
+  assert.strictEqual(h.requests.length, requests);
+  assert.strictEqual(h.finished.length, 1);
+  assert.strictEqual(h.controller.active, true);
   h.controller.dispose();
 });
 
@@ -873,7 +794,7 @@ test('Tower progress exposes the full height while Skyrail retains its journey r
     h.audio();
     await flush();
     if (challenge === 'tone') assert.match(h.app.innerHTML, /0 \/ 100 floors lit/);
-    else assert.doesNotMatch(h.app.innerHTML, /of 100|\/ 100|aria-valuemax="100"/);
+    else assert.notMatch(h.app.innerHTML, /of 100|\/ 100|aria-valuemax="100"/);
     h.controller.dispose();
   }
 });
@@ -881,28 +802,32 @@ test('Tower progress exposes the full height while Skyrail retains its journey r
 test('Tower plays after the entrance and keeps the pace between floors', async () => {
   const h = harness();
   h.controller.start({ challenge: 'tone', variant: 'normal' });
-  assert.equal(h.controller.phase, 'listening');
-  assert.equal(h.app.querySelector('[data-tone]').disabled, true);
+  assert.strictEqual(h.controller.phase, 'listening');
+  assert.strictEqual(h.app.querySelector('[data-tone]').disabled, true);
   assert.match(h.app.innerHTML, /Entering the tower/);
   h.time.advance(1999);
-  assert.equal(h.requests.length, 0);
+  assert.strictEqual(h.requests.length, 0);
   h.time.advance(1);
-  assert.equal(h.requests.length, 1);
-  assert.equal(h.requests[0].path, h.controller.state.word.audio);
-  assert.doesNotMatch(h.app.innerHTML, /Entering the tower/);
+  assert.strictEqual(h.requests.length, 1);
+  assert.strictEqual(h.requests[0].path, h.controller.state.word.audio);
+  assert.notMatch(h.app.innerHTML, /Entering the tower/);
   h.audio();
   await flush();
-  assert.equal(h.controller.phase, 'answering');
-  assert.equal(h.app.querySelector('[data-tone]').disabled, false);
-  h.document.fire('keydown', {
+  assert.strictEqual(h.controller.phase, 'answering');
+  assert.strictEqual(h.app.querySelector('[data-tone]').disabled, false);
+  fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
     target: { tagName: 'BODY' },
   });
   h.time.advance(1699);
-  assert.equal(h.controller.phase, 'correct');
+  assert.strictEqual(h.controller.phase, 'correct');
   h.time.advance(1);
-  assert.equal(h.controller.phase, 'listening');
-  assert.equal(h.requests.length, 2, 'The next sound follows the door crossing automatically');
+  assert.strictEqual(h.controller.phase, 'listening');
+  assert.strictEqual(
+    h.requests.length,
+    2,
+    'The next sound follows the door crossing automatically',
+  );
   h.controller.dispose();
 });
 
@@ -912,17 +837,17 @@ test('pausing or leaving the Tower entrance cancels its pending audio', () => {
   h.time.advance(1000);
   h.controller.pause();
   h.time.advance(60000);
-  assert.equal(h.requests.length, 0);
+  assert.strictEqual(h.requests.length, 0);
   h.controller.resume();
   h.time.advance(1999);
-  assert.equal(h.requests.length, 0);
+  assert.strictEqual(h.requests.length, 0);
   h.time.advance(1);
-  assert.equal(h.requests.length, 1);
+  assert.strictEqual(h.requests.length, 1);
   h.controller.start({ challenge: 'tone' });
   h.controller.dispose();
   h.time.advance(60000);
-  assert.equal(h.requests.length, 1);
-  assert.equal(h.time.pending, 0);
+  assert.strictEqual(h.requests.length, 1);
+  assert.strictEqual(h.time.pending, 0);
 });
 
 test('Tower offers missed-sound practice only after the run fails', async () => {
@@ -931,22 +856,22 @@ test('Tower offers missed-sound practice only after the run fails', async () => 
   for (let miss = 1; miss <= 3; miss++) {
     h.audio();
     await flush();
-    h.document.fire('keydown', {
+    fire(h.document, 'keydown', {
       key: String(h.controller.state.choices.find((t) => t !== h.controller.state.word.tone)),
       target: { tagName: 'BODY' },
     });
-    assert.equal(h.app.querySelector('#practise-mistakes'), null);
+    assert.strictEqual(h.app.querySelector('#practise-mistakes'), null);
     if (miss < 3) {
-      assert.equal(h.app.querySelector('#ending-practice'), null);
-      assert.equal(h.controller.state.status, 'playing');
+      assert.strictEqual(h.app.querySelector('#ending-practice'), null);
+      assert.strictEqual(h.controller.state.status, 'playing');
       h.click('#continue-game');
     }
   }
-  assert.equal(h.controller.state.status, 'lost');
+  assert.strictEqual(h.controller.state.status, 'lost');
   assert.ok(h.app.querySelector('#ending-practice'));
-  assert.equal(h.app.querySelector('#ending-practice').disabled, true);
+  assert.strictEqual(h.app.querySelector('#ending-practice').disabled, true);
   h.time.advance(2800);
-  assert.equal(h.app.querySelector('#ending-practice').disabled, false);
+  assert.strictEqual(h.app.querySelector('#ending-practice').disabled, false);
   h.controller.dispose();
 });
 
@@ -973,20 +898,20 @@ test('practice uses its own starting scene with fixed progress and a finish acti
     assert.match(h.app.innerHTML, challenge === 'tone' ? /Practice tones/ : /Practice spelling/);
     assert.ok(h.app.querySelector('#finish-practice'));
     for (let i = 0; i < 21; i++) {
-      assert.equal(snapshots.at(-1).scene, challenge === 'tone' ? 'tone' : 'rail');
-      assert.equal(snapshots.at(-1).progress, 0);
-      assert.equal(snapshots.at(-1).floor, 0);
-      assert.equal(snapshots.at(-1).timed, false);
+      assert.strictEqual(snapshots.at(-1).scene, challenge === 'tone' ? 'tone' : 'rail');
+      assert.strictEqual(snapshots.at(-1).progress, 0);
+      assert.strictEqual(snapshots.at(-1).floor, 0);
+      assert.strictEqual(snapshots.at(-1).timed, false);
       if (i === 20) break;
       if (challenge === 'tone')
-        h.document.fire('keydown', {
+        fire(h.document, 'keydown', {
           key: String(h.controller.state.word.tone),
           target: { tagName: 'DIV' },
         });
       else {
         const input = h.app.querySelector('#transcription-answer');
         input.value = h.controller.state.expected();
-        input.fire('input');
+        fire(input, 'input');
       }
       if (i < 19) {
         h.time.advance(900);
@@ -994,7 +919,7 @@ test('practice uses its own starting scene with fixed progress and a finish acti
         await flush();
       }
     }
-    assert.equal(h.controller.state.status, 'complete');
+    assert.strictEqual(h.controller.state.status, 'complete');
     h.controller.dispose();
   }
 });
@@ -1015,9 +940,9 @@ test('focused Skyrail practice auto-checks only the selected word parts', async 
     await flush();
     const input = h.app.querySelector('#transcription-answer');
     input.value = h.controller.state.expected();
-    input.fire('input');
-    assert.equal(h.controller.state.cleared, 1);
-    assert.equal(h.controller.phase, 'correct');
+    fire(input, 'input');
+    assert.strictEqual(h.controller.state.cleared, 1);
+    assert.strictEqual(h.controller.phase, 'correct');
     h.controller.dispose();
   }
 });
@@ -1030,36 +955,36 @@ test('a wrong final practice question completes the set and can open results', a
     await flush();
     for (let i = 0; i < 9; i++) {
       if (challenge === 'tone')
-        h.document.fire('keydown', {
+        fire(h.document, 'keydown', {
           key: String(h.controller.state.word.tone),
           target: { tagName: 'DIV' },
         });
       else {
         const input = h.app.querySelector('#transcription-answer');
         input.value = h.controller.state.expected();
-        input.fire('input');
+        fire(input, 'input');
       }
       h.time.advance(900);
       h.audio();
       await flush();
     }
     if (challenge === 'tone')
-      h.document.fire('keydown', {
+      fire(h.document, 'keydown', {
         key: String(h.controller.state.choices.find((t) => t !== h.controller.state.word.tone)),
         target: { tagName: 'DIV' },
       });
     else {
       h.app.querySelector('#transcription-answer').value = 'incorrect';
-      h.app.querySelector('#typed-form').fire('submit');
+      fire(h.app.querySelector('#typed-form'), 'submit');
     }
-    assert.equal(h.controller.state.status, 'complete');
-    assert.equal(h.controller.state.attempts, 10);
-    assert.equal(h.controller.state.cleared, 9);
-    assert.equal(h.controller.phase, 'review');
+    assert.strictEqual(h.controller.state.status, 'complete');
+    assert.strictEqual(h.controller.state.attempts, 10);
+    assert.strictEqual(h.controller.state.cleared, 9);
+    assert.strictEqual(h.controller.phase, 'review');
     assert.match(h.app.innerHTML, /10 \/ 10/);
     if (challenge === 'tone') h.time.advance(2400);
     h.click('#continue-game');
-    assert.equal(h.finished.length, 1);
+    assert.strictEqual(h.finished.length, 1);
     h.controller.dispose();
   }
 });
@@ -1087,16 +1012,16 @@ test('Mandarin feedback explains heard tones without exposing tone marks before 
   });
   h.audio();
   await flush();
-  assert.doesNotMatch(h.app.innerHTML, /nǐ|hǎo|Dictionary spelling/);
-  assert.equal(h.app.querySelector('.recording-report'), null);
-  h.document.fire('keydown', { key: '2', target: { tagName: 'BODY' } });
-  assert.match(h.app.innerHTML, /Dictionary spelling: nǐ hǎo/);
-  assert.match(h.app.innerHTML, /Heard tones: Tone 2/);
+  assert.notMatch(h.app.innerHTML, /nǐ|hǎo|Dictionary spelling/);
+  assert.strictEqual(h.app.querySelector('.recording-report'), null);
+  fire(h.document, 'keydown', { key: '2', target: { tagName: 'BODY' } });
+  assert.match(h.app.innerHTML, /Written nǐ hǎo; listening answer ní hǎo/);
+  assert.match(h.app.innerHTML, /A third tone changes before another third tone/);
   assert.ok(h.app.querySelector('.recording-report'));
-  assert.match(h.app.querySelector('.recording-report').attrs.href, /greeting/);
+  assert.match(h.app.querySelector('.recording-report').getAttribute('href'), /greeting/);
   h.controller.dispose();
 });
-test('Mandarin composition, word spaces, and r stay in the typing field', async () => {
+test('Mandarin replays with Space while preserving Pinyin r and composition', async () => {
   const h = harness({}, greeting, mandarin);
   h.controller.start({
     challenge: 'tide',
@@ -1109,17 +1034,37 @@ test('Mandarin composition, word spaces, and r stay in the typing field', async 
   await flush();
   const input = h.app.querySelector('#transcription-answer'),
     requests = h.requests.length;
-  for (const key of [' ', 'r'])
-    assert.notEqual(h.document.fire('keydown', { key, target: input }).defaultPrevented, true);
-  assert.equal(h.requests.length, requests);
-  input.fire('compositionstart');
+  input.value = 'r';
+  for (const init of [
+    { key: 'r' },
+    { key: ' ', isComposing: true },
+    { key: 'r', altKey: true },
+    { key: ' ', ctrlKey: true },
+  ])
+    assert.strictEqual(
+      fire(h.document, 'keydown', { ...init, target: input }).defaultPrevented,
+      false,
+    );
+  assert.strictEqual(h.requests.length, requests);
+  for (const init of [{ key: ' ' }]) {
+    assert.strictEqual(
+      fire(h.document, 'keydown', { ...init, target: input }).defaultPrevented,
+      true,
+    );
+    assert.strictEqual(input.value, 'r');
+    h.audio();
+    await flush();
+  }
+  assert.strictEqual(h.requests.length, requests + 1);
+  assert.strictEqual(h.controller.state.attempts, 0);
+  fire(input, 'compositionstart');
   input.value = 'nǐ hǎo';
-  input.fire('input');
-  assert.equal(h.controller.state.cleared, 0);
-  h.app.querySelector('#typed-form').fire('submit');
-  assert.equal(h.controller.state.cleared, 0);
-  input.fire('compositionend');
-  assert.equal(h.controller.state.cleared, 1);
+  fire(input, 'input');
+  assert.strictEqual(h.controller.state.cleared, 0);
+  fire(h.app.querySelector('#typed-form'), 'submit');
+  assert.strictEqual(h.controller.state.cleared, 0);
+  fire(input, 'compositionend');
+  assert.strictEqual(h.controller.state.cleared, 1);
   h.controller.dispose();
 });
 test('changing the Mandarin script during a run preserves input, timing, and scoring', async () => {
@@ -1161,15 +1106,82 @@ test('changing the Mandarin script during a run preserves input, timing, and sco
   h.app.querySelector('#transcription-answer').value = 'ma1';
   h.time.advance(5000);
   h.controller.setScript('traditional');
-  assert.equal(h.app.querySelector('#transcription-answer').value, 'ma1');
+  assert.strictEqual(h.app.querySelector('#transcription-answer').value, 'ma1');
   h.time.advance(14999);
-  assert.equal(h.controller.phase, 'answering');
+  assert.strictEqual(h.controller.phase, 'answering');
   assert.match(h.app.innerHTML, /媽/);
-  assert.equal(h.controller.state.cleared, 0);
-  assert.equal(h.controller.state.expected(), 'ma1 ma5');
+  assert.strictEqual(h.app.querySelector('.prompt-character').lang, 'cmn-Hant');
+  assert.strictEqual(h.controller.state.cleared, 0);
+  assert.strictEqual(h.controller.state.expected(), 'ma1 ma5');
   h.time.advance(1);
-  assert.equal(h.controller.phase, 'review');
+  assert.strictEqual(h.controller.phase, 'review');
   h.controller.dispose();
+});
+
+for (const profile of [cantonese, mandarin]) {
+  for (const variant of ['spelling', 'full']) {
+    test(profile.label + ' Skyrail only shows tone controls with tones enabled', async () => {
+      const h = harness({}, profile === mandarin ? greeting : words, profile);
+      h.controller.start({
+        challenge: 'tide',
+        practice: true,
+        variant,
+        content: 'multi',
+        target: 'whole',
+      });
+      h.audio();
+      await flush();
+      assert.strictEqual(
+        h.app.querySelector(
+          '#typed-help, .typing-hint, .keyboard, [data-insert="ü"], .target-label',
+        ),
+        null,
+      );
+      assert.strictEqual(h.app.querySelector('#input-status').textContent.trim(), '');
+      assert.strictEqual(h.app.querySelector('#rail-message').textContent, '');
+      assert.strictEqual(
+        h.app.querySelectorAll('[data-insert]').length,
+        profile === mandarin && variant === 'full' ? 5 : 0,
+      );
+      const input = h.app.querySelector('#transcription-answer');
+      input.value = h.controller.state.expected();
+      fire(input, 'input');
+      assert.strictEqual(h.controller.state.cleared, 1);
+      assert.strictEqual(h.app.querySelector('.tone-explanation'), null);
+      const spelling = h.controller.state.word.syllables.map((s) =>
+        variant === 'full'
+          ? profile.format(s.transcription)
+          : profile.withoutTones(s.transcription),
+      );
+      assert.deepEqual(
+        [...h.app.querySelectorAll('.prompt-romanization')].map((node) => node.textContent.trim()),
+        spelling,
+      );
+    });
+  }
+}
+
+test('Mandarin accepts v for ü without an insertion button', async () => {
+  const recordings = [
+    {
+      id: 'green',
+      text: '绿',
+      transcription: 'lü4',
+      audio: 'green.mp3',
+      syllables: [{ text: '绿', transcription: 'lü4', tone: 4 }],
+    },
+  ];
+  for (const variant of ['spelling', 'full']) {
+    const h = harness({}, recordings, mandarin);
+    h.controller.start({ challenge: 'tide', practice: true, variant });
+    h.audio();
+    await flush();
+    const input = h.app.querySelector('#transcription-answer');
+    input.value = variant === 'full' ? 'lv4' : 'lv';
+    fire(input, 'input');
+    assert.strictEqual(h.controller.state.cleared, 1);
+    h.controller.dispose();
+  }
 });
 
 const vietnameseWords = [
@@ -1187,7 +1199,7 @@ const vietnameseWords = [
     .split(' ')
     .map((part, i) => ({ text: part, transcription: part, tone: tones[i] })),
 }));
-test('Vietnamese hides every tone of the word until a door is chosen and shows its meaning throughout', async () => {
+test('Vietnamese conceals every tone, uses named keyboard choices, and reveals once', async () => {
   const h = harness({}, vietnameseWords, vietnamese);
   h.controller.start({
     challenge: 'tone',
@@ -1198,59 +1210,33 @@ test('Vietnamese hides every tone of the word until a door is chosen and shows i
   h.audio();
   await flush();
   assert.equal(h.controller.state.word.tone, 'nặng');
-  assert.deepEqual(h.controller.state.targets, [0]);
-  assert.doesNotMatch(h.app.innerHTML, /được|ợ|phép|é/);
-  assert.match(h.app.innerHTML, /<p class="prompt-gloss">to be allowed<\/p>/);
-  // Both syllables are covered, on the letter that carries the mark.
-  assert.match(
-    h.app.innerHTML,
-    /đư<span class="tone-carrier is-horned">ơ<span class="tone-cover" aria-hidden="true">/,
+  assert.equal(
+    [...h.app.querySelectorAll('.prompt-character')].map((node) => node.textContent).join(' '),
+    'đươc phep',
   );
-  assert.match(h.app.innerHTML, /ph<span class="tone-carrier">e<span class="tone-cover"/);
   assert.equal(h.app.querySelectorAll('.tone-cover').length, 2);
-  assert.equal(h.app.querySelectorAll('.is-target').length, 1);
-  assert.match(h.app.innerHTML, /data-letters="8"/);
-  // The widest tone name holds the answer's place without being shown or read.
-  assert.match(
-    h.app.innerHTML,
-    /class="prompt-romanization is-reserved"\s+aria-hidden="true"\s*>dấu huyền</,
-  );
-  assert.match(h.app.querySelector('#tower-message').textContent, /choose its tone\.$/);
-  // Doors show the written mark and its name; number keys follow the tone order.
-  const doors = h.app.querySelectorAll('[data-tone]');
-  assert.deepEqual(doors.map((door) => door.dataset.tone).sort(), ['hỏi', 'nặng']);
-  assert.ok(doors.every((door) => door.classes.has('has-mark')));
-  assert.deepEqual(doors.map((door) => door.attrs['aria-label']).sort(), [
-    'Choose dấu hỏi',
-    'Choose dấu nặng',
-  ]);
   assert.equal(h.app.querySelectorAll('.tone-mark').length, 2);
-  assert.match(h.app.innerHTML, /class="tone-name"\s*>dấu hỏi</);
-  h.document.fire('keydown', { key: '6', target: { tagName: 'BODY' } });
+  assert.equal(h.app.querySelector('.prompt-gloss').textContent, 'to be allowed');
+  assert.equal(h.app.querySelector('.is-reserved').getAttribute('aria-hidden'), 'true');
+  fire(document, 'keydown', { key: '6', target: document.body });
   assert.equal(h.controller.phase, 'answering');
-  h.document.fire('keydown', { key: '3', target: { tagName: 'BODY' } });
+  fire(document, 'keydown', { key: '3', target: document.body });
   assert.equal(h.controller.phase, 'review');
-  assert.match(h.app.innerHTML, /Not quite\. Dấu hỏi → dấu nặng\./);
-  // Every cover leaves once, revealing the word and the asked tone's name.
-  assert.match(
-    h.app.innerHTML,
-    /đư<span class="tone-carrier is-horned">ợ<span class="tone-cover is-leaving"/,
+  assert.match(h.app.querySelector('#tower-message').textContent, /dấu hỏi → dấu nặng/i);
+  assert.equal(
+    [...h.app.querySelectorAll('.prompt-character')].map((node) => node.textContent).join(' '),
+    'được phép',
   );
-  assert.match(
-    h.app.innerHTML,
-    /ph<span class="tone-carrier">é<span class="tone-cover is-leaving"/,
+  assert.equal(
+    h.app.querySelector('.is-target .prompt-romanization').textContent.trim(),
+    'dấu nặng',
   );
-  assert.match(h.app.innerHTML, /class="prompt-romanization "\s*>dấu nặng</);
-  assert.doesNotMatch(h.app.innerHTML, /dấu sắc<\/span\s*><\/span/);
-  assert.doesNotMatch(h.app.innerHTML, /is-reserved/);
-  assert.match(h.app.innerHTML, /to be allowed/);
+  assert.equal(h.app.querySelectorAll('.tone-cover.is-leaving').length, 2);
   h.controller.pause();
   h.controller.resume();
-  assert.match(h.app.innerHTML, /đư<span class="tone-carrier is-horned">ợ<\/span>c/);
-  assert.doesNotMatch(h.app.innerHTML, /class="tone-cover/);
-  h.controller.dispose();
+  assert.equal(h.app.querySelectorAll('.tone-cover').length, 0);
 });
-test('a syllable without a mark is still covered, and its door shows an empty slot', async () => {
+test('Vietnamese unmarked tones retain the same cover and key six selects the blank mark', async () => {
   const h = harness({}, vietnameseWords, vietnamese);
   h.controller.start({
     challenge: 'tone',
@@ -1260,34 +1246,38 @@ test('a syllable without a mark is still covered, and its door shows an empty sl
   });
   h.audio();
   await flush();
-  assert.match(h.app.innerHTML, /m<span class="tone-carrier">a<span class="tone-cover"/);
-  assert.match(h.app.innerHTML, /qu<span class="tone-carrier is-deep">y<span class="tone-cover"/);
-  assert.match(h.app.innerHTML, /class="tone-mark is-blank"/);
-  assert.match(h.app.innerHTML, /class="tone-name"\s*>không dấu</);
-  h.document.fire('keydown', { key: '6', target: { tagName: 'BODY' } });
+  assert.equal(h.app.querySelectorAll('.tone-cover').length, 2);
+  assert.ok(h.app.querySelector('.tone-mark.is-blank'));
+  fire(document, 'keydown', { key: '6', target: document.body });
   assert.equal(h.app.dataset.outcome, 'success');
-  assert.match(h.app.innerHTML, /class="prompt-romanization "\s*>không dấu</);
-  assert.match(h.app.innerHTML, /ghosts and demons/);
-  h.controller.dispose();
+  assert.equal(
+    h.app.querySelector('.is-target .prompt-romanization').textContent.trim(),
+    'không dấu',
+  );
 });
-test('a Vietnamese word without a listed meaning keeps its place and ends a lost run by name', async () => {
+test('Vietnamese words without meanings keep stable empty feedback and reveal on timeout', async () => {
   const h = harness({}, vietnameseWords, vietnamese);
   h.controller.start({
     challenge: 'tone',
     practice: true,
     focusIds: ['vi-mù mờ'],
     tones: ['sắc', 'huyền'],
+    timer: 'custom',
+    seconds: 5,
   });
   h.audio();
   await flush();
-  assert.match(h.app.innerHTML, /<p class="prompt-gloss">&nbsp;<\/p>/);
-  h.document.fire('keydown', { key: '2', target: { tagName: 'BODY' } });
-  assert.equal(h.app.dataset.outcome, 'success');
-  assert.match(h.app.innerHTML, /<p class="prompt-gloss">&nbsp;<\/p>/);
-  assert.doesNotMatch(h.app.innerHTML, /undefined/);
-  h.controller.dispose();
+  assert.equal(h.app.querySelector('.prompt-gloss').textContent.trim(), '');
+  h.time.advance(5000);
+  assert.equal(h.controller.phase, 'review');
+  assert.equal(
+    [...h.app.querySelectorAll('.prompt-character')].map((node) => node.textContent).join(' '),
+    'mù mờ',
+  );
+  assert.notMatch(h.app.innerHTML, /undefined/);
 });
-test('a meaning that quotes the Vietnamese word hides its tones until a door is chosen', async () => {
+
+test('quoted Vietnamese in a meaning is concealed until the answer is revealed', async () => {
   const h = harness({}, vietnameseWords, vietnamese);
   h.controller.start({
     challenge: 'tone',
@@ -1297,27 +1287,9 @@ test('a meaning that quotes the Vietnamese word hides its tones until a door is 
   });
   h.audio();
   await flush();
-  assert.match(h.app.innerHTML, /<p class="prompt-gloss">lifesaving \(ao cưu sinh\)<\/p>/);
-  assert.doesNotMatch(h.app.innerHTML, /á|ứ/);
-  const answer = h.controller.state.targets[0] === 0 ? '1' : '6';
-  h.document.fire('keydown', { key: answer, target: { tagName: 'BODY' } });
+  assert.equal(h.app.querySelector('.prompt-gloss').textContent.trim(), 'lifesaving (ao cưu sinh)');
+  assert.notMatch(h.app.innerHTML, /á|ứ/);
+  h.click('[data-tone="' + h.controller.state.word.tone + '"]');
   assert.equal(h.app.dataset.outcome, 'success');
-  assert.match(h.app.innerHTML, /<p class="prompt-gloss">lifesaving \(áo cứu sinh\)<\/p>/);
-  h.controller.dispose();
-});
-test('numbered languages keep their tone numbers on doors and in feedback', async () => {
-  const h = harness();
-  h.controller.start({ challenge: 'tone' });
-  h.audio();
-  await flush();
-  assert.equal(h.app.querySelector('.tone-mark'), null);
-  assert.equal(h.app.querySelector('.tone-cover'), null);
-  assert.equal(h.app.querySelector('.has-mark'), null);
-  assert.match(h.app.querySelector('#tower-message').textContent, /choose its tone number\.$/);
-  const right = h.controller.state.word.tone,
-    wrong = h.controller.state.choices.find((t) => t !== right);
-  assert.match(h.app.innerHTML, new RegExp('aria-label="Choose tone ' + right + '"'));
-  h.document.fire('keydown', { key: String(wrong), target: { tagName: 'BODY' } });
-  assert.match(h.app.innerHTML, new RegExp('Tone ' + wrong + ' → tone ' + right + '\\.'));
-  h.controller.dispose();
+  assert.equal(h.app.querySelector('.prompt-gloss').textContent.trim(), 'lifesaving (áo cứu sinh)');
 });

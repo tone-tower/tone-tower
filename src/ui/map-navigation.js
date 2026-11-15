@@ -1,4 +1,3 @@
-const destinations = ['tone', 'rail'];
 const navigationKeys = new Set(['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End']);
 
 /** Keep map shortcuts scoped to the home view and out of native form controls. */
@@ -9,6 +8,7 @@ export function bindMapNavigation({
   onSelect,
   onStart,
   isBlocked = () => false,
+  destinations = ['tone', 'rail'],
 }) {
   function keydown(event) {
     if (

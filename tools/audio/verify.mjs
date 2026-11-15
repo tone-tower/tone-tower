@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { languages } from '../../src/languages/profiles.ts';
 import { checkDistribution } from '../publishing/check.mjs';
 import { validateMP3 } from './convert.mjs';
 const catalogs = await Promise.all(
-  ['yue', 'cmn', 'vi'].map(async (id) =>
+  Object.keys(languages).map(async (id) =>
     JSON.parse(await readFile('dist/catalogs/' + id + '.json', 'utf8')),
   ),
 );

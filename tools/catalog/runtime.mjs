@@ -6,7 +6,10 @@ export function cantoneseCatalog(source) {
     transcriptionSystem: 'jyutping',
     entries: source.words.map((word) => ({
       id: word.id,
-      forms: { default: word.character, traditional: word.character },
+      forms: {
+        default: word.character ?? word.syllables.map((s) => s.character).join(''),
+        traditional: word.character ?? word.syllables.map((s) => s.character).join(''),
+      },
       gloss: word.gloss,
       dictionarySource: word.dictionarySource,
       glossSource: word.glossSource,

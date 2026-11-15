@@ -116,7 +116,7 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
   ></span>`;
   return /* HTML */ `<article class="info-page sound-page">
     <header class="page-heading">
-      <button class="text-button back-link" data-page="home" type="button">← World map</button>
+      <button class="text-button back-link" data-page="home" type="button">← Home</button>
       <span class="eyebrow" lang="zh-Hant">粵拼</span>
       <h1 tabindex="-1">Jyutping guide</h1>
       <p class="lead guide-introduction">
@@ -671,8 +671,8 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
         <div class="info-card">
           <h3>Tone Tower</h3>
           <p>
-            Listen to the highlighted syllable and choose its tone number. There is no typing or
-            timer, and recordings can be replayed.
+            Listen to the highlighted syllable and choose its tone. There is no typing or timer, and
+            recordings can be replayed.
           </p>
           <button class="text-button" data-start-world="tone" type="button">
             Choose Tower difficulty →

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   correctMandarin,
-  importDictionary,
+  refreshMandarinDictionary,
   prepareMandarin,
   importReviews,
   buildMandarinCatalog,
@@ -26,12 +26,11 @@ const root = process.cwd();
 let result;
 switch (positionals[0]) {
   case 'dictionary':
-    result = await importDictionary(
+    result = await refreshMandarinDictionary(
       root,
       path.resolve(values.file ?? '.audio-import-cache/cedict-source.txt.gz'),
       values.edition,
     );
-    await prepareMandarin(root);
     break;
   case 'review':
     result = await exportReview(

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "sourceSha1": "db81e637a2f1908eacb7244845fbf9162e410ec8",
+  "segments": [
+    { "start": 0.4, "end": 1.22 },
+    { "start": 1.75, "end": 2.6 },
+    { "start": 3.1, "end": 4 },
+    { "start": 4.55, "end": 5.16 }
+  ]
+}

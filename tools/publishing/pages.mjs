@@ -1,7 +1,8 @@
-import { pages, site, languagePages } from '../../src/site.js';
-import { languages, guideName } from '../../src/languages/profiles.js';
+import { pages, site, languagePages } from '../../src/site.ts';
+import { languages } from '../../src/languages/profiles.ts';
 import { aboutPageMarkup, soundPageMarkup } from '../../src/ui/info-pages.js';
-import { catalogRows, referenceRows } from '../../src/content/catalog.js';
+import { catalogRows, referenceRows } from '../../src/content/catalog.ts';
+import { languageSwitcherMarkup } from '../../src/ui/site-controls.ts';
 const escape = (value) =>
   String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 export const generatedFiles = [
@@ -25,56 +26,46 @@ export function renderPage(template, key, catalog) {
   const profile = languages[metadata.language],
     page = metadata.page;
   const url = new URL(metadata.path, site.siteUrl).href;
-  let html = localizeLinks(template, profile);
-  html = html.replace('<html lang="en">', '<html lang="en" data-language="' + profile.id + '">');
-  html = html.replace(
-    /<base href="[^"]*"\s*\/>/,
-    '<base href="' + '../'.repeat(metadata.path.split('/').filter(Boolean).length) + '" />',
-  );
-  html = html.replace(/<title>[^<]*<\/title>/, '<title>' + escape(metadata.title) + '</title>');
-  for (const [attribute, name, value] of [
-    ['name', 'description', metadata.description],
-    ['property', 'og:title', metadata.title],
-    ['property', 'og:description', metadata.description],
-    ['property', 'og:url', url],
-    ['name', 'twitter:title', metadata.title],
-    ['name', 'twitter:description', metadata.description],
-  ]) {
-    const expression = new RegExp(
-      '(<meta\\s+' + attribute + '="' + name + '"\\s+content=")[^"]*("\\s*\\/>)',
-    );
-    html = html.replace(expression, (_, before, after) => before + escape(value) + after);
-  }
-  html = html.replace(/(<link rel="canonical" href=")[^"]*/, '$1' + url);
-  html = html.replace(
-    'class="skip-link" href="#app"',
-    'class="skip-link" href="' + metadata.path + '#app"',
-  );
-  html = html.replace(
-    '<span>TONE TOWER</span>',
-    '<span>TONE TOWER<small class="brand-language">' + profile.label + '</small></span>',
-  );
-  html = html.replace(
-    '<nav aria-label="Main navigation">',
-    '<nav aria-label="Main navigation"><a class="nav-link language-link" href="./">Languages</a>',
-  );
-  html = html.replace('>Jyutping guide</a', '>' + guideName(profile) + '</a');
-  html = html
-    .replaceAll('Train your ear for Cantonese.', 'Train your ear for ' + profile.label + '.')
-    .replace(
-      'Play Tone Tower and Skyrail to practise Cantonese tones and Jyutping spelling.',
+  const values = {
+    title: escape(metadata.title),
+    description: escape(metadata.description),
+    canonical: escape(url),
+    language: escape(profile.label),
+    romanization: escape(profile.romanization),
+    guideName: escape(profile.guideName ?? profile.romanization + ' guide'),
+    loading: escape(
       profile.copy?.loading ??
         'Play Tone Tower and Skyrail to practise ' +
           profile.label +
           ' tones and ' +
           profile.romanization +
           ' spelling.',
-    );
-  if (profile.scripts.length > 1)
-    html = html.replace(
-      '<div class="project-links"',
-      '<label class="script-setting">Characters <select id="script-display"><option value="simplified">简体 · Simplified</option><option value="traditional">繁體 · Traditional</option></select></label><div class="project-links"',
-    );
+    ),
+    shareAlt: escape(
+      'Tone Tower. Train your ear for ' +
+        profile.label +
+        '. A little sprout, a tower and a railway above the clouds.',
+    ),
+    languageSwitcher: languageSwitcherMarkup(
+      profile,
+      Object.values(languages).map((language) => ({
+        profile: language,
+        path: languagePages(language)[page].path,
+      })),
+    ),
+  };
+  let html = localizeLinks(template, profile).replace(/\{\{(\w+)\}\}/g, (_, token) => {
+    if (!(token in values)) throw Error('Unknown page token: ' + token);
+    return values[token];
+  });
+  html = html.replace('<html lang="en">', '<html lang="en" data-language="' + profile.id + '">');
+  const rootPrefix = '../'.repeat(metadata.path.split('/').filter(Boolean).length);
+  html = html.replace(/<base[^>]*>/, '');
+  html = html.replace('<html lang="en"', '<html lang="en" data-site-root="' + rootPrefix + '"');
+  html = html.replace(
+    'class="skip-link" href="#app"',
+    'class="skip-link" href="' + metadata.path + '#app"',
+  );
   const rows = catalog ? catalogRows(catalog, profile) : [],
     anchors = catalog ? referenceRows(catalog, rows) : [];
   let content;
@@ -98,6 +89,13 @@ export function renderPage(template, key, catalog) {
   html = html
     .replace(/ aria-current="page"/g, '')
     .replace('data-nav-page="' + page + '"', 'data-nav-page="' + page + '" aria-current="page"');
+  // Page links are relative to the deployment root; Vite owns source asset URLs.
+  html = html.replace(/\b(href|src)="([^"]+)"/g, (match, attr, ref) => {
+    if (/^(?:[a-z][\w+.-]*:|\/\/|#|\/)/i.test(ref)) return match;
+    if (ref.startsWith('src/') || ref.startsWith('assets/') || ref === 'favicon.ico')
+      return attr + '="/' + ref + '"';
+    return attr + '="' + rootPrefix + ref + '"';
+  });
   return html;
 }
 export function sitemap() {

@@ -219,9 +219,21 @@
 .tone-door:disabled {
   opacity: 1;
 }
-.tone-number {
+.tone-symbol {
   font: 700 42px/1 monospace;
   text-shadow: 2px 2px #172b38;
+}
+.tone-symbol.is-mark {
+  font-family: Georgia, serif;
+  font-weight: 500;
+  font-size: 52px;
+  line-height: 0.8;
+}
+.tone-symbol.is-unmarked {
+  font:
+    650 14px/1 DM,
+    system-ui,
+    sans-serif;
 }
 .tone-name {
   font: 8px DM;
@@ -238,7 +250,7 @@
 .tone-door.is-correct {
   color: #c9efba;
 }
-.tone-door.is-correct .tone-number,
+.tone-door.is-correct .tone-symbol,
 .tone-door.is-correct .door-key {
   animation: door-label-out 0.35s 0.2s both;
 }
@@ -248,9 +260,17 @@
 .tone-door.is-answer {
   box-shadow: inset 0 0 0 2px #a1b98a;
 }
-.world-scene[data-count='4'] .tone-number,
-.world-scene:is([data-count='5'], [data-count='6']) .tone-number {
+.world-scene[data-count='4'] .tone-symbol,
+.world-scene:is([data-count='5'], [data-count='6']) .tone-symbol {
   font-size: 26px;
+}
+.world-scene[data-count='4'] .tone-symbol.is-mark,
+.world-scene:is([data-count='5'], [data-count='6']) .tone-symbol.is-mark {
+  font-size: 38px;
+}
+.world-scene[data-count='4'] .tone-symbol.is-unmarked,
+.world-scene:is([data-count='5'], [data-count='6']) .tone-symbol.is-unmarked {
+  font-size: 11px;
 }
 .world-scene[data-count='4'] .tone-name,
 .world-scene:is([data-count='5'], [data-count='6']) .tone-name {
@@ -506,7 +526,7 @@
   .tone-door {
     gap: 3px;
   }
-  .tone-number {
+  .tone-symbol {
     font-size: 30px;
   }
   .tone-name {
@@ -517,9 +537,23 @@
     font-size: 8px;
     padding: 1px 3px;
   }
-  .world-scene[data-count='4'] .tone-number,
-  .world-scene:is([data-count='5'], [data-count='6']) .tone-number {
+  .world-scene[data-count='4'] .tone-symbol,
+  .world-scene:is([data-count='5'], [data-count='6']) .tone-symbol {
     font-size: 18px;
+  }
+  .tone-symbol.is-mark {
+    font-size: 40px;
+  }
+  .tone-symbol.is-unmarked {
+    font-size: 12px;
+  }
+  .world-scene[data-count='4'] .tone-symbol.is-mark,
+  .world-scene:is([data-count='5'], [data-count='6']) .tone-symbol.is-mark {
+    font-size: 30px;
+  }
+  .world-scene[data-count='4'] .tone-symbol.is-unmarked,
+  .world-scene:is([data-count='5'], [data-count='6']) .tone-symbol.is-unmarked {
+    font-size: 9px;
   }
   .world-scene[data-count='4'] .tone-name,
   .world-scene:is([data-count='5'], [data-count='6']) .tone-name {
@@ -1131,7 +1165,7 @@ html {
     0 0 0 3px #d7a65c;
   gap: 1px !important;
 }
-.tone-door.is-answer .tone-number {
+.tone-door.is-answer .tone-symbol {
   color: #172b38;
   text-shadow: none;
 }
@@ -1281,7 +1315,7 @@ html {
   }
 }
 
-.world-scene[data-phase='review'] .is-wrong .tone-number {
+.world-scene[data-phase='review'] .is-wrong .tone-symbol {
   position: absolute;
   top: 9%;
 }
@@ -1300,37 +1334,6 @@ html {
 .home-world .stage {
   aspect-ratio: 5/3;
   background: #263f58;
-}
-.home-world .tower-place {
-  left: 50%;
-  top: 33%;
-  transform: translateX(-50%);
-}
-.home-world .rail-place {
-  left: 73%;
-  top: 38%;
-}
-.home-world .place {
-  font-size: 11px;
-  padding: 9px 13px;
-  letter-spacing: 1px;
-  background: #19293de8;
-  border-color: #748787;
-  transition:
-    border-color 0.2s,
-    background 0.2s;
-}
-.home-world .place small {
-  margin: 4px 0 0;
-  font-size: 10px;
-  letter-spacing: 0;
-}
-.home-world .place[aria-pressed='true'] {
-  border-color: var(--gold);
-  background: #3e4a51;
-  box-shadow:
-    0 3px #172b38,
-    0 0 22px #d7a65c24;
 }
 .home-world .game-hud {
   border-bottom: 1px solid #647b7c;
@@ -1562,23 +1565,6 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
   }
 }
 @media (max-width: 700px) {
-  .home-world .tower-place {
-    top: 30%;
-  }
-  .home-world .rail-place {
-    left: auto;
-    right: 4%;
-    top: 40%;
-  }
-  .home-world .place {
-    font-size: 8px;
-    letter-spacing: 0;
-    padding: 6px 7px;
-    min-height: 38px;
-  }
-  .home-world .place small {
-    font-size: 7px;
-  }
   .home-world .dock {
     grid-template-columns: 1fr;
     padding: 19px 17px;
@@ -1874,7 +1860,7 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
 #app[data-practice='true'] .scene-content {
   transform: none;
 }
-#app[data-practice='true'] .tone-door.is-correct .tone-number,
+#app[data-practice='true'] .tone-door.is-correct .tone-symbol,
 #app[data-practice='true'] .tone-door.is-correct .door-key {
   animation: none;
 }
@@ -1885,18 +1871,6 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
   #app[data-practice='true'] .game-progress-label {
     font-size: 9px;
   }
-}
-
-.home-world .home-map-layout .tower-place {
-  left: 30%;
-  top: 40%;
-  transform: translateX(-50%);
-}
-.home-world .home-map-layout .rail-place {
-  left: 70%;
-  right: auto;
-  top: 40%;
-  transform: translateX(-50%);
 }
 
 .practice-tone-contour {

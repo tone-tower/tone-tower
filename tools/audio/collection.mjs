@@ -1,3 +1,4 @@
+import { validateInventory } from './inventory.mjs';
 import { readFile, mkdir, writeFile, unlink } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -73,31 +74,7 @@ export async function loadCollection(root, id) {
   )
     throw Error('Invalid collection source configuration');
   const inventory = await readJSON(paths.inventory, () => emptyInventory(config));
-  const seen = new Set();
-  if (
-    inventory.version !== 1 ||
-    inventory.collectionId !== id ||
-    inventory.language !== config.language ||
-    !Array.isArray(inventory.recordings)
-  )
-    throw Error('Invalid collection inventory');
-  for (const row of inventory.recordings) {
-    if (
-      !/^commons-[1-9]\d*$/.test(row.id || '') ||
-      seen.has(row.id) ||
-      row.language !== config.language ||
-      row.audio?.file !== 'audio/' + id + '/' + row.id + '.mp3' ||
-      !/^[a-f0-9]{64}$/.test(row.audio?.sha256 || '') ||
-      !/^[a-f0-9]{40}$/.test(row.original?.sha1 || '') ||
-      !/^[a-f0-9]{64}$/.test(row.original?.sha256 || '') ||
-      !Number.isSafeInteger(row.original.bytes) ||
-      row.original.bytes < 1 ||
-      !row.attribution?.license ||
-      !row.source?.fileTimestamp
-    )
-      throw Error('Invalid or duplicate archived recording ' + row.id);
-    seen.add(row.id);
-  }
+  validateInventory(inventory, id, config.language);
   const review = await readJSON(paths.review, { version: 1, recordings: {} });
   if (
     review.version !== 1 ||

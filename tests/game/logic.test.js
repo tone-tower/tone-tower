@@ -1,6 +1,6 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { buildChoices, shuffle } from '../../src/game/logic.js';
+import { buildChoices, shuffle } from '../../src/game/logic.ts';
 
 test('every supported tone subset offers unique doors including the answer', () => {
   for (let mask = 1; mask < 64; mask++) {

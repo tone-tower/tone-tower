@@ -1,9 +1,9 @@
-import { cantonese } from '../../src/languages/profiles.js';
+import { cantonese } from '../../src/languages/profiles.ts';
 import { cantoneseCatalog } from '../../tools/catalog/runtime.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { syncRegistry, assembleCatalog, emptyCorrections } from '../../tools/catalog/catalog.mjs';
-import { catalogRows as runtimeRows, chooseWordRecording } from '../../src/content/catalog.js';
+import { catalogRows as runtimeRows, chooseWordRecording } from '../../src/content/catalog.ts';
 
 const catalogRows = (source) => runtimeRows(cantoneseCatalog(source), cantonese);
 const clip = (id, character = '你', jyutping = 'nei5', extra = {}) => ({

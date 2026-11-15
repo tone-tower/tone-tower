@@ -168,12 +168,21 @@ export function drawSkyrail(ctx, s, base) {
   }
   // The near track is a single world-space route. Old repairs stay behind the car.
   const first = Math.floor((cam - 300) / RAIL_SPAN);
-  for (let i = first; i < first + 7; i++) {
-    const x = i * RAIL_SPAN - cam,
-      biome = clamp(Math.floor(((s.progress || 0) + i - j.segment) / 20), 0, 4),
-      isCliff = hash(i) % 3 === 0 || i === 0;
+  const chunks = Array.from({ length: 7 }, (_, index) => {
+    const i = first + index;
+    return {
+      i,
+      x: i * RAIL_SPAN - cam,
+      biome: clamp(Math.floor(((s.progress || 0) + i - j.segment) / 20), 0, 4),
+      isCliff: hash(i) % 3 === 0 || i === 0,
+    };
+  });
+  const gapStart = 270 - RAIL_SPAN,
+    gapEnd = gapStart + 58;
+  // Ground comes first. The rear verge stops at both sides of each bridge gap.
+  for (const { x, isCliff } of chunks) {
     if (isCliff) {
-      r(x - 5, 214, RAIL_SPAN + 10, 75, P.deep);
+      r(x, 214, RAIL_SPAN, 75, P.deep);
       r(x, 214, RAIL_SPAN, 5, P.grass);
       for (let k = 0; k < 7; k++) {
         r(x + 10 + k * 24, 225, 3, 50, P.shade);
@@ -191,6 +200,11 @@ export function drawSkyrail(ctx, s, base) {
         r(x + k * 40 + 32, 225, 4, 6, P.shade);
       }
     }
+    r(x, 199, gapStart, 15, isCliff ? P.grass : P.stone);
+    r(x + gapEnd, 199, RAIL_SPAN - gapEnd, 15, isCliff ? P.grass : P.stone);
+  }
+  // Plants and landmarks stand on that verge, behind the running rails.
+  for (const { i, x, biome, isCliff } of chunks) {
     if (isCliff) {
       drawGarden(ctx, x + 14, 204, P, i);
       drawGarden(ctx, x + 150, 205, P, i + 1);
@@ -198,13 +212,6 @@ export function drawSkyrail(ctx, s, base) {
       r(x + 41, 222, 2, 17, P.grass);
       r(x + 39, 232, 5, 2, P.leaf);
     }
-    for (let k = 0; k < 15; k++) {
-      r(x + k * 12, 207, 5, 12, P.deep);
-      r(x + k * 12, 208, 4, 10, P.wood);
-      r(x + k * 12 + 1, 209, 1, 7, P.brick);
-    }
-    r(x, 207, RAIL_SPAN, 2, P.edge);
-    r(x, 215, RAIL_SPAN, 2, P.stone);
     if (i === 0) {
       house(x + 18, 169, 63);
       r(x + 12, 197, 78, 5, P.edge);
@@ -215,18 +222,18 @@ export function drawSkyrail(ctx, s, base) {
       r(x + 22, 172, 11, 3, P.cream);
       lamp(x + 55, 187);
     } else if (biome === 0) {
-      tree(x + 105, 182);
+      if (isCliff) tree(x + 55, 178);
     } else if (biome === 1) {
-      r(x + 91, 191, 31, 8, P.brick);
+      r(x + 45, 197, 31, 8, P.brick);
       for (let k = 0; k < 4; k++) {
-        r(x + 95 + k * 7, 181, 3, 11, P.grass);
-        r(x + 94 + k * 7, 178, 5, 4, P.leaf);
+        r(x + 49 + k * 7, 187, 3, 11, P.grass);
+        r(x + 48 + k * 7, 184, 5, 4, P.leaf);
       }
-      r(x + 120, 220, 2, 30, P.grass);
+      r(x + 74, 220, 2, 30, P.grass);
     } else if (biome === 2) {
-      r(x + 86, 126, 7, 80, P.wood);
-      r(x + 86, 127, 67, 4, P.gold);
-      r(x + 145, 127, 7, 79, P.wood);
+      r(x + 75, 126, 7, 80, P.wood);
+      r(x + 75, 127, 90, 4, P.gold);
+      r(x + 158, 127, 7, 79, P.wood);
       for (let k = 0; k < 4; k++) r(x + 95 + k * 13, 132 + k * 8, 3, 9, P.gold);
       r(x + 102, 197, 34, 6, P.deep);
     } else if (biome === 3) {
@@ -248,6 +255,39 @@ export function drawSkyrail(ctx, s, base) {
       r(x + 148, 118, 11, 21, P.shade);
       for (let k = 0; k < 4; k++) r(x + 99 + k * 13, 123, 2, 14, P.teal);
     }
+  }
+  // A station appears after the crossing, behind the track and its signals.
+  if (j.station !== null && j.station !== undefined && !s.ending) {
+    const arrive =
+        s.reduced || s.phase !== 'landing' ? 1 : Math.min(1, Math.max(0, (s.elapsed - 0.5) / 0.8)),
+      sy = 105 + (1 - arrive) * 24,
+      sx = j.station - cam;
+    if (sx > -200 && sx < 500) {
+      r(sx, sy + 14, 173, 82, P.deep);
+      r(sx + 7, sy + 19, 159, 74, P.wood);
+      eaves(sx - 9, sy, 191);
+      r(sx + 18, sy + 32, 135, 40, P.shade);
+      for (const xx of [sx + 24, sx + 129]) {
+        r(xx, sy + 38, 17, 29, P.gold);
+        r(xx + 7, sy + 38, 2, 29, P.wood);
+        r(xx, sy + 49, 17, 2, P.wood);
+      }
+      r(sx + 63, sy + 38, 47, 55, P.dark);
+      r(sx + 73, sy + 43, 27, 50, P.teal);
+      lamp(sx + 1, sy + 25);
+      lamp(sx + 170, sy + 25);
+      r(sx - 16, 202, 200, 4, P.edge);
+    }
+  }
+  // Draw the rails over all ground scenery, then cut the open gaps below.
+  for (const { x } of chunks) {
+    for (let k = 0; k < 15; k++) {
+      r(x + k * 12, 207, 5, 12, P.deep);
+      r(x + k * 12, 208, 4, 10, P.wood);
+      r(x + k * 12 + 1, 209, 1, 7, P.brick);
+    }
+    r(x, 207, RAIL_SPAN, 2, P.edge);
+    r(x, 215, RAIL_SPAN, 2, P.stone);
   }
   const newestRepair = j.repaired.size ? Math.max(...j.repaired) : null;
   // Gaps are separate from scenery chunks, so construction and camera motion never reset.
@@ -287,29 +327,6 @@ export function drawSkyrail(ctx, s, base) {
       );
     } else {
       text(i < j.segment ? '›' : '·', post + 1, 176, P.gold, 12);
-    }
-  }
-  // A station appears after the crossing, with time to notice the new district.
-  if (j.station !== null && j.station !== undefined && !s.ending) {
-    const arrive =
-        s.reduced || s.phase !== 'landing' ? 1 : Math.min(1, Math.max(0, (s.elapsed - 0.5) / 0.8)),
-      sy = 105 + (1 - arrive) * 24,
-      sx = j.station - cam;
-    if (sx > -200 && sx < 500) {
-      r(sx, sy + 14, 173, 82, P.deep);
-      r(sx + 7, sy + 19, 159, 74, P.wood);
-      eaves(sx - 9, sy, 191);
-      r(sx + 18, sy + 32, 135, 40, P.shade);
-      for (const xx of [sx + 24, sx + 129]) {
-        r(xx, sy + 38, 17, 29, P.gold);
-        r(xx + 7, sy + 38, 2, 29, P.wood);
-        r(xx, sy + 49, 17, 2, P.wood);
-      }
-      r(sx + 63, sy + 38, 47, 55, P.dark);
-      r(sx + 73, sy + 43, 27, 50, P.teal);
-      lamp(sx + 1, sy + 25);
-      lamp(sx + 170, sy + 25);
-      r(sx - 16, 202, 200, 4, P.edge);
     }
   }
   // Car upgrades increase the apparent pace and silhouette at the twenty-span checkpoints.

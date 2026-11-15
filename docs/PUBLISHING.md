@@ -39,19 +39,20 @@ fonts retain their separate licences in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_
 GitHub Free supports Pages for public repositories. This workflow uses GitHub's
 automatic GITHUB_TOKEN; do not create a personal access token or add secrets.
 If Actions is disabled on the repository, enable it under Settings → Actions.
-An optional rule for `main` can require the **Test and build** check before merges;
-requiring approvals from another reviewer is unnecessary for a solo project.
+Configure a branch ruleset for `main`: require pull requests and the **Test and build** status check, block force pushes and deletion, and require zero additional approvals for this solo project. This setting lives in GitHub and cannot be enforced by committed workflow YAML. The implementation environment has no branch-protection write capability, so this administrative step must be applied in repository Settings → Rules → Rulesets.
 
 ## Local release checks
 
-Use Node.js 22 or later. Run `npm ci` to install the locked development formatter. The game has no runtime npm dependencies.
+Use Node.js 22.12 or later. Run `npm ci` to install the locked development tools. Install Chromium with `npx playwright install chromium`. The game has no runtime npm dependencies.
 The full test suite also needs FFmpeg and FFprobe on PATH for importer checks;
 the GitHub workflow installs these tools when needed.
 
 ```sh
 npm run format:check
+npm run typecheck
 npm run audio:sync
 npm run test:all
+npm run mandarin:status -- --release
 npm run build
 npm run check:dist
 git diff -- data/audio
@@ -60,13 +61,13 @@ npm run preview -- --base /tone-tower/ --port 4174
 
 Review and commit registry changes with their matching inventory and MP3s.
 The preview serves only `dist/` at http://127.0.0.1:4174/tone-tower/.
-`npm start` serves the source for development. Do not publish the source root:
+`npm start` runs Vite and generates language pages for development. Do not publish the source root:
 `catalogs/` is generated and absent after a fresh clone.
 
-CI runs tests, builds without updating versioned metadata, checks that source data stays unchanged,
+CI checks types and formatting, runs Vitest Node/browser and Node tooling tests, enforces Mandarin readiness, and builds without updating versioned metadata, checks that source data stays unchanged,
 then checks every built file under both `/` and a different nested repository
 path. Pull requests can run checks but cannot deploy. Only successful `main`
-builds deploy. Official actions are pinned to release commits; Dependabot opens
+builds deploy. Vite processes application assets; publication copies only selected recordings and required notices. Distribution checks verify an output manifest and content hashes, and Playwright verifies generated pages under root and nested paths. Official actions are pinned to release commits; Dependabot opens
 monthly update PRs for them. The npm download cache speeds up installation of development tools.
 
 An optional deeper audio check is `npm run audio:verify` after building. It
@@ -108,7 +109,7 @@ history. Do not commit or manually edit `dist/`.
 You can rename the GitHub repository in its Settings and update the local remote
 URL with `git remote set-url origin NEW-REPOSITORY-URL`. Redeploy and use the new
 Pages address. Runtime paths do not embed `tone-tower`. Update `siteUrl`, repository
-and maintainer links in `src/site.js`, and the default metadata and footer links in
+and maintainer links in `src/site.ts`, and the default metadata and footer links in
 `index.html`, then rebuild. A display-name change affects the HTML,
 page text, README and package name; keep the versioned save-data keys stable.
 
@@ -131,7 +132,7 @@ The home address stays free of `#home`; URL fragments are only for in-page ancho
 A sitemap is published at `sitemap.xml`. Do not add a project-level robots.txt:
 robots.txt is only recognised at the origin root, which this repository does not own.
 
-Public identity and page descriptions live in `src/site.js`. The root chooser is `index.html`; the generated language pages use `src/shell.html`. The branded artwork lives in
+Public identity and page descriptions live in `src/site.ts`. The root chooser is `index.html`; the generated language pages use `src/shell.html`. The branded artwork lives in
 `assets/brand/`; the 1200 × 630 PNG is the social preview, and the SVG is its editable
 source. The sprout favicon is supplied as SVG and ICO, plus an Apple touch icon.
 Social services may cache old previews after deployment.
@@ -146,3 +147,9 @@ After deployment, share the home and guide URLs in a messaging app and check the
 preview image and text. Also check favicon, touch icon, footer links and issue forms.
 
 Mandarin beta readiness depends on playable coverage; manual listening approval is optional. See [Mandarin website and curation](MANDARIN-WEBSITE.md). The beta uses dictionary matches and common tone-change estimates, with separate corrections for reported problems. Builds never modify `data/content/` or the downloader archive. No old root-level route aliases or redirects are generated.
+
+## Tooling boundaries
+
+TypeScript checks application contracts; it does not replace runtime validation of catalogs or browser storage. Vite owns module and asset processing, while content tooling owns dictionary evidence, recording eligibility and attribution. Language HTML is staged in the OS temporary directory and removed after builds. The preview server serves only the built directory and has no source-route rendering. `dist/` includes a generated `.publication.json` inventory used by `check:dist`; do not edit it.
+
+Use `npm run test:browser` for the full browser release check; it builds first. CI runs `npx playwright test` after its explicit build to avoid repeating that build. Curation and builds share a Mandarin content lock, independent of the downloader lock; conflicting operations fail clearly and can be retried after the current command finishes.

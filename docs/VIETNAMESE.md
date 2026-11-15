@@ -42,11 +42,11 @@ four-syllable words stay on one line on a phone.
 
 ## Profile
 
-`vietnamese` in `src/languages/profiles.js` uses named tone IDs and
+`vietnamese` in `src/languages/vietnamese/profile.ts` uses named tone IDs and
 `challenges: ['tone']`. A few optional profile fields carry what differs from the
 romanised languages; the shared game reads them without checking the language:
 
-- `toneDefinitions[].mark` is the SVG path of the written mark. A door, guide
+- `toneDefinitions[].markPath` is the SVG path of the written mark. A door, guide
   tile or practice button draws it in place of a tone number; an empty string
   draws the empty slot.
 - `concealTone(text)` returns a syllable’s toneless spelling and the index of the
@@ -59,7 +59,7 @@ romanised languages; the shared game reads them without checking the language:
   Skyrail or human recordings: page titles and descriptions, the navigation
   label, the home introduction, and the recording credits.
 
-`src/languages/vietnamese.js` splits a syllable into letters and tone and finds
+`src/languages/vietnamese.ts` splits a syllable into letters and tone and finds
 the marked vowel. Open `oa`, `oe` and `uy` use the traditional placement
 (`hòa`, `khỏe`, `thủy`), matching the word list. Vietnamese letters are missing
 from the bundled DM Sans, so Vietnamese text uses a system font stack.
@@ -77,9 +77,7 @@ URLs.
 Games ask words of two or more syllables. Isolated syllables are left out
 because a synthetic voice reads them less reliably than words. The guide’s tone
 references are words too, chosen so that both syllables carry the same tone:
-`chú ý`, `hoàn toàn`, `đảm bảo`, `mãi mãi`, `hiện tại` and `hôm nay`. The home
-example spells out the syllable `mãi` and plays `mãi mãi`. They are ordinary
-words and can also be asked.
+`chú ý`, `hoàn toàn`, `đảm bảo`, `mãi mãi`, `hiện tại` and `hôm nay`. They are ordinary words and can also be asked. The shared home, practice controls, language switcher and rewards use the current application UI.
 
 The recordings are synthetic speech generated with ElevenLabs, not recordings of
 a person. The catalog marks each one `synthetic` and credits the voice, and the
@@ -116,5 +114,8 @@ differs from its recorded hash. `npm run vietnamese:status -- --release` also
 requires 20 words containing each tone and the six tone references. The
 references are always imported, whatever `--max-rank` says.
 
-To drop a wrong clip, remove its entry from the word’s `audio` object, or the
-whole word, delete the MP3 and rebuild.
+To replace or remove a wrong clip, correct the supplied CSV/audio and rerun the import for that voice. Other voices are preserved.
+
+Imports and catalog builds use the same Vietnamese curation lock. An import validates and stages the full selection before replacing audio, keeps rollback copies until the manifest is committed, and removes obsolete clips afterward. If interrupted, builds stop rather than reading a mixed collection. Recover explicitly with `npm run vietnamese:import -- --recover`, then rerun the import if needed.
+
+Spoken tones are inferred from written Vietnamese and remain marked as assumed; synthetic speech can pronounce them incorrectly. Vietnamese support in the optional listening-review tools is deferred. No manual review is required to build or play.

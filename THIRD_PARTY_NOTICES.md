@@ -27,6 +27,16 @@ Accepted licences are CC0 1.0, CC BY 4.0 and CC BY-SA 4.0, as identified for eac
 recording. Share-alike audio derivatives retain their indicated licence. The
 publication build includes only the clips referenced in its playable catalog; the application's MIT licence does not replace audio licences.
 
+### Matched Mandarin tone examples
+
+The mā, má, mǎ and mà teaching excerpts come from
+[FourMandarinTones.ogg by Wolfdog](https://commons.wikimedia.org/wiki/File:FourMandarinTones.ogg),
+licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+The excerpts are trimmed and converted to MP3; pitch and speed are unchanged.
+These audio adaptations retain CC BY-SA 4.0. Source evidence, cut points and
+checksums are retained in data/audio/mandarin-tone-examples.json. Published
+catalog entries and Voices & credits include their attribution and processing notes.
+
 ## Synthetic speech recordings
 
 The Vietnamese word recordings in audio/vi/ are synthetic speech. No person

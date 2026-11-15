@@ -4,11 +4,14 @@ import {
 } from '../languages/cantonese-guide.js';
 import { mandarinGuide } from '../languages/mandarin-guide.js';
 import { vietnameseGuide } from '../languages/vietnamese-guide.js';
-import { guideName } from '../languages/profiles.js';
-import { site } from '../site.js';
+const guideName = (profile) => profile.guideName ?? profile.romanization + ' guide';
+import { site } from '../site.ts';
 const guides = {
   yue: { full: cantoneseGuide, compact: cantoneseCompact },
-  cmn: { full: (a, d) => mandarinGuide(a, d), compact: (a, d) => mandarinGuide(a, d, true) },
+  cmn: {
+    full: (a, d, rows) => mandarinGuide(a, d, false, rows),
+    compact: (a, d) => mandarinGuide(a, d, true),
+  },
   vi: { full: (a, d) => vietnameseGuide(a, d), compact: (a, d) => vietnameseGuide(a, d, true) },
 };
 export function soundPageMarkup(anchors, definitions, rows, profile) {
@@ -37,7 +40,7 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
   </button>`;
   return /* HTML */ `<article class="info-page about-page">
     <header class="page-heading">
-      <button class="text-button back-link" data-page="home" type="button">← World map</button>
+      <button class="text-button back-link" data-page="home" type="button">← Home</button>
       <h1 tabindex="-1">About Tone Tower</h1>
       <p class="lead">
         Tone Tower is a browser game for practising
@@ -111,7 +114,8 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
           Practice</button
         >. Choose a tone pair
         ${spelling ? 'or work on initials, finals and spelling' : 'or a larger set of tones'}.
-        Practice results stay separate from adventure records.
+        Complete game difficulties to earn permanent decorations for the home world; practice stays
+        free of unlock goals.
       </p>
       <p class="small">
         Tone Tower trains listening
@@ -121,7 +125,7 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
       </p>
     </section>
     <section class="info-section" aria-labelledby="recordings-heading">
-      ${availability?.mode === 'beta' ? '<p class="beta-source-note">Mandarin is in beta. Source labels and dictionary readings provide the starting content; reported problems can be corrected without replacing the original recordings.</p>' : ''}
+      ${availability?.mode === 'beta' ? '<p class="beta-source-note">' + profile.label + ' is in beta. Source labels and dictionary readings provide the starting content; reported problems can be corrected without replacing the original recordings.</p>' : ''}
       <h2 id="recordings-heading">Recordings and sources</h2>
       <p>
         ${
@@ -145,12 +149,17 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
     <section class="info-section" aria-labelledby="progress-heading">
       <h2 id="progress-heading">Progress and privacy</h2>
       <p>
-        Tone Tower does not require an account and has no analytics. Records and preferences are
+        Tone Tower does not require an account and has no analytics. Progress and preferences are
         saved separately for each language in this browser and do not sync between devices. Clearing
         browser storage removes them; closing or reloading the page ends the current run.
       </p>
-      <button class="text-button section-link" data-info-action="records" type="button">
-        View your records →
+      <p>
+        Your best tower climb lights its windows at home. Each completed difficulty adds a butterfly
+        garden, a roaming cat, a banner, a moon heron or a dragon. Decorations
+        accumulate${spelling ? ', and either Skyrail answer style earns its difficulty’s reward' : ''}.
+      </p>
+      <button class="text-button section-link" data-info-action="reset" type="button">
+        Reset saved progress…
       </button>
     </section>
     <section class="info-section" aria-labelledby="project-heading">

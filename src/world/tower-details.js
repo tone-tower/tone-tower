@@ -186,6 +186,9 @@ export function drawRestLanding(ctx, s, P, sprite) {
   r(449, 18, 13, 208, P.stone);
   r(0, 224, 480, 16, P.stone);
   r(0, 224, 480, 3, P.edge);
+  // The balcony needs an opaque walking surface beneath its plants and furniture.
+  r(31, 200, 418, 24, P.shade);
+  for (const y of [208, 216]) r(31, y, 418, 1, P.stone);
   r(25, 196, 430, 4, P.edge);
   for (let i = 0; i < 16; i++) r(29 + i * 28, 199, 3, 25, P.shade);
   // Quiet reading space beside a lantern fountain and the open sky.

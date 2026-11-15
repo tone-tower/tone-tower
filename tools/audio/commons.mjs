@@ -2,7 +2,7 @@ import { atomicJSON, readJSON } from '../lib/json.mjs';
 
 export const emptyCache = () => ({ metadata: {}, retryAfter: 0 });
 export const COMMONS_USER_AGENT =
-  'ToneTower/1.0 (https://github.com/john0107/tone-tower) educational audio importer';
+  'ToneTower/1.0 (https://github.com/tone-tower/tone-tower) educational audio importer';
 const MIN_INTERVAL = 2000;
 const MAX_INTERVAL = 60000;
 

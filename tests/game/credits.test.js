@@ -1,6 +1,6 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { filterCredits, creditsPage } from '../../src/ui/credits.js';
+import { filterCredits, creditsPage } from '../../src/ui/credits.ts';
 test('credits keep a bounded page and clamp navigation after filtering', () => {
   const rows = Array.from({ length: 473 }, (_, id) => ({
     id,

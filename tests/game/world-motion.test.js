@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { sceneMotion } from '../../src/world/world-motion.js';
 import { doorSlots, drawWorld } from '../../src/world/pixel-world.js';

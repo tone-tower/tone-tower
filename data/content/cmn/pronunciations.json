@@ -22994,6 +22994,22 @@
       ]
     },
     {
+      "id": "cedict-3fd9698f532ef0aa26e59fa8",
+      "entryId": "cedict-3fd9698f532ef0aa26e59fa8",
+      "kind": "syllable",
+      "syllables": [
+        {
+          "transcription": "ma1",
+          "tone": 1,
+          "forms": {
+            "default": "妈",
+            "simplified": "妈",
+            "traditional": "媽"
+          }
+        }
+      ]
+    },
+    {
       "id": "cedict-9a06b35346fb65ff151e6da0",
       "entryId": "cedict-9a06b35346fb65ff151e6da0",
       "kind": "word",
@@ -25145,6 +25161,22 @@
             "default": "军",
             "simplified": "军",
             "traditional": "軍"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cedict-30cf135f97becaeeec0880d8",
+      "entryId": "cedict-30cf135f97becaeeec0880d8",
+      "kind": "syllable",
+      "syllables": [
+        {
+          "transcription": "zhuan1",
+          "tone": 1,
+          "forms": {
+            "default": "专",
+            "simplified": "专",
+            "traditional": "專"
           }
         }
       ]
@@ -35058,6 +35090,22 @@
           "forms": {
             "default": "折",
             "simplified": "折",
+            "traditional": "摺"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cedict-42c6dac4e816bb1259802942",
+      "entryId": "cedict-42c6dac4e816bb1259802942",
+      "kind": "syllable",
+      "syllables": [
+        {
+          "transcription": "zhe2",
+          "tone": 2,
+          "forms": {
+            "default": "摺",
+            "simplified": "摺",
             "traditional": "摺"
           }
         }
@@ -56544,6 +56592,22 @@
       ]
     },
     {
+      "id": "cedict-1d1202b7bf3a1b4914fbbdb3",
+      "entryId": "cedict-1d1202b7bf3a1b4914fbbdb3",
+      "kind": "syllable",
+      "syllables": [
+        {
+          "transcription": "ma4",
+          "tone": 4,
+          "forms": {
+            "default": "骂",
+            "simplified": "骂",
+            "traditional": "罵"
+          }
+        }
+      ]
+    },
+    {
       "id": "cedict-d444a0f0cf844d21485baf56",
       "entryId": "cedict-d444a0f0cf844d21485baf56",
       "kind": "word",
@@ -60708,6 +60772,22 @@
             "default": "延",
             "simplified": "延",
             "traditional": "延"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cedict-8684a08d0aa413d0530c5892",
+      "entryId": "cedict-8684a08d0aa413d0530c5892",
+      "kind": "syllable",
+      "syllables": [
+        {
+          "transcription": "ma2",
+          "tone": 2,
+          "forms": {
+            "default": "麻",
+            "simplified": "麻",
+            "traditional": "蔴"
           }
         }
       ]
@@ -74785,6 +74865,22 @@
       ]
     },
     {
+      "id": "cedict-ce8c3121681701daf56555aa",
+      "entryId": "cedict-ce8c3121681701daf56555aa",
+      "kind": "syllable",
+      "syllables": [
+        {
+          "transcription": "ma4",
+          "tone": 4,
+          "forms": {
+            "default": "骂",
+            "simplified": "骂",
+            "traditional": "駡"
+          }
+        }
+      ]
+    },
+    {
       "id": "cedict-f85248059333937a2e262135",
       "entryId": "cedict-f85248059333937a2e262135",
       "kind": "syllable",
@@ -75800,6 +75896,38 @@
             "default": "子",
             "simplified": "子",
             "traditional": "子"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cedict-e63d6a9f54c4868ea764f630",
+      "entryId": "cedict-e63d6a9f54c4868ea764f630",
+      "kind": "syllable",
+      "syllables": [
+        {
+          "transcription": "ma2",
+          "tone": 2,
+          "forms": {
+            "default": "麻",
+            "simplified": "麻",
+            "traditional": "麻"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cedict-10d8663af73707fb518af462",
+      "entryId": "cedict-10d8663af73707fb518af462",
+      "kind": "syllable",
+      "syllables": [
+        {
+          "transcription": "ma2",
+          "tone": 2,
+          "forms": {
+            "default": "麻",
+            "simplified": "麻",
+            "traditional": "麻"
           }
         }
       ]

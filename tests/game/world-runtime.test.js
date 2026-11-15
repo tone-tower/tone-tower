@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { animateWorld } from '../../src/world/world-runtime.js';
 
@@ -16,7 +16,7 @@ for (const height of [240, 400]) {
     })) {
       const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
       Object.defineProperty(globalThis, name, { configurable: true, writable: true, value });
-      t.after(() => {
+      t.onTestFinished(() => {
         if (descriptor) Object.defineProperty(globalThis, name, descriptor);
         else delete globalThis[name];
       });
