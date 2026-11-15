@@ -19922,6 +19922,26 @@
       }
     },
     {
+      "id": "cedict-3fd9698f532ef0aa26e59fa8",
+      "forms": {
+        "default": "妈",
+        "simplified": "妈",
+        "traditional": "媽"
+      },
+      "gloss": "ma; mom; mother",
+      "dictionarySource": {
+        "name": "CC-CEDICT",
+        "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+        "edition": "v1",
+        "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+        "date": "2026-11-07T03:55:59Z",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "entryId": "cedict-3fd9698f532ef0aa26e59fa8",
+        "raw": "媽 妈 [ma1] /ma/mom/mother/"
+      }
+    },
+    {
       "id": "cedict-9a06b35346fb65ff151e6da0",
       "forms": {
         "default": "妈妈",
@@ -21759,6 +21779,26 @@
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
         "entryId": "cedict-f86aa9acd65285a44c42eb27",
         "raw": "將軍 将军 [jiang1 jun1] /general/high-ranking military officer/to check or checkmate/fig. to embarrass/to challenge/to put sb on the spot/"
+      }
+    },
+    {
+      "id": "cedict-30cf135f97becaeeec0880d8",
+      "forms": {
+        "default": "专",
+        "simplified": "专",
+        "traditional": "專"
+      },
+      "gloss": "for a particular person, occasion, purpose; focused on one thing; special; expert; particular (to sth); concentrated; specialized",
+      "dictionarySource": {
+        "name": "CC-CEDICT",
+        "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+        "edition": "v1",
+        "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+        "date": "2026-11-07T03:55:59Z",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "entryId": "cedict-30cf135f97becaeeec0880d8",
+        "raw": "專 专 [zhuan1] /for a particular person, occasion, purpose/focused on one thing/special/expert/particular (to sth)/concentrated/specialized/"
       }
     },
     {
@@ -30439,6 +30479,26 @@
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
         "entryId": "cedict-c57a89e9eec1908f4f3d706d",
         "raw": "摺 折 [zhe2] /variant of 折[zhe2]/to fold/"
+      }
+    },
+    {
+      "id": "cedict-42c6dac4e816bb1259802942",
+      "forms": {
+        "default": "摺",
+        "simplified": "摺",
+        "traditional": "摺"
+      },
+      "gloss": "document folded in accordion form; to fold",
+      "dictionarySource": {
+        "name": "CC-CEDICT",
+        "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+        "edition": "v1",
+        "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+        "date": "2026-11-07T03:55:59Z",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "entryId": "cedict-42c6dac4e816bb1259802942",
+        "raw": "摺 摺 [zhe2] /document folded in accordion form/to fold/"
       }
     },
     {
@@ -49282,6 +49342,26 @@
       }
     },
     {
+      "id": "cedict-1d1202b7bf3a1b4914fbbdb3",
+      "forms": {
+        "default": "骂",
+        "simplified": "骂",
+        "traditional": "罵"
+      },
+      "gloss": "to scold; to abuse; to curse; CL:通[tong4],頓|顿[dun4]",
+      "dictionarySource": {
+        "name": "CC-CEDICT",
+        "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+        "edition": "v1",
+        "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+        "date": "2026-11-07T03:55:59Z",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "entryId": "cedict-1d1202b7bf3a1b4914fbbdb3",
+        "raw": "罵 骂 [ma4] /to scold/to abuse/to curse/CL:通[tong4],頓|顿[dun4]/"
+      }
+    },
+    {
       "id": "cedict-d444a0f0cf844d21485baf56",
       "forms": {
         "default": "罢工",
@@ -53039,6 +53119,26 @@
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
         "entryId": "cedict-0520f5ff56fa5088bb111f94",
         "raw": "蔓延 蔓延 [man4 yan2] /to spread; to extend/"
+      }
+    },
+    {
+      "id": "cedict-8684a08d0aa413d0530c5892",
+      "forms": {
+        "default": "麻",
+        "simplified": "麻",
+        "traditional": "蔴"
+      },
+      "gloss": "hemp (variant of 麻[ma2])",
+      "dictionarySource": {
+        "name": "CC-CEDICT",
+        "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+        "edition": "v1",
+        "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+        "date": "2026-11-07T03:55:59Z",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "entryId": "cedict-8684a08d0aa413d0530c5892",
+        "raw": "蔴 麻 [ma2] /hemp (variant of 麻[ma2])/"
       }
     },
     {
@@ -65502,6 +65602,26 @@
       }
     },
     {
+      "id": "cedict-ce8c3121681701daf56555aa",
+      "forms": {
+        "default": "骂",
+        "simplified": "骂",
+        "traditional": "駡"
+      },
+      "gloss": "variant of 罵|骂[ma4]",
+      "dictionarySource": {
+        "name": "CC-CEDICT",
+        "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+        "edition": "v1",
+        "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+        "date": "2026-11-07T03:55:59Z",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "entryId": "cedict-ce8c3121681701daf56555aa",
+        "raw": "駡 骂 [ma4] /variant of 罵|骂[ma4]/"
+      }
+    },
+    {
       "id": "cedict-f85248059333937a2e262135",
       "forms": {
         "default": "骑",
@@ -66459,6 +66579,46 @@
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
         "entryId": "cedict-51dbc0b7109e6e130014defc",
         "raw": "麵子 面子 [mian4 zi5] /(medicinal) powder/"
+      }
+    },
+    {
+      "id": "cedict-e63d6a9f54c4868ea764f630",
+      "forms": {
+        "default": "麻",
+        "simplified": "麻",
+        "traditional": "麻"
+      },
+      "gloss": "surname Ma",
+      "dictionarySource": {
+        "name": "CC-CEDICT",
+        "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+        "edition": "v1",
+        "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+        "date": "2026-11-07T03:55:59Z",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "entryId": "cedict-e63d6a9f54c4868ea764f630",
+        "raw": "麻 麻 [Ma2] /surname Ma/"
+      }
+    },
+    {
+      "id": "cedict-10d8663af73707fb518af462",
+      "forms": {
+        "default": "麻",
+        "simplified": "麻",
+        "traditional": "麻"
+      },
+      "gloss": "generic name for hemp, flax etc; hemp or flax fiber for textile materials; sesame; CL:縷|缕[lu:3]; (of materials) rough or coarse; pocked; pitted; to have pins and needles or tingling; to feel numb",
+      "dictionarySource": {
+        "name": "CC-CEDICT",
+        "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+        "edition": "v1",
+        "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+        "date": "2026-11-07T03:55:59Z",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "entryId": "cedict-10d8663af73707fb518af462",
+        "raw": "麻 麻 [ma2] /generic name for hemp, flax etc/hemp or flax fiber for textile materials/sesame/CL:縷|缕[lu:3]/(of materials) rough or coarse/pocked/pitted/to have pins and needles or tingling/to feel numb/"
       }
     },
     {

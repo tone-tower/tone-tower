@@ -31,7 +31,11 @@ function catalogOf(list, { examplesOnly = false } = {}) {
     version: 2,
     language: 'vi',
     transcriptionSystem: 'quoc-ngu',
-    entries: list.map(([text, gloss], i) => ({ id: 'vi-' + i, forms: { default: text }, gloss })),
+    entries: list.map(([text, gloss], i) => ({
+      id: 'vi-' + i,
+      forms: { default: text },
+      gloss: gloss ?? '',
+    })),
     pronunciations: list.map(([text], i) => ({
       id: 'vi-' + i,
       entryId: 'vi-' + i,
@@ -113,22 +117,17 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await page.goto('/');
   await page.locator('.language-card--vietnamese').click();
   await expect(page).toHaveURL(/\/vietnamese\/$/);
-  await expect(page.locator('h1')).toHaveText('Practise Vietnamese tones.');
+  await expect(page.locator('h1')).toHaveText('Tone Tower');
   await expect(page.locator('[data-mode-card]:visible')).toHaveCount(1);
   await expect(page.locator('[data-destination="rail"]:visible')).toHaveCount(0);
-  // One syllable is spelled out, and heard in a word that repeats it.
-  await expect(page.locator('.syllable-result b')).toHaveText('mãi');
-  await expect(page.locator('.syllable-result small')).toHaveText('mãi mãi · forever');
-  await expect(page.locator('.hear-example')).toBeEnabled();
+  await expect(page.locator('.language-switcher')).toContainText('Vietnamese');
+  await expect(page.locator('#setup-practice')).toBeVisible();
   await page.locator('#credits').click();
   await expect(page.locator('#dialog')).toContainText('Synthetic speech generated with ElevenLabs');
   await expect(page.locator('#dialog')).toContainText('Fixture · synthetic voice');
   await expect(page.locator('#dialog')).not.toContainText(/undefined|Wikimedia|Original/);
   await page.locator('#close-dialog').click();
-  await page.locator('#progress').click();
-  await expect(page.locator('#dialog')).toContainText('Tone Tower');
-  await expect(page.locator('#dialog')).not.toContainText('Skyrail');
-  await page.locator('#close-dialog').click();
+  await expect(page.locator('#progress')).toHaveCount(0);
   await page.locator('#learn').click();
   await expect(page).toHaveURL(/\/vietnamese\/guide\/$/);
   await expect(page.getByRole('heading', { name: 'Six tones, five marks' })).toBeVisible();
@@ -154,7 +153,7 @@ test('six doors show tone marks and names, and every cover leaves once a door is
   const doors = page.locator('.tone-door');
   await expect(doors).toHaveCount(6);
   await expect(page.locator('.tone-door .tone-mark')).toHaveCount(6);
-  expect((await page.locator('.tone-number').allInnerTexts()).join('')).not.toMatch(/[0-9]/);
+  expect((await page.locator('.tone-symbol').allInnerTexts()).join('')).not.toMatch(/[0-9]/);
   expect(await page.locator('.tone-name').allInnerTexts()).toEqual([
     'dấu sắc',
     'dấu huyền',
@@ -272,4 +271,45 @@ test('reduced motion shows the answer without the leaving cover', async ({ page 
   await page.locator('.tone-door[data-tone="' + tone + '"]').click();
   expect(await shown(page)).toBe(text);
   await expect(page.locator('.tone-cover').first()).toBeHidden();
+});
+
+test('Vietnamese saves stay separate while the newer language switcher preserves the page', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('soundbound-cantonese-v1', 'cantonese-sentinel');
+    localStorage.setItem('soundbound-mandarin-v1', 'mandarin-sentinel');
+  });
+  await practice(page, '6');
+  const { tone } = await current(page);
+  await page.locator('.tone-door[data-tone="' + tone + '"]').click();
+  await page.locator('#finish-practice').click();
+  const saves = await page.evaluate(() => ({
+    vi: localStorage.getItem('soundbound-vietnamese-v1'),
+    yue: localStorage.getItem('soundbound-cantonese-v1'),
+    cmn: localStorage.getItem('soundbound-mandarin-v1'),
+  }));
+  expect(saves.vi).toBeTruthy();
+  expect(saves.yue).toBe('cantonese-sentinel');
+  expect(saves.cmn).toBe('mandarin-sentinel');
+  await page.locator('#learn').click();
+  await page.locator('.language-switcher summary').click();
+  await expect(page.locator('[data-language-link="cmn"]')).toHaveAttribute(
+    'href',
+    /mandarin\/guide\/$/,
+  );
+  await expect(page.locator('[data-language-link="yue"]')).toHaveAttribute(
+    'href',
+    /cantonese\/guide\/$/,
+  );
+});
+
+test('home keyboard shortcuts keep Vietnamese on its supported tower', async ({ page }) => {
+  await loaded(page);
+  await page.locator('body').click({ position: { x: 2, y: 2 } });
+  await page.keyboard.press('End');
+  await expect(page.locator('#destination-title')).toHaveText('Tone Tower');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#destination-title')).toHaveText('Tone Tower');
+  await expect(page.locator('[data-mode-card][data-destination="rail"]:visible')).toHaveCount(0);
 });

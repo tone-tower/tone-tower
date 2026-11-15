@@ -18,7 +18,7 @@ jobs:
   check:
     name: Test and build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,6 +29,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run format:check
+      - run: npm run typecheck
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
       - name: Install audio test tools
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
@@ -38,11 +41,22 @@ jobs:
           ffmpeg -version
           ffprobe -version
       - name: Run tests
-        run: node .github/scripts/run-tests.mjs
+        run: npm run test:all
+      - run: npm run mandarin:status -- --release
+      - run: npm run vietnamese:status -- --release
       - run: npm run build
       - name: Ensure the build leaves source data unchanged
         run: git diff --exit-code -- data/audio data/content
       - run: npm run check:dist
+      - name: Check browser flows and built routes
+        run: npx playwright test
+      - name: Preserve browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-results
+          path: ${{ runner.temp }}/tone-tower-browser-results
+          if-no-files-found: ignore
       - name: Upload only the built site
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5

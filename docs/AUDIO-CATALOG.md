@@ -3,6 +3,10 @@
 The app remains a static website. This document describes the Cantonese source inventory; see [Mandarin curation and the shared catalog](MANDARIN-WEBSITE.md) for the language sites and common browser format. Existing recordings are available by default;
 players can report recording problems through prefilled GitHub issue links; source corrections remain internal.
 
+[Optional shared listening review and coverage tools](AUDIO-REVIEW.md) support
+gradual review of either language, structured speaker credits, proposed contrasts,
+and hash-bound audio measurements. Listening approval is not a gameplay prerequisite.
+
 ## Files and ownership
 
 - `data/audio/content.json`: the downloader's original inventory and source attribution.

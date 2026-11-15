@@ -1,8 +1,12 @@
-import { readFile, readdir, mkdir, copyFile, unlink } from 'node:fs/promises';
+import fileOps from 'node:fs/promises';
+import { withCurationLock } from './curation-lock.mjs';
+import { validateCatalog } from '../../src/content/catalog.ts';
+import { vietnamese } from '../../src/languages/profiles.ts';
+import { readFile, readdir, mkdir, copyFile, unlink, lstat, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { atomicJSON, readJSON } from '../lib/json.mjs';
-import { splitTone } from '../../src/languages/vietnamese.js';
+import { atomicJSON, atomicText, readJSON } from '../lib/json.mjs';
+import { splitTone } from '../../src/languages/vietnamese.ts';
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const sourceFile = (root) => path.join(root, 'data/content/vi/words.json');
@@ -66,6 +70,7 @@ function validate(source) {
   if (
     source?.version !== 1 ||
     !source.voices ||
+    typeof source.voices !== 'object' ||
     Array.isArray(source.voices) ||
     !Array.isArray(source.words)
   )
@@ -75,6 +80,16 @@ function validate(source) {
       throw Error('Incomplete Vietnamese voice: ' + id);
   const seen = new Set();
   for (const row of source.words) {
+    if (!row || typeof row !== 'object' || Array.isArray(row))
+      throw Error('Invalid Vietnamese row.');
+    if (
+      !row.frequency ||
+      !Number.isSafeInteger(row.frequency.rank) ||
+      row.frequency.rank < 1 ||
+      (row.frequency.perMillion !== undefined &&
+        (!Number.isFinite(row.frequency.perMillion) || row.frequency.perMillion < 0))
+    )
+      throw Error('Invalid Vietnamese frequency for ' + row.text);
     if (!valid(row.text)) throw Error('Invalid Vietnamese word: ' + row.text);
     const name = asciiName(row.text);
     if (seen.has(name)) throw Error('Duplicate Vietnamese word: ' + row.text);
@@ -88,6 +103,7 @@ function validate(source) {
       if (
         audio.file !== 'audio/vi/' + voice + '-' + name + '.mp3' ||
         !Number.isSafeInteger(audio.bytes) ||
+        audio.bytes < 1000 ||
         !/^[0-9a-f]{64}$/.test(audio.sha256)
       )
         throw Error('Invalid recording for ' + row.text + ': ' + voice);
@@ -99,18 +115,103 @@ function validate(source) {
 // Imports one voice from a frequency list and a folder of `<rank>_<word>.mp3` clips.
 // The import replaces that voice: its clips are copied unchanged, and clips of words
 // that are no longer selected are removed. Other voices are left alone.
-export async function importVietnamese(
+
+const transactionDir = (root) => path.resolve(root, '.audio-import-cache/vi/import-transaction');
+const journalFile = (root) => path.join(transactionDir(root), 'transaction.json');
+async function removeTransaction(root) {
+  const dir = transactionDir(root);
+  if (
+    path.dirname(dir) !== path.resolve(root, '.audio-import-cache/vi') ||
+    (await lstat(dir)).isSymbolicLink()
+  )
+    throw Error('Unsafe Vietnamese transaction directory.');
+  await rm(dir, { recursive: true, force: true });
+}
+async function loadTransaction(root) {
+  const bytes = await readFile(journalFile(root), 'utf8').catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+    return null;
+  });
+  return bytes === null ? { exists: false } : { exists: true, journal: JSON.parse(bytes) };
+}
+async function ensureNoTransaction(root) {
+  if ((await loadTransaction(root)).exists)
+    throw Error('Incomplete Vietnamese import. Run npm run vietnamese:import -- --recover.');
+}
+async function recoverUnlocked(root) {
+  const { exists, journal } = await loadTransaction(root);
+  if (!exists) return { recovered: false };
+  if (
+    !journal ||
+    typeof journal !== 'object' ||
+    Array.isArray(journal) ||
+    journal.version !== 1 ||
+    !['installing', 'committed'].includes(journal.phase) ||
+    !Array.isArray(journal.files) ||
+    !Array.isArray(journal.obsolete) ||
+    typeof journal.manifestExisted !== 'boolean'
+  )
+    throw Error('Invalid Vietnamese import recovery journal.');
+  for (const row of journal.files)
+    if (!row || !/^audio\/vi\/[a-z0-9-]+\.mp3$/.test(row.file) || typeof row.existed !== 'boolean')
+      throw Error('Invalid Vietnamese recovery file.');
+  for (const file of journal.obsolete)
+    if (!/^audio\/vi\/[a-z0-9-]+\.mp3$/.test(file))
+      throw Error('Invalid Vietnamese obsolete file.');
+  if (journal.phase === 'installing') {
+    for (const { file, existed } of journal.files) {
+      const target = path.join(root, file);
+      if (existed)
+        await copyFile(path.join(transactionDir(root), 'old', path.basename(file)), target);
+      else
+        await unlink(target).catch((error) => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+    }
+    if (journal.manifestExisted)
+      await atomicText(
+        sourceFile(root),
+        await readFile(path.join(transactionDir(root), 'previous.json'), 'utf8'),
+      );
+    else
+      await unlink(sourceFile(root)).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+  } else {
+    for (const file of journal.obsolete)
+      await unlink(path.join(root, file)).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+  }
+  await removeTransaction(root);
+  return { recovered: true, outcome: journal.phase === 'installing' ? 'rolled back' : 'completed' };
+}
+export function recoverVietnameseImport(root) {
+  return withCurationLock(root, 'vi', () => recoverUnlocked(root));
+}
+export function importVietnamese(root, options) {
+  return withCurationLock(root, 'vi', () => importVietnameseUnlocked(root, options));
+}
+
+async function importVietnameseUnlocked(
   root,
   { csv, audio, voice, name, generator, minSyllables = 2, maxRank = Infinity },
 ) {
   if (!/^[a-z0-9]+$/.test(voice ?? '')) throw Error('Choose a voice ID, such as tuananh.');
   if (!Number.isInteger(minSyllables) || minSyllables < 1 || !(maxRank >= 1))
     throw Error('Choose a syllable count and a rank of at least 1.');
+  await ensureNoTransaction(root);
   const source = validate(await readJSON(sourceFile(root), emptyVietnamese));
   if (name || generator || !source.voices[voice]) {
-    if (!nonempty(name ?? source.voices[voice]?.name) || !nonempty(generator))
+    if (
+      !nonempty(name ?? source.voices[voice]?.name) ||
+      !nonempty(generator ?? source.voices[voice]?.generator)
+    )
       throw Error('A new voice needs --name and --generator.');
-    source.voices[voice] = { name: name ?? source.voices[voice].name, generator };
+    source.voices[voice] = {
+      name: name ?? source.voices[voice]?.name,
+      generator: generator ?? source.voices[voice]?.generator,
+    };
   }
   const clips = new Map(
     (await readdir(audio))
@@ -134,12 +235,20 @@ export async function importVietnamese(
     duplicates: [],
     missing: [],
   };
-  await mkdir(path.join(root, 'audio/vi'), { recursive: true });
-  for (const record of parseCSV(await readFile(csv, 'utf8'))) {
+  const staged = new Map();
+  const records = parseCSV(await readFile(csv, 'utf8'));
+  if (
+    !records.length ||
+    !['rank', 'word', 'english', 'per_million'].every((field) => Object.hasOwn(records[0], field))
+  )
+    throw Error(
+      'Expected a nonempty Vietnamese CSV with rank, word, english and per_million columns.',
+    );
+  for (const record of records) {
     const text = String(record.word ?? record.syllable ?? '').normalize('NFC'),
       rank = Number(record.rank),
       perMillion = Number(record.per_million);
-    if (!valid(text) || !Number.isSafeInteger(rank))
+    if (!valid(text) || !Number.isSafeInteger(rank) || rank < 1)
       throw Error('Invalid list row: ' + JSON.stringify(record));
     const reference = references.includes(text);
     if (!reference && text.split(' ').length < minSyllables) {
@@ -163,7 +272,7 @@ export async function importVietnamese(
     const bytes = await readFile(path.join(audio, clip));
     if (bytes.length < 1000) throw Error('Empty or invalid audio for ' + text);
     const file = 'audio/vi/' + voice + '-' + asciiName(text) + '.mp3';
-    await copyFile(path.join(audio, clip), path.join(root, file));
+    staged.set(file, bytes);
     words.set(text, {
       text,
       ...(nonempty(record.english) ? { gloss: record.english.trim() } : {}),
@@ -184,11 +293,63 @@ export async function importVietnamese(
   source.words = [...words.values()].sort(
     (a, b) => a.frequency.rank - b.frequency.rank || a.text.localeCompare(b.text),
   );
-  await atomicJSON(sourceFile(root), validate(source));
+  validate(source);
+  const dir = transactionDir(root);
+  await mkdir(dir, { recursive: true });
+  // A leftover staging directory without a journal has never changed live content.
+  await removeTransaction(root);
+  await mkdir(path.join(dir, 'new'), { recursive: true });
+  await mkdir(path.join(dir, 'old'), { recursive: true });
+  await mkdir(path.join(root, 'audio/vi'), { recursive: true });
+  const previousManifest = await readFile(sourceFile(root), 'utf8').catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+    return null;
+  });
+  if (previousManifest !== null) await writeFile(path.join(dir, 'previous.json'), previousManifest);
+  const files = [];
+  for (const [file, bytes] of staged) {
+    await writeFile(path.join(dir, 'new', path.basename(file)), bytes);
+    let existed = true;
+    await copyFile(path.join(root, file), path.join(dir, 'old', path.basename(file))).catch(
+      (error) => {
+        if (error.code !== 'ENOENT') throw error;
+        existed = false;
+      },
+    );
+    files.push({ file, existed });
+  }
   const kept = new Set(source.words.map((row) => row.audio[voice]?.file).filter(Boolean));
-  for (const file of await readdir(path.join(root, 'audio/vi')))
-    if (file.startsWith(voice + '-') && file.endsWith('.mp3') && !kept.has('audio/vi/' + file))
-      await unlink(path.join(root, 'audio/vi', file));
+  const obsolete = (await readdir(path.join(root, 'audio/vi')))
+    .filter(
+      (file) =>
+        file.startsWith(voice + '-') && file.endsWith('.mp3') && !kept.has('audio/vi/' + file),
+    )
+    .map((file) => 'audio/vi/' + file);
+  const journal = {
+    version: 1,
+    phase: 'installing',
+    manifestExisted: previousManifest !== null,
+    files,
+    obsolete,
+  };
+  await atomicJSON(journalFile(root), journal);
+  try {
+    for (const { file } of files)
+      await fileOps.copyFile(path.join(dir, 'new', path.basename(file)), path.join(root, file));
+    await atomicJSON(sourceFile(root), source);
+    await atomicJSON(journalFile(root), { ...journal, phase: 'committed' });
+  } catch (error) {
+    try {
+      await recoverUnlocked(root);
+    } catch (recoveryError) {
+      throw new AggregateError(
+        [error, recoveryError],
+        'Vietnamese import failed; recovery is required. Run npm run vietnamese:import -- --recover.',
+      );
+    }
+    throw error;
+  }
+  await recoverUnlocked(root);
   return result;
 }
 
@@ -205,8 +366,36 @@ export function coverage(catalog) {
   return { ready: !missing.length, tones, missing };
 }
 
-export async function buildVietnameseCatalog(root) {
+export function writeVietnameseCatalog(root) {
+  return withCurationLock(root, 'vi', async () => {
+    const catalog = await buildVietnameseCatalogUnlocked(root);
+    await atomicText(path.join(root, 'catalogs/vi.json'), JSON.stringify(catalog) + '\n');
+    return catalog;
+  });
+}
+export function buildVietnameseCatalog(root) {
+  return withCurationLock(root, 'vi', () => buildVietnameseCatalogUnlocked(root));
+}
+async function buildVietnameseCatalogUnlocked(root) {
+  await ensureNoTransaction(root);
   const source = validate(await readJSON(sourceFile(root), emptyVietnamese));
+  const checks = source.words.flatMap((row) =>
+    Object.values(row.audio).map((audio) => ({ text: row.text, audio })),
+  );
+  // Verify independent files concurrently, then assemble in source order for stable catalogs.
+  for (let start = 0; start < checks.length; start += 32) {
+    const results = await Promise.allSettled(
+      checks.slice(start, start + 32).map(async ({ text, audio }) => {
+        const bytes = await readFile(path.join(root, audio.file)).catch((error) => {
+          throw Error('Missing audio for ' + text + ': ' + error.message);
+        });
+        if (bytes.length !== audio.bytes || sha256(bytes) !== audio.sha256)
+          throw Error('Audio differs from the word list: ' + audio.file);
+      }),
+    );
+    const failure = results.find((result) => result.status === 'rejected');
+    if (failure) throw failure.reason;
+  }
   const catalog = {
     version: 2,
     language: 'vi',
@@ -224,7 +413,7 @@ export async function buildVietnameseCatalog(root) {
     catalog.entries.push({
       id,
       forms: { default: row.text },
-      ...(row.gloss ? { gloss: row.gloss } : {}),
+      gloss: row.gloss ?? '',
       metadata: { frequency: row.frequency },
     });
     catalog.pronunciations.push({
@@ -234,11 +423,6 @@ export async function buildVietnameseCatalog(root) {
       syllables,
     });
     for (const [voice, audio] of Object.entries(row.audio)) {
-      const bytes = await readFile(path.join(root, audio.file)).catch((error) => {
-        throw Error('Missing audio for ' + row.text + ': ' + error.message);
-      });
-      if (bytes.length !== audio.bytes || sha256(bytes) !== audio.sha256)
-        throw Error('Audio differs from the word list: ' + audio.file);
       catalog.recordings.push({
         id: 'vi-' + voice + '-' + asciiName(row.text),
         pronunciationId: id,
@@ -247,6 +431,11 @@ export async function buildVietnameseCatalog(root) {
         speakerId: voice,
         author: source.voices[voice].name + ' · synthetic voice',
         synthetic: true,
+        toneEvidence: {
+          status: 'assumed',
+          basis:
+            'Tone inferred from Vietnamese spelling; synthetic audio has not been independently reviewed.',
+        },
         conversion: 'Synthetic speech generated with ' + source.voices[voice].generator + '.',
       });
     }
@@ -261,5 +450,5 @@ export async function buildVietnameseCatalog(root) {
       });
   }
   catalog.availability = coverage(catalog);
-  return catalog;
+  return validateCatalog(catalog, vietnamese, { publication: true });
 }

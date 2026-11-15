@@ -40,21 +40,26 @@ test('publication follows runtime dependencies, includes credits, and excludes l
   for (const row of input) await put(row.audio, Buffer.alloc(1200));
   await put(
     'src/shell.html',
-    '<base href="./" /><link rel="stylesheet" href="src/styles/style.css"><a href="./">Home</a><a href="#guide">Guide</a><script type="module" src="src/app.js"></script>',
+    '<base href="./" /><link rel="stylesheet" href="src/styles/style.css"><a href="./">Home</a><a href="#guide">Guide</a><script type="module" src="src/app.ts"></script>',
   );
   await put(
     'index.html',
     '<link rel="stylesheet" href="src/styles/style.css"><a href="cantonese/">Cantonese</a><a href="mandarin/">Mandarin</a>',
   );
   await put('audio/cmn/unreviewed.mp3', Buffer.alloc(1200));
-  await put('src/app.js', "import {run} from './game/game.js'; run();");
-  await put('src/game/game.js', "export {play as run} from '../audio/audio.js';");
-  await put('src/audio/audio.js', 'export function play() {}');
+  await put('src/app.ts', "import {run} from './game/game.js'; run();");
+  await put('src/game/game.js', "export {play as run} from '../audio/audio.ts';");
+  await put(
+    'src/audio/audio.ts',
+    "export function play() { document.body.dataset.fixture='played'; }",
+  );
   await put(
     'src/styles/style.css',
     "body {font-family:Game} @font-face{font-family:Game;src:url('../../assets/fonts/game.ttf')}",
   );
-  await put('assets/fonts/game.ttf', 'font');
+  await put('assets/fonts/game.ttf', Buffer.alloc(5000));
+  await put('assets/brand/share-card.png', 'share card');
+  await put('favicon.ico', 'icon');
   await put('assets/fonts/game-LICENSE.txt', 'Font licence');
   await put('LICENSE', 'Code licence');
   await put('.nojekyll', '');
@@ -71,11 +76,10 @@ test('publication follows runtime dependencies, includes credits, and excludes l
   const { files } = await publish(root);
   assert.equal(await readFile(path.join(root, 'data/audio/words.json'), 'utf8'), registryBefore);
 
+  assert.ok(files.some((name) => /^assets\/.+\.js$/.test(name)));
+  assert.ok(files.some((name) => /^assets\/.+\.css$/.test(name)));
+  assert.ok(files.some((name) => /^assets\/.+\.ttf$/.test(name)));
   for (const name of [
-    'src/app.js',
-    'src/game/game.js',
-    'src/audio/audio.js',
-    'assets/fonts/game.ttf',
     'assets/fonts/game-LICENSE.txt',
     'catalogs/yue.json',
     '.nojekyll',
@@ -107,7 +111,7 @@ test('publication follows runtime dependencies, includes credits, and excludes l
   await put('dist/private-cache.txt', 'must not be published');
   await assert.rejects(() => checkDistribution(path.join(root, 'dist')), /unexpected files/);
   await put('src/game/game.js', "import '/root-only.js';");
-  await assert.rejects(() => publish(root), /relative paths/);
+  await assert.rejects(() => publish(root), /resolve|ENOENT/);
   await put('src/game/game.js', "import '../missing.js';");
-  await assert.rejects(() => publish(root), /ENOENT/);
+  await assert.rejects(() => publish(root), /resolve|ENOENT/);
 });

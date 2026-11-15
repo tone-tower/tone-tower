@@ -1,5 +1,5 @@
-import { cantonese } from '../../src/languages/profiles.js';
-import test from 'node:test';
+import { cantonese } from '../../src/languages/profiles.ts';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   loadProgress,
@@ -7,8 +7,8 @@ import {
   recordRun,
   resetProgress,
   emptyProgress,
-} from '../../src/persistence/progress.js';
-import { createRun, defaultPractice } from '../../src/game/game-core.js';
+} from '../../src/persistence/progress.ts';
+import { createRun, defaultPractice } from '../../src/game/game-core.ts';
 const PROGRESS_KEY = cantonese.storageKey;
 const storage = (values) => {
   const data = new Map(

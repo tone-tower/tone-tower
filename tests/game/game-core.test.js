@@ -1,8 +1,8 @@
-import { practiceSpelling } from '../../src/languages/jyutping.js';
-import { cantonese } from '../../src/languages/profiles.js';
-import test from 'node:test';
+import { practiceSpelling } from '../../src/languages/jyutping.ts';
+import { cantonese } from '../../src/languages/profiles.ts';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { createRun, defaultPractice, validatePractice } from '../../src/game/game-core.js';
+import { createRun, defaultPractice, validatePractice } from '../../src/game/game-core.ts';
 
 const words = Array.from({ length: 240 }, (_, i) => {
   const tone = (i % 6) + 1;

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { bindMapNavigation } from '../../src/ui/map-navigation.js';
 
@@ -40,7 +40,7 @@ class Element {
   }
 }
 
-function harness(initial = 'tone') {
+function harness(initial = 'tone', destinations) {
   const listeners = new Set(),
     document = {
       addEventListener(type, handler) {
@@ -75,6 +75,7 @@ function harness(initial = 'tone') {
       },
       onStart: () => calls.push(['start', selected]),
       isBlocked: () => blocked,
+      destinations,
     });
   return {
     document,
@@ -221,4 +222,18 @@ test('disabled destinations do not handle keys and cleanup removes the document 
   h.key('ArrowRight');
   h.key('Enter');
   assert.deepEqual(h.calls, []);
+});
+
+test('one-game profiles never navigate into an unsupported destination', () => {
+  const h = harness('tone', ['tone']);
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']) {
+    h.key(key);
+    assert.equal(h.selected, 'tone');
+  }
+  const count = h.calls.length;
+  h.key('Enter', h.cards.rail);
+  assert.equal(h.calls.length, count);
+  h.key('Enter');
+  assert.deepEqual(h.calls.at(-1), ['start', 'tone']);
+  h.cleanup();
 });

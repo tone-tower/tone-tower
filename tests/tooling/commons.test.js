@@ -52,7 +52,7 @@ test('host pacing survives a restart, preserves metadata and isolates media cool
   let requests = 0;
   const fetch = async (url, options) => {
     assert.equal(options.headers['User-Agent'], COMMONS_USER_AGENT);
-    assert.match(COMMONS_USER_AGENT, /https:\/\/github.com\/john0107\/tone-tower/);
+    assert.match(COMMONS_USER_AGENT, /https:\/\/github.com\/tone-tower\/tone-tower/);
     return ++requests === 1 ? limited(429, '600') : ok();
   };
   await commonsClient(f.file, null, { ...f.options, fetch })('https://upload.wikimedia.org/a.wav');

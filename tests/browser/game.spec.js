@@ -49,6 +49,9 @@ test.beforeEach(async ({ page }) => {
         this.src = src;
       }
       load() {}
+      removeAttribute(name) {
+        if (name === 'src') this.src = '';
+      }
       pause() {
         clearTimeout(this.end);
       }
@@ -171,6 +174,52 @@ test('phone keyboard keeps the rail journey visible above the typing field', asy
   await expectNoOverflow(page);
   await page.setViewportSize(size);
   await expect(page.locator('body')).not.toHaveClass(/keyboard-open/);
+});
+
+test('first completion reveals a permanent friend at home', async ({ page }) => {
+  test.skip(page.viewportSize().width < 700, 'One complete journey covers the unlock lifecycle.');
+  test.setTimeout(90000);
+  const extraWords = Array.from({ length: 120 }, (_, i) => ({
+    ...singles[i % singles.length],
+    id: 'journey-' + i,
+  }));
+  await page.route('**/catalogs/yue.json', (route) =>
+    route.fulfill({
+      json: cantoneseCatalog({
+        ...catalog,
+        words: [...words, ...extraWords],
+        recordings: [
+          ...catalog.recordings,
+          ...extraWords.map((word) => ({
+            id: word.id,
+            wordId: word.id,
+            audio: 'audio/' + word.id + '.mp3',
+          })),
+        ],
+      }),
+    }),
+  );
+  await page.reload();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await start(page, 'tone');
+  await page.clock.runFor(2200);
+  for (let floor = 1; floor <= 100; floor++) {
+    await page.locator('[data-tone="' + (await currentTone(page)) + '"]').click();
+    await page.clock.fastForward(1800);
+    await page.clock.runFor(150);
+    if (floor < 100 && floor % 20 === 0) {
+      await page.locator('#continue-game').click();
+      await page.clock.runFor(150);
+    }
+  }
+  await expect(page.locator('.homecoming-message')).toContainText('Rooftop cat unlocked.');
+  await page.locator('#ending-home').click();
+  await expect(page.getByRole('button', { name: 'Pet the rooftop cat' })).toBeVisible();
+  await expect(page.locator('#home-reward-status')).toContainText('Welcome home.');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Pet the rooftop cat' })).toBeVisible();
+  await expect(page.locator('[data-variant="normal"] .earned-reward')).toHaveCount(1);
+  await expect(page.locator('[data-variant="easy"] .earned-reward')).toHaveCount(0);
 });
 
 test('missed-sound practice retains multi-syllable recordings from the tower', async ({ page }) => {

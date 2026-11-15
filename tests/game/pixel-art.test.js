@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { drawSprout, drawRepairSpan } from '../../src/world/pixel-art.js';
 import { drawWorld, P } from '../../src/world/pixel-world.js';
@@ -41,6 +41,11 @@ test('pixel geometry stays on the integer grid across animated scene samples', (
         elapsed: time,
         lives: 3,
         maxLives: 4,
+        rewards: {
+          tone: { easy: true, normal: true, hard: true, extreme: true },
+          tide: { easy: true, normal: true, hard: true, extreme: true },
+        },
+        rewardInteraction: 'tone-extreme',
       });
       assert.ok(ctx.pixels.length > 0);
       for (const pixel of ctx.pixels) {
@@ -55,7 +60,18 @@ test('reduced motion keeps ambient artwork and the explorer still as time change
   for (const scene of ['hub', 'tone', 'tower-rest', 'rail']) {
     const samples = [0, 1.7, 4.6].map((time) => {
       const ctx = recordingContext();
-      drawWorld(ctx, { scene, time, reduced: true, actor: { x: 237, y: 206 }, count: 2 });
+      drawWorld(ctx, {
+        scene,
+        time,
+        reduced: true,
+        actor: { x: 237, y: 206 },
+        count: 2,
+        rewards: {
+          tone: { easy: true, normal: true, hard: true, extreme: true },
+          tide: { easy: true, normal: true, hard: true, extreme: true },
+        },
+        rewardInteraction: 'tone-extreme',
+      });
       return ctx.pixels;
     });
     assert.deepEqual(samples[0], samples[1], scene);
@@ -86,4 +102,27 @@ test('bridge construction settles and reduced motion shows the completed span im
   assert.notDeepEqual(draw(0.06), draw(1));
   assert.deepEqual(draw(1), draw(8));
   assert.deepEqual(draw(0, true), draw(1));
+});
+
+function scenePixel(state, x, y) {
+  const ctx = recordingContext();
+  drawWorld(ctx, { reduced: true, count: 2, ...state });
+  return ctx.pixels.findLast(
+    ([left, top, width, height]) => x >= left && x < left + width && y >= top && y < top + height,
+  )?.[4];
+}
+
+test('tower plants stay behind door frames and the floor gauge', () => {
+  assert.equal(scenePixel({ scene: 'tone', count: 3, floor: 20 }, 60, 204), P.wood);
+  assert.equal(scenePixel({ scene: 'tone', floor: 0 }, 28, 47), P.dark);
+});
+
+test('Skyrail leaves open air above a track gap instead of growing a tree there', () => {
+  const color = scenePixel({ scene: 'rail', progress: 0 }, 296, 196);
+  assert.notEqual(color, P.grass);
+  assert.notEqual(color, P.leaf);
+});
+
+test('rest landing furniture and plants have a solid balcony floor beneath them', () => {
+  assert.equal(scenePixel({ scene: 'tower-rest', progress: 20 }, 320, 212), P.shade);
 });

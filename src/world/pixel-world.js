@@ -9,6 +9,7 @@ import {
   drawGarden,
 } from './pixel-art.js';
 import { drawSkyrail } from './skyrail-world.js';
+import { drawHomeRewards } from './home-rewards.js';
 import {
   drawFloorGauge,
   drawTowerHearts,
@@ -290,26 +291,14 @@ export function drawWorld(ctx, s) {
   if (s.scene === 'hub') {
     cliff(54, 207, 168, 67);
     cliff(268, 207, 162, 67);
-    archBridge(214, 212, 63);
-    r(68, 207, 344, 5, P.gold);
-    r(73, 208, 334, 1, P.cream);
-    r(133, 207, 25, 13, P.gold);
-    r(338, 209, 22, 12, P.gold);
+    // Trees grow on the islands, behind buildings, the walking path and the train.
+    for (const x of [64, 198, 270, 400]) tree(x, 180);
     tower(94, 30, 102, 177, s.progress);
     r(132, 184, 26, 23, P.deep);
     r(136, 186, 18, 21, P.wood);
     r(142, 188, 6, 19, P.gold);
 
     station(290, 139);
-    track(264, 211, 216, s.travel > 0 ? t * 12 : 0);
-    cart(398, 208, s.travel > 0);
-
-    tree(32, 185);
-    tree(66, 181);
-    tree(204, 182);
-    tree(268, 182);
-    tree(438, 181);
-    tree(456, 185);
     for (const [gx, gy, seed] of [
       [80, 205, 0],
       [180, 205, 1],
@@ -317,6 +306,14 @@ export function drawWorld(ctx, s) {
       [418, 205, 3],
     ])
       drawGarden(ctx, gx, gy, P, seed);
+    drawHomeRewards(ctx, s, P, 'gardens');
+    archBridge(214, 212, 63);
+    r(68, 207, 344, 5, P.gold);
+    r(73, 208, 334, 1, P.cream);
+    r(133, 207, 25, 13, P.gold);
+    r(338, 209, 22, 12, P.gold);
+    track(264, 211, 216, s.travel > 0 ? t * 12 : 0);
+    cart(398, 208, s.travel > 0);
     // A small shrine and stepping stones turn the connecting path into a place.
     r(213, 200, 8, 6, P.stone);
     r(211, 199, 12, 2, P.edge);
@@ -342,6 +339,7 @@ export function drawWorld(ctx, s) {
       r(x - 1, y + 6, 3, 5, P.cream);
       r(x, y + 13, 1, 4, P.red);
     }
+    drawHomeRewards(ctx, s, P);
     sprite(s.actor.x, s.actor.y, s.walking);
   } else if (s.scene === 'tower-entry') {
     cliff(126, 261, 228, 64);
@@ -412,7 +410,6 @@ export function drawWorld(ctx, s) {
       r(i * 32 + 4, 233, 24, 1, P.shade);
       r(i * 32 + 5, 230, 12, 1, P.edge);
     }
-    drawFloorGauge(ctx, s, P);
     for (const x of [34, 429]) {
       r(x - 2, 98, 21, 85, P.stone);
       r(x, 100, 17, 79, P.sky);
@@ -442,7 +439,7 @@ export function drawWorld(ctx, s) {
         }
       if (level === 3) {
         for (const x of [73, 399]) {
-          r(x, 205, 10, 15, P.brick);
+          r(x, 205, 10, 19, P.brick);
           r(x + 4, 180, 2, 26, P.grass);
           for (let k = 0; k < 3; k++) {
             r(x - 3, 184 + k * 7, 8, 3, P.leaf);
@@ -456,13 +453,15 @@ export function drawWorld(ctx, s) {
         for (let k = 0; k < 5; k++)
           r(x + (k % 2) * 9, 104 + ((k * 17 + (s.reduced ? 0 : t * 19)) % 65), 1, 7, P.glass);
       for (const x of [33, 429]) {
-        r(x, 211, 18, 3, P.water);
-        r(x + 3, 209, 12, 1, P.glass);
+        r(x, 228, 18, 3, P.water);
+        r(x + 3, 226, 12, 1, P.glass);
       }
     }
     if (level === 2) {
       for (const x of [36, 434]) {
         r(x, 190, 11, 17, P.wood);
+        r(x + 1, 207, 3, 17, P.wood);
+        r(x + 7, 207, 3, 17, P.wood);
         r(x - 4, 186, 19, 4, P.gold);
         r(x + 4, 171, 3, 15, P.edge);
         const step = s.reduced ? 0 : Math.floor(t * 3) % 2;
@@ -472,7 +471,7 @@ export function drawWorld(ctx, s) {
     }
     if (level === 4) {
       for (const x of [37, 434]) {
-        r(x, 197, 3, 23, P.wood);
+        r(x, 197, 3, 27, P.wood);
         r(x - 6, 204, 15, 3, P.gold);
         r(x - 6, 182, 15, 6, accent);
         r(x - 10, 178, 7, 7, P.gold);
@@ -483,7 +482,12 @@ export function drawWorld(ctx, s) {
         r(x + 1, 25 + (k % 2) * 6, 1, 6, accent);
       }
     }
-    drawTowerHearts(ctx, s, P);
+    // Corner planters belong behind the stairs and door frames, with pots on the floor.
+    for (const x of [31, 432]) {
+      tree(x, 195);
+      r(x + 3, 218, 14, 6, P.brick);
+      r(x + 2, 216, 16, 3, P.wood);
+    }
     const slots = doorSlots(s.count),
       active = s.selected ?? -1,
       open = s.open || 0;
@@ -585,8 +589,6 @@ export function drawWorld(ctx, s) {
         if (solution) r(x - 5, y - 4, w + 10, 3, P.cream);
       }
     }
-    tree(43, 195);
-    tree(419, 195);
     const start = { x: 240, y: 231 },
       slot = slots[Math.max(0, active)];
     const walk = s.walk || 0;
@@ -652,6 +654,9 @@ export function drawWorld(ctx, s) {
           );
       }
     }
+    // HUD plaques stay above roofs, vines and ending effects in every district.
+    drawFloorGauge(ctx, s, P);
+    drawTowerHearts(ctx, s, P);
   }
   // Subtle ambient specks, all constrained to the same pixel grid.
   if (!s.reduced)

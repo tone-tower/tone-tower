@@ -17091,6 +17091,20 @@
       "raw": "婚禮 婚礼 [hun1 li3] /wedding ceremony/wedding/CL:場|场[chang3]/"
     },
     {
+      "id": "cedict-3fd9698f532ef0aa26e59fa8",
+      "traditional": "媽",
+      "simplified": "妈",
+      "reading": "ma1",
+      "syllables": [
+        {
+          "transcription": "ma1",
+          "tone": 1
+        }
+      ],
+      "gloss": "ma; mom; mother",
+      "raw": "媽 妈 [ma1] /ma/mom/mother/"
+    },
+    {
       "id": "cedict-9a06b35346fb65ff151e6da0",
       "traditional": "媽媽",
       "simplified": "妈妈",
@@ -18681,6 +18695,20 @@
       ],
       "gloss": "general; high-ranking military officer; to check or checkmate; fig. to embarrass; to challenge; to put sb on the spot",
       "raw": "將軍 将军 [jiang1 jun1] /general/high-ranking military officer/to check or checkmate/fig. to embarrass/to challenge/to put sb on the spot/"
+    },
+    {
+      "id": "cedict-30cf135f97becaeeec0880d8",
+      "traditional": "專",
+      "simplified": "专",
+      "reading": "zhuan1",
+      "syllables": [
+        {
+          "transcription": "zhuan1",
+          "tone": 1
+        }
+      ],
+      "gloss": "for a particular person, occasion, purpose; focused on one thing; special; expert; particular (to sth); concentrated; specialized",
+      "raw": "專 专 [zhuan1] /for a particular person, occasion, purpose/focused on one thing/special/expert/particular (to sth)/concentrated/specialized/"
     },
     {
       "id": "cedict-3b0df6e0ce4986f356fee819",
@@ -26077,6 +26105,20 @@
       ],
       "gloss": "variant of 折[zhe2]; to fold",
       "raw": "摺 折 [zhe2] /variant of 折[zhe2]/to fold/"
+    },
+    {
+      "id": "cedict-42c6dac4e816bb1259802942",
+      "traditional": "摺",
+      "simplified": "摺",
+      "reading": "zhe2",
+      "syllables": [
+        {
+          "transcription": "zhe2",
+          "tone": 2
+        }
+      ],
+      "gloss": "document folded in accordion form; to fold",
+      "raw": "摺 摺 [zhe2] /document folded in accordion form/to fold/"
     },
     {
       "id": "cedict-6ccacf797aadcf3fd4015d02",
@@ -42115,6 +42157,20 @@
       "raw": "罪犯 罪犯 [zui4 fan4] /criminal/"
     },
     {
+      "id": "cedict-1d1202b7bf3a1b4914fbbdb3",
+      "traditional": "罵",
+      "simplified": "骂",
+      "reading": "ma4",
+      "syllables": [
+        {
+          "transcription": "ma4",
+          "tone": 4
+        }
+      ],
+      "gloss": "to scold; to abuse; to curse; CL:通[tong4],頓|顿[dun4]",
+      "raw": "罵 骂 [ma4] /to scold/to abuse/to curse/CL:通[tong4],頓|顿[dun4]/"
+    },
+    {
       "id": "cedict-d444a0f0cf844d21485baf56",
       "traditional": "罷工",
       "simplified": "罢工",
@@ -45261,6 +45317,20 @@
       ],
       "gloss": "to spread; to extend",
       "raw": "蔓延 蔓延 [man4 yan2] /to spread; to extend/"
+    },
+    {
+      "id": "cedict-8684a08d0aa413d0530c5892",
+      "traditional": "蔴",
+      "simplified": "麻",
+      "reading": "ma2",
+      "syllables": [
+        {
+          "transcription": "ma2",
+          "tone": 2
+        }
+      ],
+      "gloss": "hemp (variant of 麻[ma2])",
+      "raw": "蔴 麻 [ma2] /hemp (variant of 麻[ma2])/"
     },
     {
       "id": "cedict-4484917acac1427a99499f7f",
@@ -55809,6 +55879,20 @@
       "raw": "馬賽 马赛 [Ma3 sai4] /Marseille, city in south France/Basay, one of the indigenous peoples of Taiwan/"
     },
     {
+      "id": "cedict-ce8c3121681701daf56555aa",
+      "traditional": "駡",
+      "simplified": "骂",
+      "reading": "ma4",
+      "syllables": [
+        {
+          "transcription": "ma4",
+          "tone": 4
+        }
+      ],
+      "gloss": "variant of 罵|骂[ma4]",
+      "raw": "駡 骂 [ma4] /variant of 罵|骂[ma4]/"
+    },
+    {
       "id": "cedict-f85248059333937a2e262135",
       "traditional": "騎",
       "simplified": "骑",
@@ -56591,6 +56675,34 @@
       ],
       "gloss": "(medicinal) powder",
       "raw": "麵子 面子 [mian4 zi5] /(medicinal) powder/"
+    },
+    {
+      "id": "cedict-e63d6a9f54c4868ea764f630",
+      "traditional": "麻",
+      "simplified": "麻",
+      "reading": "Ma2",
+      "syllables": [
+        {
+          "transcription": "ma2",
+          "tone": 2
+        }
+      ],
+      "gloss": "surname Ma",
+      "raw": "麻 麻 [Ma2] /surname Ma/"
+    },
+    {
+      "id": "cedict-10d8663af73707fb518af462",
+      "traditional": "麻",
+      "simplified": "麻",
+      "reading": "ma2",
+      "syllables": [
+        {
+          "transcription": "ma2",
+          "tone": 2
+        }
+      ],
+      "gloss": "generic name for hemp, flax etc; hemp or flax fiber for textile materials; sesame; CL:縷|缕[lu:3]; (of materials) rough or coarse; pocked; pitted; to have pins and needles or tingling; to feel numb",
+      "raw": "麻 麻 [ma2] /generic name for hemp, flax etc/hemp or flax fiber for textile materials/sesame/CL:縷|缕[lu:3]/(of materials) rough or coarse/pocked/pitted/to have pins and needles or tingling/to feel numb/"
     },
     {
       "id": "cedict-2306b0810a5c5e1094abf2f4",

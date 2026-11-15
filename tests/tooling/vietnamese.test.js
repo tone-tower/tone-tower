@@ -1,4 +1,8 @@
-import test from 'node:test';
+import test, { mock } from 'node:test';
+import fileOps from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { withCurationLock } from '../../tools/content/curation-lock.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,12 +11,14 @@ import {
   asciiName,
   parseCSV,
   importVietnamese,
+  recoverVietnameseImport,
   buildVietnameseCatalog,
+  writeVietnameseCatalog,
   coverage,
   VIETNAMESE_TONES,
 } from '../../tools/content/vietnamese.mjs';
-import { vietnamese } from '../../src/languages/profiles.js';
-import { catalogRows, referenceRows } from '../../src/content/catalog.js';
+import { vietnamese } from '../../src/languages/profiles.ts';
+import { catalogRows, referenceRows } from '../../src/content/catalog.ts';
 
 // rank, word, meaning; the list mixes single syllables, words, a repeat and a missing clip.
 const list = [
@@ -159,7 +165,7 @@ test('importing a voice takes whole words, including the six tone examples, and 
   const entry = (id) => catalog.entries.find((e) => e.id === id);
   assert.equal(entry('vi-xin-chao2').gloss, 'hello');
   assert.deepEqual(entry('vi-xin-chao2').metadata.frequency, { rank: 8, perMillion: 92 });
-  assert.equal(Object.hasOwn(entry('vi-chu3-nghia4-xa4-ho6i5'), 'gloss'), false);
+  assert.equal(entry('vi-chu3-nghia4-xa4-ho6i5').gloss, '');
   assert.equal(catalog.pronunciations.find((p) => p.id === 'vi-xin-chao2').kind, 'word');
 
   // The browser reads it like any other language. Each tone's example is a whole word
@@ -275,7 +281,7 @@ test('a changed, missing or mislabelled Vietnamese clip stops the build', async 
 });
 
 test('the committed Vietnamese collection is ready for a full climb', async () => {
-  const catalog = await buildVietnameseCatalog(new URL('../../', import.meta.url).pathname);
+  const catalog = await buildVietnameseCatalog(fileURLToPath(new URL('../../', import.meta.url)));
   assert.equal(catalog.availability.ready, true, catalog.availability.missing.join(', '));
   const rows = catalogRows(catalog, vietnamese);
   assert.equal(rows.length, catalog.recordings.length);
@@ -289,4 +295,183 @@ test('the committed Vietnamese collection is ready for a full climb', async () =
   assert.ok(anchors.every((row) => row.syllables.every((s) => s.tone === row.tone)));
   // The home page example plays one of them.
   assert.ok(rows.some((row) => row.transcription === vietnamese.example.transcription));
+});
+
+test('an invalid later CSV row leaves the previous manifest and audio unchanged', async (t) => {
+  const { root, voice } = await fixture(t);
+  await importVietnamese(root, voice);
+  const manifest = path.join(root, 'data/content/vi/words.json');
+  const before = await readFile(manifest, 'utf8');
+  const clip = path.join(root, 'audio/vi/tuananh-chu1-y1.mp3');
+  const previousAudio = await readFile(clip);
+  const input = (await readdir(voice.audio)).find((name) => name.startsWith('00002_'));
+  await writeFile(path.join(voice.audio, input), Buffer.alloc(1200, 99));
+  await writeFile(voice.csv, (await readFile(voice.csv, 'utf8')) + '\r\n99,ma1,invalid,1\r\n');
+  await assert.rejects(() => importVietnamese(root, voice), /Invalid list row/);
+  assert.equal(await readFile(manifest, 'utf8'), before);
+  assert.deepEqual(await readFile(clip), previousAudio);
+  await buildVietnameseCatalog(root);
+});
+
+test('a failed live audio installation rolls back all replacements and the manifest', async (t) => {
+  const { root, voice } = await fixture(t);
+  await importVietnamese(root, voice);
+  const before = await readFile(path.join(root, 'data/content/vi/words.json'), 'utf8');
+  const input = (await readdir(voice.audio)).find((name) => name.startsWith('00002_'));
+  await writeFile(path.join(voice.audio, input), Buffer.alloc(1200, 99));
+  const copy = fileOps.copyFile;
+  let installed = 0;
+  const fault = mock.method(fileOps, 'copyFile', async (...args) => {
+    if (++installed === 2) throw Error('Injected installation failure');
+    return copy(...args);
+  });
+  try {
+    await assert.rejects(() => importVietnamese(root, voice), /Injected installation failure/);
+  } finally {
+    fault.mock.restore();
+  }
+  assert.equal(await readFile(path.join(root, 'data/content/vi/words.json'), 'utf8'), before);
+  await buildVietnameseCatalog(root);
+  assert.deepEqual(
+    await readFile(path.join(root, 'audio/vi/tuananh-chu1-y1.mp3')),
+    Buffer.alloc(1200, 2),
+  );
+});
+
+test('Vietnamese imports and catalog builds reject a conflicting curation writer', async (t) => {
+  const { root, voice } = await fixture(t);
+  await importVietnamese(root, voice);
+  await withCurationLock(root, 'vi', async () => {
+    await assert.rejects(
+      () => importVietnamese(root, voice),
+      /Another Vietnamese curation operation/,
+    );
+    await assert.rejects(
+      () => buildVietnameseCatalog(root),
+      /Another Vietnamese curation operation/,
+    );
+    await assert.rejects(
+      () => writeVietnameseCatalog(root),
+      /Another Vietnamese curation operation/,
+    );
+    await assert.rejects(
+      () => recoverVietnameseImport(root),
+      /Another Vietnamese curation operation/,
+    );
+  });
+  await buildVietnameseCatalog(root);
+});
+
+test('interrupted imports require explicit recovery and restore the previous playable collection', async (t) => {
+  const { root, voice } = await fixture(t);
+  await importVietnamese(root, voice);
+  const dir = path.join(root, '.audio-import-cache/vi/import-transaction');
+  await mkdir(path.join(dir, 'old'), { recursive: true });
+  const manifest = path.join(root, 'data/content/vi/words.json');
+  await writeFile(path.join(dir, 'previous.json'), await readFile(manifest));
+  const file = 'audio/vi/tuananh-chu1-y1.mp3';
+  await writeFile(
+    path.join(dir, 'old', path.basename(file)),
+    await readFile(path.join(root, file)),
+  );
+  await writeFile(path.join(root, file), Buffer.alloc(1200, 99));
+  await writeFile(
+    path.join(dir, 'transaction.json'),
+    JSON.stringify({
+      version: 1,
+      phase: 'installing',
+      manifestExisted: true,
+      files: [{ file, existed: true }],
+      obsolete: [],
+    }),
+  );
+  await assert.rejects(() => buildVietnameseCatalog(root), /Incomplete Vietnamese import/);
+  await assert.rejects(() => importVietnamese(root, voice), /Incomplete Vietnamese import/);
+  assert.deepEqual(await recoverVietnameseImport(root), {
+    recovered: true,
+    outcome: 'rolled back',
+  });
+  assert.deepEqual(await recoverVietnameseImport(root), { recovered: false });
+  await buildVietnameseCatalog(root);
+});
+
+test('replacing one Vietnamese voice preserves a second voice and rejects empty input', async (t) => {
+  const { root, voice } = await fixture(t);
+  await importVietnamese(root, voice);
+  await importVietnamese(root, { ...voice, voice: 'other', name: 'Other' });
+  await importVietnamese(root, { ...voice, maxRank: 1 });
+  const catalog = await buildVietnameseCatalog(root);
+  assert.equal(catalog.recordings.filter((row) => row.speakerId === 'other').length, 10);
+  assert.equal(catalog.recordings.filter((row) => row.speakerId === 'tuananh').length, 6);
+  await writeFile(voice.csv, 'rank,word,english,per_million\n');
+  await assert.rejects(() => importVietnamese(root, voice), /nonempty Vietnamese CSV/);
+  assert.equal((await buildVietnameseCatalog(root)).recordings.length, 16);
+});
+
+test('the recovery CLI completes committed cleanup without changing the new catalog', async (t) => {
+  const { root, voice } = await fixture(t);
+  await importVietnamese(root, voice);
+  const dir = path.join(root, '.audio-import-cache/vi/import-transaction');
+  await mkdir(dir, { recursive: true });
+  const obsolete = 'audio/vi/tuananh-retired.mp3';
+  await writeFile(path.join(root, obsolete), Buffer.alloc(1200));
+  const before = await readFile(path.join(root, 'data/content/vi/words.json'), 'utf8');
+  await writeFile(
+    path.join(dir, 'transaction.json'),
+    JSON.stringify({
+      version: 1,
+      phase: 'committed',
+      manifestExisted: true,
+      files: [],
+      obsolete: [obsolete],
+    }),
+  );
+  const result = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        '--import',
+        import.meta.resolve('tsx'),
+        fileURLToPath(new URL('../../tools/content/vietnamese-cli.mjs', import.meta.url)),
+        'import',
+        '--recover',
+      ],
+      { cwd: root, encoding: 'utf8' },
+    ),
+  );
+  assert.deepEqual(result, { recovered: true, outcome: 'completed' });
+  await assert.rejects(() => readFile(path.join(root, obsolete)), { code: 'ENOENT' });
+  assert.equal(await readFile(path.join(root, 'data/content/vi/words.json'), 'utf8'), before);
+  await buildVietnameseCatalog(root);
+});
+test('recovery rejects journal paths outside the Vietnamese audio directory', async (t) => {
+  const { root } = await fixture(t);
+  const dir = path.join(root, '.audio-import-cache/vi/import-transaction');
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(root, 'keep.txt'), 'unchanged');
+  await writeFile(
+    path.join(dir, 'transaction.json'),
+    JSON.stringify({
+      version: 1,
+      phase: 'committed',
+      manifestExisted: true,
+      files: [],
+      obsolete: ['../../keep.txt'],
+    }),
+  );
+  await assert.rejects(() => recoverVietnameseImport(root), /Invalid Vietnamese obsolete file/);
+  assert.equal(await readFile(path.join(root, 'keep.txt'), 'utf8'), 'unchanged');
+});
+
+test('a malformed pending journal cannot be mistaken for an absent transaction', async (t) => {
+  const { root } = await fixture(t);
+  const dir = path.join(root, '.audio-import-cache/vi/import-transaction');
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, 'transaction.json'), 'null');
+  await assert.rejects(() => buildVietnameseCatalog(root), /Incomplete Vietnamese import/);
+  await assert.rejects(
+    () => recoverVietnameseImport(root),
+    /Invalid Vietnamese import recovery journal/,
+  );
+  assert.equal(await readFile(path.join(dir, 'transaction.json'), 'utf8'), 'null');
 });

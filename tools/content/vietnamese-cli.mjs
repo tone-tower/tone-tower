@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { importVietnamese, buildVietnameseCatalog } from './vietnamese.mjs';
+import {
+  importVietnamese,
+  buildVietnameseCatalog,
+  recoverVietnameseImport,
+} from './vietnamese.mjs';
 const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: {
@@ -12,12 +16,17 @@ const { positionals, values } = parseArgs({
     'min-syllables': { type: 'string', default: '2' },
     'max-rank': { type: 'string' },
     release: { type: 'boolean' },
+    recover: { type: 'boolean' },
   },
 });
 const root = process.cwd();
 let result;
 switch (positionals[0]) {
   case 'import':
+    if (values.recover) {
+      result = await recoverVietnameseImport(root);
+      break;
+    }
     if (!values.csv || !values.audio || !values.voice)
       throw Error('Specify --csv, --audio and --voice.');
     result = await importVietnamese(root, {

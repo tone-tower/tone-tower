@@ -1,6 +1,8 @@
+import { validateCatalog } from '../../src/content/catalog.ts';
+import { cantonese } from '../../src/languages/profiles.ts';
 import { cantoneseCatalog } from './runtime.mjs';
 import { buildMandarinCatalog } from '../content/mandarin.mjs';
-import { buildVietnameseCatalog } from '../content/vietnamese.mjs';
+import { writeVietnameseCatalog } from '../content/vietnamese.mjs';
 import { mkdir } from 'node:fs/promises';
 import { stat } from 'node:fs/promises';
 import { atomicJSON, atomicText, readJSON } from '../lib/json.mjs';
@@ -8,6 +10,9 @@ import { audioPaths } from '../audio/paths.mjs';
 import { withAudioLock } from '../audio/lock.mjs';
 import path from 'node:path';
 import { withPhoneticMetadata } from './word-metadata.mjs';
+import { enrichCatalog } from './enrichment.mjs';
+import { applyCatalogReviews } from '../content/listening-items.mjs';
+import { withCurationLock } from '../content/curation-lock.mjs';
 
 const WORD_FIELDS = [
   'character',
@@ -234,23 +239,34 @@ export async function syncWordRegistry(root = process.cwd()) {
   }, root);
 }
 
-export async function buildCatalog(root = process.cwd()) {
+export async function cantoneseReviewCatalog(root = process.cwd(), { validateFiles = true } = {}) {
   const { imported, registry, corrections } = await catalogInputs(root);
   if (JSON.stringify(syncRegistry(imported, registry)) !== JSON.stringify(registry))
     throw Error('Word registry is out of date. Stop imports, then run npm run audio:sync.');
   const catalog = assembleCatalog(imported, registry, corrections);
-  await validateAudio(root, catalog);
-  const runtime = cantoneseCatalog(catalog);
-  await mkdir(path.join(root, 'catalogs'), { recursive: true });
-  await atomicText(path.join(root, 'catalogs/yue.json'), JSON.stringify(runtime) + '\n');
-  return runtime;
+  if (validateFiles) await validateAudio(root, catalog);
+  return validateCatalog(enrichCatalog(cantoneseCatalog(catalog), cantonese), cantonese, {
+    publication: true,
+  });
+}
+
+export async function buildCatalog(root = process.cwd()) {
+  return withCurationLock(root, 'yue', async () => {
+    const runtime = validateCatalog(
+      await applyCatalogReviews(root, await cantoneseReviewCatalog(root)),
+      cantonese,
+      { publication: true },
+    );
+    await mkdir(path.join(root, 'catalogs'), { recursive: true });
+    await atomicText(path.join(root, 'catalogs/yue.json'), JSON.stringify(runtime) + '\n');
+    return runtime;
+  });
 }
 
 export async function buildCatalogs(root = process.cwd()) {
   const yue = await buildCatalog(root);
   const cmn = await buildMandarinCatalog(root);
   await atomicText(path.join(root, 'catalogs/cmn.json'), JSON.stringify(cmn) + '\n');
-  const vi = await buildVietnameseCatalog(root);
-  await atomicText(path.join(root, 'catalogs/vi.json'), JSON.stringify(vi) + '\n');
+  const vi = await writeVietnameseCatalog(root);
   return { yue, cmn, vi };
 }

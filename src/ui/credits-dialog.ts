@@ -1,0 +1,148 @@
+import { filterCredits, creditsPage } from './credits.ts';
+import { recordingIssueUrl } from './recording-report.ts';
+import { query, required, escape } from './dom.ts';
+import type { LanguageProfile, ExerciseRow } from '../types.ts';
+interface Options {
+  dialogBody: HTMLElement;
+  profile: LanguageProfile;
+  getRows: () => ExerciseRow[];
+  openDialog: (html: string) => void;
+}
+export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }: Options) {
+  const safeHref = (value: string | undefined) => {
+    try {
+      const u = new URL(value ?? '');
+      return ['http:', 'https:'].includes(u.protocol) ? escape(u.href) : '#';
+    } catch {
+      return '#';
+    }
+  };
+  return function showCredits() {
+    const data = getRows();
+    openDialog(
+      /* HTML */ `<div class="eyebrow">Sources & licences</div>
+        <h2 id="dialog-title">Voices & credits</h2>
+        <p>
+          ${escape(profile.copy?.credits ?? 'Human recordings from Wikimedia Commons. Each recording keeps its source licence.')}
+        </p>
+        <details>
+          <summary>Dictionary, typography & application credits</summary>
+          ${
+            profile.dictionarySources.length
+              ? /* HTML */ `
+                  <p>
+                    Readings and glosses include adaptations from
+                    ${profile.dictionarySources.map((source) => '<a href="' + safeHref(source.url) + '" target="_blank" rel="noopener">' + escape(source.name) + '</a>' + (source.attribution ? ' · ' + escape(source.attribution) : '') + ' under <a href="' + safeHref(source.licenseUrl) + '">' + escape(source.license) + '</a>').join('; ')}.
+                    Individual entries identify their dictionary sources.
+                  </p>
+                `
+              : ''
+          }
+          <p>
+            DM Sans: <a href="assets/fonts/DMSans-LICENSE.txt">Font licence</a>. Application code:
+            <a href="LICENSE">MIT</a>. <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a>. No
+            accounts or analytics.
+          </p>
+        </details>
+        <label class="credits-search"
+          >Find a recording<input
+            id="credit-search"
+            type="search"
+            placeholder="${profile.challenges.includes('tide') ? 'Written form, ' + profile.romanization + ', creator…' : 'Written form, meaning, voice…'}"
+            autocomplete="off"
+        /></label>
+        <div id="credit-results"></div>`,
+    );
+    const results = required(dialogBody, '#credit-results'),
+      search = required(dialogBody, '#credit-search');
+    let page = 0,
+      query = '',
+      debounce: ReturnType<typeof setTimeout>;
+    function draw() {
+      if (!results.isConnected) return;
+      const matches = filterCredits(data, query),
+        view = creditsPage(matches, page);
+      page = view.page;
+      results.innerHTML = /* HTML */ `<div class="credits-pagination">
+          <span role="status"
+            >${matches.length ? `${page * 20 + 1}–${Math.min(matches.length, (page + 1) * 20)} of ${matches.length} recordings` : 'No matching recordings'}</span
+          >
+          <div>
+            <button
+              class="secondary"
+              id="credits-prev"
+              type="button"
+              ${page === 0 ? 'disabled' : ''}
+            >
+              ←</button
+            ><button
+              class="secondary"
+              id="credits-next"
+              type="button"
+              ${page >= view.pages - 1 ? 'disabled' : ''}
+            >
+              →
+            </button>
+          </div>
+        </div>
+        <div class="credits-table">
+          <table>
+            <caption class="sr-only">
+              Recording sources and licences
+            </caption>
+            <thead>
+              <tr>
+                <th>Recording</th>
+                <th>Creator</th>
+                <th>Source / licence</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${view.rows
+                .map(
+                  (w) =>
+                    /* HTML */ `<tr>
+                      <td>
+                        ${escape(w.text)}<small
+                          >${escape(w.text === profile.format(w.transcription ?? '') ? '' : profile.format(w.transcription ?? ''))}</small
+                        >
+                      </td>
+                      <td>${escape(w.author || 'See original')}</td>
+                      <td>
+                        ${w.source ? '<a href="' + safeHref(w.source) + '" target="_blank" rel="noopener">Original ↗</a>' : ''}${w.source && w.license ? ' · ' : ''}${w.license ? '<a href="' + safeHref(w.licenseUrl) + '" target="_blank" rel="noopener">' + escape(w.license) + '</a>' : ''}${w.conversion ? /* HTML */ `<small>${escape(w.conversion)}</small>` : ''}<small
+                          ><a
+                            href="${escape(recordingIssueUrl(w, profile))}"
+                            target="_blank"
+                            rel="noopener"
+                            >Report this recording ↗</a
+                          ></small
+                        >
+                      </td>
+                    </tr>`,
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>`;
+      required(results, '#credits-prev').onclick = () => {
+        page--;
+        draw();
+        required(results, '#credits-prev').focus({ preventScroll: true });
+      };
+      required(results, '#credits-next').onclick = () => {
+        page++;
+        draw();
+        required(results, '#credits-next').focus({ preventScroll: true });
+      };
+    }
+    search.addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        query = search.value;
+        page = 0;
+        draw();
+      }, 120);
+    });
+    draw();
+  };
+}

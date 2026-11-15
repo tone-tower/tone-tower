@@ -1,0 +1,310 @@
+{
+  "version": 1,
+  "source": {
+    "id": "commons-83387745",
+    "language": "cmn",
+    "sourceText": "mā má mǎ mà",
+    "attribution": {
+      "author": "Wolfdog",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    "source": {
+      "provider": "commons",
+      "pageid": 83387745,
+      "title": "File:FourMandarinTones.ogg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:FourMandarinTones.ogg",
+      "fileUrl": "https://upload.wikimedia.org/wikipedia/commons/a/a3/FourMandarinTones.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "fileTimestamp": "2019-10-26T11:46:51Z",
+      "uploader": "Wolfdog",
+      "licenseEvidence": {
+        "shortName": "CC BY-SA 4.0",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "template": "cc-by-sa-4.0",
+        "usageTerms": "Creative Commons Attribution-Share Alike 4.0",
+        "authorHtml": "<a href=\"//commons.wikimedia.org/wiki/User:Wolfdog\" title=\"User:Wolfdog\">Wolfdog</a>"
+      }
+    },
+    "original": {
+      "sha1": "db81e637a2f1908eacb7244845fbf9162e410ec8",
+      "bytes": 77622,
+      "mime": "application/ogg",
+      "sha256": "e857c893662741a9c99e527a1c54df52eb386fb83df021cb9a42faee77af9049"
+    },
+    "reviewStatus": "unreviewed"
+  },
+  "segments": [
+    {
+      "tone": 1,
+      "start": 0.4,
+      "end": 1.22,
+      "entry": {
+        "id": "guide-commons-83387745-ma1",
+        "forms": {
+          "default": "妈",
+          "simplified": "妈",
+          "traditional": "媽"
+        },
+        "gloss": "mother",
+        "dictionarySource": {
+          "name": "CC-CEDICT",
+          "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+          "edition": "v1",
+          "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+          "date": "2026-11-07T03:55:59Z",
+          "license": "CC-BY-SA-4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "entryId": "cedict-3fd9698f532ef0aa26e59fa8",
+          "raw": "媽 妈 [ma1] /ma/mom/mother/"
+        }
+      },
+      "pronunciation": {
+        "id": "guide-commons-83387745-ma1",
+        "entryId": "guide-commons-83387745-ma1",
+        "kind": "syllable",
+        "syllables": [
+          {
+            "transcription": "ma1",
+            "tone": 1,
+            "forms": {
+              "default": "妈",
+              "simplified": "妈",
+              "traditional": "媽"
+            }
+          }
+        ]
+      },
+      "recording": {
+        "id": "commons-83387745-ma1",
+        "pronunciationId": "guide-commons-83387745-ma1",
+        "audio": "audio/cmn/commons-83387745-ma1-013c85dc3431.mp3",
+        "realizedTones": [
+          1
+        ],
+        "toneTargets": [
+          0
+        ],
+        "referenceOnly": true,
+        "source": "https://commons.wikimedia.org/wiki/File:FourMandarinTones.ogg",
+        "author": "Wolfdog",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "speakerId": "commons-user-Wolfdog",
+        "toneEvidence": {
+          "status": "assumed",
+          "basis": "Source-labelled four-tone teaching sequence; excerpts selected without changing pitch or speed. Not a human listening review."
+        },
+        "conversion": "Excerpt 0.4–1.22 s from FourMandarinTones.ogg by Wolfdog; trimmed and converted to MP3 with FFmpeg. Pitch and speed unchanged. Excerpt licensed CC-BY-SA-4.0."
+      },
+      "audio": {
+        "bytes": 9435,
+        "sha256": "013c85dc3431b111191acaabc5314e34b29c884f0709fa279bd054b9aa3e31bb",
+        "duration": 0.860728
+      }
+    },
+    {
+      "tone": 2,
+      "start": 1.75,
+      "end": 2.6,
+      "entry": {
+        "id": "guide-commons-83387745-ma2",
+        "forms": {
+          "default": "麻",
+          "simplified": "麻",
+          "traditional": "麻"
+        },
+        "gloss": "hemp",
+        "dictionarySource": {
+          "name": "CC-CEDICT",
+          "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+          "edition": "v1",
+          "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+          "date": "2026-11-07T03:55:59Z",
+          "license": "CC-BY-SA-4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "entryId": "cedict-10d8663af73707fb518af462",
+          "raw": "麻 麻 [ma2] /generic name for hemp, flax etc/hemp or flax fiber for textile materials/sesame/CL:縷|缕[lu:3]/(of materials) rough or coarse/pocked/pitted/to have pins and needles or tingling/to feel numb/"
+        }
+      },
+      "pronunciation": {
+        "id": "guide-commons-83387745-ma2",
+        "entryId": "guide-commons-83387745-ma2",
+        "kind": "syllable",
+        "syllables": [
+          {
+            "transcription": "ma2",
+            "tone": 2,
+            "forms": {
+              "default": "麻",
+              "simplified": "麻",
+              "traditional": "麻"
+            }
+          }
+        ]
+      },
+      "recording": {
+        "id": "commons-83387745-ma2",
+        "pronunciationId": "guide-commons-83387745-ma2",
+        "audio": "audio/cmn/commons-83387745-ma2-8ba011dde9ee.mp3",
+        "realizedTones": [
+          2
+        ],
+        "toneTargets": [
+          0
+        ],
+        "referenceOnly": true,
+        "source": "https://commons.wikimedia.org/wiki/File:FourMandarinTones.ogg",
+        "author": "Wolfdog",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "speakerId": "commons-user-Wolfdog",
+        "toneEvidence": {
+          "status": "assumed",
+          "basis": "Source-labelled four-tone teaching sequence; excerpts selected without changing pitch or speed. Not a human listening review."
+        },
+        "conversion": "Excerpt 1.75–2.6 s from FourMandarinTones.ogg by Wolfdog; trimmed and converted to MP3 with FFmpeg. Pitch and speed unchanged. Excerpt licensed CC-BY-SA-4.0."
+      },
+      "audio": {
+        "bytes": 12201,
+        "sha256": "8ba011dde9ee7447b89c72c0f283f8b9120a8aba1c9b1875969fbb1bc1500859",
+        "duration": 0.886878
+      }
+    },
+    {
+      "tone": 3,
+      "start": 3.1,
+      "end": 4,
+      "entry": {
+        "id": "guide-commons-83387745-ma3",
+        "forms": {
+          "default": "马",
+          "simplified": "马",
+          "traditional": "馬"
+        },
+        "gloss": "horse",
+        "dictionarySource": {
+          "name": "CC-CEDICT",
+          "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+          "edition": "v1",
+          "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+          "date": "2026-11-07T03:55:59Z",
+          "license": "CC-BY-SA-4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "entryId": "cedict-52027b7116f3d763ce6efcca",
+          "raw": "馬 马 [ma3] /horse/CL:匹[pi3]/horse or cavalry piece in Chinese chess/knight in Western chess/"
+        }
+      },
+      "pronunciation": {
+        "id": "guide-commons-83387745-ma3",
+        "entryId": "guide-commons-83387745-ma3",
+        "kind": "syllable",
+        "syllables": [
+          {
+            "transcription": "ma3",
+            "tone": 3,
+            "forms": {
+              "default": "马",
+              "simplified": "马",
+              "traditional": "馬"
+            }
+          }
+        ]
+      },
+      "recording": {
+        "id": "commons-83387745-ma3",
+        "pronunciationId": "guide-commons-83387745-ma3",
+        "audio": "audio/cmn/commons-83387745-ma3-3c3a1049bfe6.mp3",
+        "realizedTones": [
+          3
+        ],
+        "toneTargets": [
+          0
+        ],
+        "referenceOnly": true,
+        "source": "https://commons.wikimedia.org/wiki/File:FourMandarinTones.ogg",
+        "author": "Wolfdog",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "speakerId": "commons-user-Wolfdog",
+        "toneEvidence": {
+          "status": "assumed",
+          "basis": "Source-labelled four-tone teaching sequence; excerpts selected without changing pitch or speed. Not a human listening review."
+        },
+        "conversion": "Excerpt 3.1–4 s from FourMandarinTones.ogg by Wolfdog; trimmed and converted to MP3 with FFmpeg. Pitch and speed unchanged. Excerpt licensed CC-BY-SA-4.0."
+      },
+      "audio": {
+        "bytes": 13010,
+        "sha256": "3c3a1049bfe6d76288f79f72bff419f22be33f39ccf52585a688fd79ad40c269",
+        "duration": 0.939067
+      }
+    },
+    {
+      "tone": 4,
+      "start": 4.55,
+      "end": 5.16,
+      "entry": {
+        "id": "guide-commons-83387745-ma4",
+        "forms": {
+          "default": "骂",
+          "simplified": "骂",
+          "traditional": "罵"
+        },
+        "gloss": "to scold",
+        "dictionarySource": {
+          "name": "CC-CEDICT",
+          "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+          "edition": "v1",
+          "sha256": "1506709cbf4d91a2dfc585f7cc12354febf4fcd3a2bf90dab76f7c4cbed6a4c9",
+          "date": "2026-11-07T03:55:59Z",
+          "license": "CC-BY-SA-4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "entryId": "cedict-1d1202b7bf3a1b4914fbbdb3",
+          "raw": "罵 骂 [ma4] /to scold/to abuse/to curse/CL:通[tong4],頓|顿[dun4]/"
+        }
+      },
+      "pronunciation": {
+        "id": "guide-commons-83387745-ma4",
+        "entryId": "guide-commons-83387745-ma4",
+        "kind": "syllable",
+        "syllables": [
+          {
+            "transcription": "ma4",
+            "tone": 4,
+            "forms": {
+              "default": "骂",
+              "simplified": "骂",
+              "traditional": "罵"
+            }
+          }
+        ]
+      },
+      "recording": {
+        "id": "commons-83387745-ma4",
+        "pronunciationId": "guide-commons-83387745-ma4",
+        "audio": "audio/cmn/commons-83387745-ma4-49269d3d1d40.mp3",
+        "realizedTones": [
+          4
+        ],
+        "toneTargets": [
+          0
+        ],
+        "referenceOnly": true,
+        "source": "https://commons.wikimedia.org/wiki/File:FourMandarinTones.ogg",
+        "author": "Wolfdog",
+        "license": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "speakerId": "commons-user-Wolfdog",
+        "toneEvidence": {
+          "status": "assumed",
+          "basis": "Source-labelled four-tone teaching sequence; excerpts selected without changing pitch or speed. Not a human listening review."
+        },
+        "conversion": "Excerpt 4.55–5.16 s from FourMandarinTones.ogg by Wolfdog; trimmed and converted to MP3 with FFmpeg. Pitch and speed unchanged. Excerpt licensed CC-BY-SA-4.0."
+      },
+      "audio": {
+        "bytes": 7349,
+        "sha256": "49269d3d1d40faf8a6839f468ac4b6edf393dbb965f03d30e22f283caa5d492c",
+        "duration": 0.652136
+      }
+    }
+  ]
+}

@@ -1,18 +1,17 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { cantonese, mandarin, vietnamese, toneText } from '../../src/languages/profiles.js';
-import { splitTone, toneCarrier } from '../../src/languages/vietnamese.js';
-import { parsePinyin, formatPinyin, pinyinSpelling } from '../../src/languages/pinyin.js';
-import { createRun, defaultPractice, validatePractice } from '../../src/game/game-core.js';
-import { catalogRows, referenceRows } from '../../src/content/catalog.js';
+import { cantonese, mandarin, vietnamese } from '../../src/languages/profiles.ts';
+import { parsePinyin, formatPinyin, pinyinSpelling } from '../../src/languages/pinyin.ts';
+import { createRun, defaultPractice, validatePractice } from '../../src/game/game-core.ts';
+import { catalogRows, referenceRows } from '../../src/content/catalog.ts';
 import {
   emptyProgress,
   loadProgress,
   saveProgress,
   resetProgress,
-} from '../../src/persistence/progress.js';
+} from '../../src/persistence/progress.ts';
 import { doorSlots } from '../../src/world/pixel-world.js';
-import { arrowChoiceIndex } from '../../src/game/game-controller.js';
+import { arrowChoiceIndex } from '../../src/game/game-controller.ts';
 
 test('Pinyin compares syllables, tone marks, neutral tone, umlauts, and explicit boundaries', () => {
   for (const input of ['NI3 HAO3', 'ni3hao3', 'nǐ hǎo', 'nǐhǎo', 'nǐ hǎo'])
@@ -234,6 +233,8 @@ test('tone exercises skip ineligible targets without losing their spelling pract
   assert.equal(spelling.answer('wo3 hen3 hao3').correct, true);
 });
 
+import { splitTone, toneCarrier } from '../../src/languages/vietnamese.ts';
+import { toneLabel } from '../../src/ui/tone-presentation.ts';
 test('Vietnamese spelling separates the tone from the letters and finds the marked vowel', () => {
   for (const [written, base, tone, carrier] of [
     ['được', 'đươc', 'nặng', 'ơ'],
@@ -262,8 +263,8 @@ test('Vietnamese spelling separates the tone from the letters and finds the mark
   assert.equal(vietnamese.evaluate('đươc', ['được'], true), false);
   assert.equal(vietnamese.evaluate('đươc', ['được']), true);
   assert.equal(vietnamese.evaluate('', ['được']), null);
-  assert.equal(toneText(vietnamese, 'ngang'), 'không dấu');
-  assert.equal(toneText(cantonese, 3), 'tone 3');
+  assert.equal(toneLabel(vietnamese, 'ngang'), 'không dấu');
+  assert.ok(toneLabel(cantonese, 3).startsWith('Tone 3'));
 });
 
 function vietnameseWords() {
@@ -313,7 +314,7 @@ test('a Vietnamese climb uses named tones, two to six doors, and offers only the
   );
   // Five tones have a written mark; the level tone shows an empty slot.
   assert.deepEqual(
-    vietnamese.toneDefinitions.map((tone) => Boolean(tone.mark)),
+    vietnamese.toneDefinitions.map((tone) => Boolean(tone.markPath)),
     [true, true, true, true, true, false],
   );
 });

@@ -41,14 +41,16 @@ async function fixture(t) {
   const recordings = [];
   for (let i = 0; i < texts.length; i++) {
     const bytes = Buffer.from('fixture audio ' + i),
-      id = 'voice-' + i,
+      id = 'commons-' + (100 + i),
       file = 'audio/cmn/' + id + '.mp3';
     await put(file, bytes);
     recordings.push({
       id,
+      language: 'cmn',
+      original: { sha1: '0'.repeat(40), sha256: digest(bytes), bytes: bytes.length },
       sourceText: texts[i],
       audio: { file, bytes: bytes.length, sha256: digest(bytes), processing: 'Fixture' },
-      source: { pageUrl: 'https://example.org/' + id },
+      source: { pageUrl: 'https://example.org/' + id, fileTimestamp: '2026-11-13T00:00:00Z' },
       speaker: { name: 'Voice', id: 'speaker' },
       attribution: {
         author: 'Voice',
@@ -60,6 +62,7 @@ async function fixture(t) {
   await put('data/audio/collections/cmn/recordings.json', {
     version: 1,
     language: 'cmn',
+    collectionId: 'cmn',
     recordings,
   });
   await put(
@@ -119,25 +122,25 @@ test('dictionary matches remain unapproved; review import is validated and atomi
   assert.equal(catalog.recordings.length, 6);
   assert.equal(catalog.references.length, 5);
   assert.equal(catalog.availability.ready, false);
-  assert.deepEqual(catalog.recordings.find((r) => r.id === 'voice-5').realizedTones, [2, 3]);
+  assert.deepEqual(catalog.recordings.find((r) => r.id === 'commons-105').realizedTones, [2, 3]);
   assert.equal(catalog.entries.find((e) => e.forms.simplified === '妈').forms.traditional, '媽');
   assert.equal(
     await readFile(path.join(f.root, 'data/audio/collections/cmn/recordings.json'), 'utf8'),
     inventoryBefore,
   );
   const saved = await readFile(path.join(f.root, 'data/content/cmn/annotations.json'), 'utf8');
-  annotations['voice-0'].realizedTones = [6];
+  annotations['commons-100'].realizedTones = [6];
   await f.put('reviews.json', { version: 1, annotations });
   await assert.rejects(importReviews(f.root, path.join(f.root, 'reviews.json')), /spoken syllable/);
   assert.equal(
     await readFile(path.join(f.root, 'data/content/cmn/annotations.json'), 'utf8'),
     saved,
   );
-  annotations['voice-0'].realizedTones = [1];
-  annotations['voice-0'].recordingSha256 = 'wrong';
+  annotations['commons-100'].realizedTones = [1];
+  annotations['commons-100'].recordingSha256 = 'wrong';
   await f.put('reviews.json', { version: 1, annotations });
   await assert.rejects(importReviews(f.root, path.join(f.root, 'reviews.json')), /different audio/);
-  await f.put('audio/cmn/voice-0.mp3', 'changed audio');
+  await f.put('audio/cmn/commons-100.mp3', 'changed audio');
   await assert.rejects(buildMandarinCatalog(f.root, { reviewedOnly: true }), /integrity/);
 });
 
@@ -151,7 +154,7 @@ test('review page exports decisions without modifying the archive or approving m
   new Script(html.match(/<script>([\s\S]*?)<\/script>/)[1]);
   assert.match(html, /Export edited reviews/);
   assert.match(html, /recordingSha256/);
-  assert.match(html, /\.\.\/\.\.\//);
+  assert.match(html, /file:\/\/\//);
   assert.equal((await buildMandarinCatalog(f.root, { reviewedOnly: true })).recordings.length, 0);
 });
 
@@ -197,7 +200,7 @@ test('beta accepts unambiguous dictionary matches without inventing listening ap
   assert.equal(catalog.availability.ambiguous, 1);
   assert.equal(catalog.availability.unmatched, 1);
   assert.ok(catalog.recordings.every((r) => r.toneEvidence.status === 'assumed'));
-  assert.deepEqual(catalog.recordings.find((r) => r.id === 'voice-5').realizedTones, [2, 3]);
+  assert.deepEqual(catalog.recordings.find((r) => r.id === 'commons-105').realizedTones, [2, 3]);
   assert.equal(catalog.references.length, 5);
   assert.equal(catalog.references.find((r) => r.tone === 5).targetIndex, 1);
   assert.equal(
@@ -213,36 +216,46 @@ test('beta corrections can exclude, restore, resolve a reading and override tone
   const f = await fixture(t);
   await importDictionary(f.root, path.join(f.root, 'dictionary.txt'));
   await prepareMandarin(f.root);
-  await correctMandarin(f.root, { recordingId: 'voice-0', excluded: true, reason: 'Wrong clip' });
-  assert.ok(!(await buildMandarinCatalog(f.root)).recordings.some((r) => r.id === 'voice-0'));
   await correctMandarin(f.root, {
-    recordingId: 'voice-0',
+    recordingId: 'commons-100',
+    excluded: true,
+    reason: 'Wrong clip',
+  });
+  assert.ok(!(await buildMandarinCatalog(f.root)).recordings.some((r) => r.id === 'commons-100'));
+  await correctMandarin(f.root, {
+    recordingId: 'commons-100',
     excluded: false,
     reason: 'Confirmed source label',
   });
-  assert.ok((await buildMandarinCatalog(f.root)).recordings.some((r) => r.id === 'voice-0'));
+  assert.ok((await buildMandarinCatalog(f.root)).recordings.some((r) => r.id === 'commons-100'));
   await correctMandarin(f.root, {
-    recordingId: 'voice-5',
+    recordingId: 'commons-105',
     realizedTones: [3, 3],
     reason: 'Correction fixture',
   });
-  const corrected = (await buildMandarinCatalog(f.root)).recordings.find((r) => r.id === 'voice-5');
+  const corrected = (await buildMandarinCatalog(f.root)).recordings.find(
+    (r) => r.id === 'commons-105',
+  );
   assert.deepEqual(corrected.realizedTones, [3, 3]);
   assert.equal(corrected.toneEvidence.status, 'corrected');
-  const ambiguous = (await reviewQueue(f.root)).find((r) => r.recordingId === 'voice-6');
+  const ambiguous = (await reviewQueue(f.root)).find((r) => r.recordingId === 'commons-106');
   await correctMandarin(f.root, {
-    recordingId: 'voice-6',
+    recordingId: 'commons-106',
     pronunciationId: ambiguous.candidates[0].pronunciationId,
     reason: 'Resolve reading',
   });
   assert.equal((await buildMandarinCatalog(f.root)).recordings.length, 7);
   const saved = await readFile(path.join(f.root, 'data/content/cmn/corrections.json'), 'utf8');
   await assert.rejects(
-    correctMandarin(f.root, { recordingId: 'voice-0', realizedTones: [7], reason: 'Invalid tone' }),
+    correctMandarin(f.root, {
+      recordingId: 'commons-100',
+      realizedTones: [7],
+      reason: 'Invalid tone',
+    }),
     /Corrected tones/,
   );
   await assert.rejects(
-    correctMandarin(f.root, { recordingId: 'voice-0', excluded: true }),
+    correctMandarin(f.root, { recordingId: 'commons-100', excluded: true }),
     /reason/,
   );
   assert.equal(
@@ -258,7 +271,7 @@ test('beta skips unavailable audio instead of adding invalid files to the game',
   const f = await fixture(t);
   await importDictionary(f.root, path.join(f.root, 'dictionary.txt'));
   await prepareMandarin(f.root);
-  await f.put('audio/cmn/voice-0.mp3', 'corrupted');
+  await f.put('audio/cmn/commons-100.mp3', 'corrupted');
   const catalog = await buildMandarinCatalog(f.root);
   assert.equal(catalog.availability.unavailable, 1);
   assert.equal(catalog.recordings.length, 5);

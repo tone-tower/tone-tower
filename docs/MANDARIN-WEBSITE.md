@@ -79,8 +79,15 @@ credits, and licence when its exercise annotation changes.
 
 ## Shared engine and catalog
 
-Profiles in `src/languages/profiles.js` own tone identities, answer rules,
-spelling focuses, exercise capabilities, examples, and input behavior.
+Each language owns a profile under `src/languages/<language>/profile.ts`;
+`src/languages/profiles.ts` registers them. Profiles own tone identities, answer rules,
+spelling focuses, exercise capabilities, examples, and input behavior. Tone symbols,
+typing helpers, writing-system labels, language tags, and tone-change feedback are
+also explicit profile data. Shared game and UI code must not infer a neutral tone
+from the number of tones, assume Han script, or branch on a particular language ID.
+`src/languages/profile.ts` contains the engine-facing profile contract check,
+without importing the concrete profiles; saved tone-pair decoding belongs in
+`src/persistence/tone-pairs.ts`.
 `createRun(config, rows, { profile, random })`, controllers, practice setup, and
 persistence require an explicit profile. Scoring, timing, playback recovery,
 rendering, and animation remain shared.
@@ -129,13 +136,33 @@ Builds verify audio hashes and leave source data unchanged.
 
 ## Optional listening review
 
-The existing `mandarin:review` and `mandarin:import-review` tools remain available
-for systematic annotation. Generate the local page with `npm run mandarin:review`
-and open
-http://127.0.0.1:4173/.audio-import-cache/cmn/pronunciation-review.html.
-Review decisions are kept separately in `annotations.json`; confirmed readings
-and tones override automatic estimates, and rejected clips are excluded.
+`npm run mandarin:review` starts the shared internal listening-review server,
+normally at http://127.0.0.1:4180/. Review only the recordings you choose, save
+browser drafts, export decisions, and import them with `mandarin:import-review`.
+New decisions live separately in `listening-reviews.json`; legacy `annotations.json`
+and exported annotation batches remain supported. Confirmed readings and tones
+override automatic estimates, rejected clips are excluded, and uncertain clips
+can retain spelling exercises without tone questions. See the
+[shared workflow and coverage instructions](AUDIO-REVIEW.md).
 This is optional quality improvement, not a beta launch prerequisite.
+
+## Moving beyond beta
+
+Passing the coverage check establishes playable variety, not listening accuracy.
+The beta label remains until a release review records:
+
+- Listening checks of all five teaching references, including neutral tone in context.
+- Focused checks of third-tone changes, 一, 不, and neutral-tone targets, plus a
+  documented sample across the available speakers.
+- Corrections or exclusions for the issues found, with uncertain targets left out
+  of tone questions rather than labelled as reviewed.
+- Passing type, format, game/controller, tooling, distribution, and browser checks,
+  plus a real-phone check of audio, typing, and the five-door layout.
+
+The reviewer should record the sample, decisions, and remaining limitations in
+`data/content/cmn/` using the content commands. This is a release decision;
+`mandarin:status -- --release` remains the beta coverage gate and does not certify
+human review. UI polish alone does not change the catalog's evidence or beta mode.
 
 ## Adding another language
 

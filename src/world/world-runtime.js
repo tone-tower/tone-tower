@@ -39,6 +39,7 @@ export function animateWorld(canvas, initial = {}) {
     journey = null;
   let tower = null;
   function update(next) {
+    if (next.rewardInteraction !== undefined) effect = 0;
     if (next.scene === 'rail' && !journey) journey = createRailJourney(next.progress || 0);
     if (journey && (next.scene === 'rail' || state.scene === 'rail'))
       journey.update({ ...state, ...next });
