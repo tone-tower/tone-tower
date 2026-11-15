@@ -209,7 +209,7 @@ export const vietnamese = Object.freeze({
     guidePrompt: 'New to Vietnamese tones?',
     loading: 'Play Tone Tower to practise the six Vietnamese tones.',
     recordings:
-      'recordings are synthetic speech: each word was generated with ElevenLabs using the voice “Tuan Anh”. They are not recordings of a person, and a synthetic voice can get a tone wrong, so please report any clip that sounds off. The word list and English meanings were compiled by the project’s contributors; the less common words have no meaning yet.',
+      'recordings are synthetic speech: each word was generated with ElevenLabs using the voice “Tuan Anh”. They are not recordings of a person, and a synthetic voice can get a tone wrong, so please report any clip that sounds off. The word list and English meanings were compiled by the project’s contributors.',
     credits: 'Synthetic speech generated with ElevenLabs. No person recorded these words.',
   },
 });
