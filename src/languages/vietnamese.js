@@ -24,6 +24,11 @@ export function splitTone(value) {
   return base && !/[^a-zăâêôơưđ]/.test(base) ? { base, tone } : null;
 }
 
+// A syllable has one run of vowels, which sets it apart from a borrowed word in an
+// English meaning, such as attaché.
+const syllable = new RegExp('^[^' + vowels + ']*[' + vowels + ']+[^' + vowels + ']*$');
+const toneMarks = new RegExp('[' + Object.keys(marks).join('') + ']', 'g');
+
 // The letter that carries the mark depends only on the toneless spelling, so a
 // cover placed there never hints at the answer.
 export function toneCarrier(base) {
@@ -77,4 +82,15 @@ export const quocNgu = {
       index = toneCarrier(base);
     return index < 0 ? null : { base, index };
   },
+  // A meaning may quote Vietnamese: a phrase the word belongs to, or another spelling
+  // of it. Those syllables lose their tones too, and keep their capitals.
+  concealMeaning: (text) =>
+    String(text ?? '')
+      .normalize('NFC')
+      .replace(/\p{L}+/gu, (word) => {
+        const parts = splitTone(word);
+        return parts && parts.tone !== 'ngang' && syllable.test(parts.base)
+          ? word.normalize('NFD').replace(toneMarks, '').normalize('NFC')
+          : word;
+      }),
 };

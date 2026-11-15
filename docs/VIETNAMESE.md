@@ -17,8 +17,10 @@ highlighted. The word is displayed without its tones, so `xin chào` appears as
 the tone mark and a smaller one sits below it. Both are always shown, and their
 position depends only on the toneless spelling, so the cover never hints at a
 dot below (`dấu nặng`) or at a syllable with no mark. The English meaning is
-shown beneath the word from the start; meanings are written in English only, so
-they never contain a tone mark.
+shown beneath the word from the start. A meaning may quote Vietnamese, such as a
+phrase the word belongs to or another spelling of it. Those syllables are shown
+without their tones as well, so `lifesaving (áo cứu sinh)` appears as
+`lifesaving (ao cưu sinh)` until a door is chosen.
 
 Each door shows a written tone mark, drawn large, above its name:
 
@@ -33,7 +35,8 @@ Each door shows a written tone mark, drawn large, above its name:
 
 The order follows the VNI typing keys 1–5, with the unmarked tone last; its door
 shows an empty dotted slot. After any choice the creatures leave and the whole
-word appears, with the name of the highlighted syllable’s tone beneath it. With reduced motion the cover is removed
+word appears, with the name of the highlighted syllable’s tone beneath it, and
+the meaning gets its tones back. With reduced motion the cover is removed
 without animation. The word’s size follows its letter count, so the longest
 four-syllable words stay on one line on a phone.
 
@@ -49,6 +52,9 @@ romanised languages; the shared game reads them without checking the language:
 - `concealTone(text)` returns a syllable’s toneless spelling and the index of the
   letter that carries the mark. The prompt then covers that letter on every
   syllable until the answer is known.
+- `concealMeaning(text)` returns a meaning with the tones removed from the
+  Vietnamese syllables it quotes. The prompt shows that version while the word
+  is covered. Borrowed words such as `attaché` are left as written.
 - `copy` and `guideName` replace wording that assumes a separate romanisation,
   Skyrail or human recordings: page titles and descriptions, the navigation
   label, the home introduction, and the recording credits.
@@ -61,7 +67,7 @@ from the bundled DM Sans, so Vietnamese text uses a system font stack.
 ## Word list and recordings
 
 `data/content/vi/words.json` is the versioned source. Each word has its
-spelling, frequency rank, English meaning where known and, per voice, the
+spelling, frequency rank, English meaning and, per voice, the
 clip’s path, size and SHA-256 hash. Tones are read from the spelling. Clips live
 in `audio/vi/` as `<voice>-<word>.mp3`, with each syllable in the ASCII VNI
 convention and hyphens between syllables (`xin chào` → `xin-chao2`,
@@ -90,8 +96,10 @@ npm run catalog
 npm run vietnamese:status
 ```
 
-The list needs `rank`, `word`, `english` and `per_million` columns; `english`
-may be empty. Clips are copied unchanged. The command reports single syllables
+The list needs `rank`, `word`, `english` and `per_million` columns. `english`
+may be empty, though every word in the committed list has a meaning. To change
+meanings, edit the list and run the same import again; it rewrites them from the
+list. Clips are copied unchanged. The command reports single syllables
 it left out, repeated words (the first, most frequent row is kept) and rows
 without a clip. Two options narrow or widen the selection:
 

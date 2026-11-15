@@ -316,6 +316,11 @@ export function createGameController({
     const concealed = (i) =>
       isTide() ? null : (profile.concealTone?.(run.word.syllables[i].text) ?? null);
     const covered = run.word.syllables.some((_, i) => concealed(i));
+    // A meaning that quotes the word, or a phrase with it, hides those tones as well.
+    const meaning =
+      covered && !reveal && run.word.gloss
+        ? (profile.concealMeaning?.(run.word.gloss) ?? run.word.gloss)
+        : run.word.gloss;
     // A written word is as wide as its letters; its size follows their count.
     const letters = run.word.syllables.reduce((n, s) => n + [...s.text].length, 0);
     // The longest tone name holds the answer's place, so revealing it moves nothing.
@@ -358,7 +363,7 @@ export function createGameController({
           .join('')}
       </div>
       ${reveal && run.word.syllables.some((s) => s.dictionaryTone !== undefined && s.dictionaryTone !== s.tone) ? '<p class="tone-explanation">Heard tones: ' + escape(run.word.syllables.map((s) => profile.toneDefinitions.find((d) => d.value === s.tone)?.label).join(' · ')) + '. Dictionary spelling: ' + escape(profile.format(run.word.transcription || run.word.syllables.map((s) => s.transcription).join(' '))) + '. Tone Tower follows this recording; Skyrail uses dictionary spelling.</p>' : ''}
-      <p class="prompt-gloss">${run.word.gloss ? escape(run.word.gloss) : '&nbsp;'}</p>
+      <p class="prompt-gloss">${meaning ? escape(meaning) : '&nbsp;'}</p>
     </div>`;
   }
   function toneButtons() {

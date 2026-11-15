@@ -1176,6 +1176,7 @@ const vietnameseWords = [
   ['được phép', ['nặng', 'sắc'], 'to be allowed'],
   ['ma quỷ', ['ngang', 'hỏi'], 'ghosts and demons'],
   ['mù mờ', ['huyền', 'huyền'], undefined],
+  ['cứu sinh', ['sắc', 'ngang'], 'lifesaving (áo cứu sinh)'],
 ].map(([text, tones, gloss]) => ({
   id: 'vi-' + text,
   text,
@@ -1284,6 +1285,24 @@ test('a Vietnamese word without a listed meaning keeps its place and ends a lost
   assert.equal(h.app.dataset.outcome, 'success');
   assert.match(h.app.innerHTML, /<p class="prompt-gloss">&nbsp;<\/p>/);
   assert.doesNotMatch(h.app.innerHTML, /undefined/);
+  h.controller.dispose();
+});
+test('a meaning that quotes the Vietnamese word hides its tones until a door is chosen', async () => {
+  const h = harness({}, vietnameseWords, vietnamese);
+  h.controller.start({
+    challenge: 'tone',
+    practice: true,
+    focusIds: ['vi-cứu sinh'],
+    tones: ['sắc', 'ngang'],
+  });
+  h.audio();
+  await flush();
+  assert.match(h.app.innerHTML, /<p class="prompt-gloss">lifesaving \(ao cưu sinh\)<\/p>/);
+  assert.doesNotMatch(h.app.innerHTML, /á|ứ/);
+  const answer = h.controller.state.targets[0] === 0 ? '1' : '6';
+  h.document.fire('keydown', { key: answer, target: { tagName: 'BODY' } });
+  assert.equal(h.app.dataset.outcome, 'success');
+  assert.match(h.app.innerHTML, /<p class="prompt-gloss">lifesaving \(áo cứu sinh\)<\/p>/);
   h.controller.dispose();
 });
 test('numbered languages keep their tone numbers on doors and in feedback', async () => {
