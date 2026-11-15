@@ -287,6 +287,11 @@ test('the committed Vietnamese collection is ready for a full climb', async () =
   assert.equal(rows.length, catalog.recordings.length);
   // Every recording is a whole word, including the six tone examples in the guide.
   assert.ok(rows.every((row) => row.syllables.length > 1 && !row.anchor));
+  assert.deepEqual(
+    rows.filter((row) => !row.gloss).map((row) => row.text),
+    [],
+    'Every word has a meaning.',
+  );
   const anchors = referenceRows(catalog, rows);
   assert.deepEqual(
     anchors.map((row) => row.tone),

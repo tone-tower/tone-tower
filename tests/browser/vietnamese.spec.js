@@ -183,7 +183,7 @@ test('six doors show tone marks and names, and every cover leaves once a door is
   await expect(page.locator('.tone-cover-bottom').first()).toBeVisible();
   await expect(page.locator('.is-target')).toHaveCount(1);
   await expect(page.locator('.prompt-romanization.is-reserved')).toBeHidden();
-  // The meaning is shown from the start; it is English and carries no tone mark.
+  // The meaning is shown from the start.
   await expect(page.locator('.prompt-gloss')).toHaveText(gloss ?? '');
   // Each cover sits over its own marked letter without leaving the prompt.
   const question = await page.locator('.scene-question').boundingBox();
@@ -262,6 +262,34 @@ for (const text of ['trung học chuyên nghiệp', 'nghiêng nghiêng', 'phòng
     }
     await noOverflow(page);
   });
+
+test('a meaning that quotes Vietnamese shows it without tones until a door is chosen', async ({
+  page,
+}) => {
+  const text = 'cứu sinh',
+    gloss = 'lifesaving (áo cứu sinh)';
+  await page.route('**/catalogs/vi.json', (route) =>
+    route.fulfill({ json: catalogOf([...references, [text, gloss]], { examplesOnly: true }) }),
+  );
+  await loaded(page);
+  await page.locator('#start-adventure').click();
+  await page.clock.runFor(2300);
+  await expect(page.locator('.tone-door').first()).toBeEnabled();
+  await expect(page.locator('.prompt-gloss')).toHaveText('lifesaving (ao cưu sinh)');
+  const before = await page.locator('.prompt-gloss').boundingBox();
+  const index = await page
+    .locator('.prompt-syllable')
+    .evaluateAll((nodes) => nodes.findIndex((n) => n.classList.contains('is-target')));
+  const tone = toneOf(text.split(' ')[index]);
+  await page.locator('.tone-door[data-tone="' + tone + '"]').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+  await expect(page.locator('.prompt-gloss')).toHaveText(gloss);
+  // The meaning keeps its place when its tones return.
+  const after = await page.locator('.prompt-gloss').boundingBox();
+  expect(after.y).toBe(before.y);
+  expect(after.height).toBe(before.height);
+  await noOverflow(page);
+});
 
 test('reduced motion shows the answer without the leaving cover', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });

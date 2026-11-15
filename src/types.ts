@@ -155,6 +155,7 @@ export interface LanguageProfile extends Transcription {
   typingHelpers: readonly TypingHelper[];
   toneFeedback?: (syllables: readonly Syllable[]) => string;
   concealTone?: (text: string) => { base: string; index: number } | null;
+  concealMeaning?: (text: string) => string;
   guideName?: string;
   copy?: {
     homeTitle?: string;

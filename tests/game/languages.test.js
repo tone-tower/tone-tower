@@ -259,6 +259,17 @@ test('Vietnamese spelling separates the tone from the letters and finds the mark
   assert.deepEqual(vietnamese.concealTone('đươc'), vietnamese.concealTone('được'));
   for (const invalid of ['', 'ma1', 'mạ́', 'xin chào'])
     assert.equal(vietnamese.concealTone(invalid), null);
+  // A meaning hides the tones of any Vietnamese it quotes and leaves other words alone.
+  for (const [meaning, hidden] of [
+    ['to be allowed', 'to be allowed'],
+    ['lifesaving (áo cứu sinh)', 'lifesaving (ao cưu sinh)'],
+    ['to celebrate Tết', 'to celebrate Têt'],
+    ['color (variant of màu sắc)'.normalize('NFD'), 'color (variant of mau săc)'],
+    ['(hà thủ ô = fo-ti herb)', '(ha thu ô = fo-ti herb)'],
+    ['attaché; coup d’état; lamé', 'attaché; coup d’état; lamé'],
+    ['in a … way', 'in a … way'],
+  ])
+    assert.equal(vietnamese.concealMeaning(meaning), hidden);
   assert.equal(vietnamese.evaluate('Được', ['được'], true), true);
   assert.equal(vietnamese.evaluate('đươc', ['được'], true), false);
   assert.equal(vietnamese.evaluate('đươc', ['được']), true);

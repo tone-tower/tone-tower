@@ -1158,6 +1158,7 @@ const vietnameseWords = [
   ['được phép', ['nặng', 'sắc'], 'to be allowed'],
   ['ma quỷ', ['ngang', 'hỏi'], 'ghosts and demons'],
   ['mù mờ', ['huyền', 'huyền'], undefined],
+  ['cứu sinh', ['sắc', 'ngang'], 'lifesaving (áo cứu sinh)'],
 ].map(([text, tones, gloss]) => ({
   id: 'vi-' + text,
   text,
@@ -1244,4 +1245,21 @@ test('Vietnamese words without meanings keep stable empty feedback and reveal on
     'mù mờ',
   );
   assert.notMatch(h.app.innerHTML, /undefined/);
+});
+
+test('quoted Vietnamese in a meaning is concealed until the answer is revealed', async () => {
+  const h = harness({}, vietnameseWords, vietnamese);
+  h.controller.start({
+    challenge: 'tone',
+    practice: true,
+    focusIds: ['vi-cứu sinh'],
+    tones: ['sắc', 'ngang'],
+  });
+  h.audio();
+  await flush();
+  assert.equal(h.app.querySelector('.prompt-gloss').textContent.trim(), 'lifesaving (ao cưu sinh)');
+  assert.notMatch(h.app.innerHTML, /á|ứ/);
+  h.click('[data-tone="' + h.controller.state.word.tone + '"]');
+  assert.equal(h.app.dataset.outcome, 'success');
+  assert.equal(h.app.querySelector('.prompt-gloss').textContent.trim(), 'lifesaving (áo cứu sinh)');
 });
