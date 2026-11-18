@@ -60,7 +60,7 @@ for (const base of [
           expect((await page.request.get(guideAudio)).status()).toBe(200);
         }
         await page.locator('.brand').click();
-        await expect(page.locator('.mode-cards')).toBeVisible();
+        await expect(page.locator('#start-adventure')).toBeVisible();
         await expect(page.locator('.site-header [data-nav-page="about"]')).toHaveText('About');
         await expect(page.locator('#progress, #reward-hint')).toHaveCount(0);
         await expect(page.locator('.home-world')).not.toContainText('Tower windows remember');
@@ -86,7 +86,7 @@ for (const base of [
         const license = page.getByRole('link', { name: 'MIT licensed' });
         await expect(license).toHaveAttribute('href', base + 'LICENSE');
         await page.goto(base + language + '/practice/');
-        await expect(page.locator('.mode-cards')).toBeVisible();
+        await expect(page.locator('#start-adventure')).toBeVisible();
         if (language !== 'vietnamese')
           await page.locator('[data-mode-card][data-destination="rail"]').click();
         else await expect(page.locator('[data-destination="rail"]:visible')).toHaveCount(0);

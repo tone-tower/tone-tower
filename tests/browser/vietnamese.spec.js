@@ -86,7 +86,7 @@ test.beforeEach(async ({ page }) => {
 });
 async function loaded(page, url = '/vietnamese/') {
   await page.goto(url);
-  await expect(page.locator('.mode-cards')).toBeVisible();
+  await expect(page.locator('#start-adventure')).toBeVisible();
   await page.clock.pauseAt(new Date(Date.now() + 1000));
 }
 async function practice(page, choices) {
@@ -94,6 +94,7 @@ async function practice(page, choices) {
   await page.locator('#setup-practice').click();
   if (choices) await page.locator('[data-practice-setting="choices"]').selectOption(choices);
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   await expect(page.locator('.tone-door').first()).toBeEnabled();
 }
@@ -118,7 +119,7 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await page.locator('.language-card--vietnamese').click();
   await expect(page).toHaveURL(/\/vietnamese\/$/);
   await expect(page.locator('h1')).toHaveText('Tone Tower');
-  await expect(page.locator('[data-mode-card]:visible')).toHaveCount(1);
+  await expect(page.locator('.mode-picker')).toHaveCount(0);
   await expect(page.locator('[data-destination="rail"]:visible')).toHaveCount(0);
   await expect(page.locator('.language-switcher')).toContainText('Vietnamese');
   await expect(page.locator('#setup-practice')).toBeVisible();
@@ -138,7 +139,7 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
     references.map(([text]) => text),
   );
   await page.locator('.guide-tone').nth(3).click();
-  expect(await page.evaluate(() => window.__audioPlays.at(-1))).toMatch(/voice-3\.mp3$/);
+  expect(await page.evaluate(() => window.__audioPlays.at(-1))).toMatch(/tuananh-mai4-mai4\.mp3$/);
   await page.goto('/vietnamese/about/');
   await expect(page.locator('.about-page .info-card')).toHaveCount(1);
   await expect(page.locator('.about-page')).toContainText('synthetic speech');
@@ -243,6 +244,7 @@ for (const text of ['trung học chuyên nghiệp', 'nghiêng nghiêng', 'phòng
     await loaded(page);
     // A climb with a single word asks that word on its first floor.
     await page.locator('#start-adventure').click();
+    await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
     await page.clock.runFor(2300);
     await expect(page.locator('.tone-door').first()).toBeEnabled();
     expect((await shown(page)).normalize('NFD')).toBe(toneless(text));
@@ -273,6 +275,7 @@ test('a meaning that quotes Vietnamese shows it without tones until a door is ch
   );
   await loaded(page);
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(2300);
   await expect(page.locator('.tone-door').first()).toBeEnabled();
   await expect(page.locator('.prompt-gloss')).toHaveText('lifesaving (ao cưu sinh)');

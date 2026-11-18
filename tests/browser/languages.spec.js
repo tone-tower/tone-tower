@@ -87,6 +87,55 @@ async function loaded(page, url = '/mandarin/') {
 const noOverflow = async (page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
+test('Start is fully in view before scrolling on all language homes', async ({ page }) => {
+  const size = page.viewportSize();
+  if (size.width > 700) await page.setViewportSize({ width: 1280, height: 720 });
+  for (const language of ['cantonese', 'mandarin', 'vietnamese']) {
+    await page.goto('/' + language + '/');
+    const start = page.locator('#start-adventure');
+    await expect(start).toBeVisible();
+    await expect(start).toBeInViewport({ ratio: 1 });
+    await page.locator('#setup-practice').click();
+    await expect(start).toBeInViewport({ ratio: 1 });
+  }
+});
+
+test('guide playback works before the game library is requested, and Start can retry', async ({
+  page,
+}) => {
+  let requests = 0;
+  const firstResponse = Promise.withResolvers();
+  await page.route('**/catalogs/cmn.json', async (route) => {
+    if (++requests === 1) {
+      await firstResponse.promise;
+      await route.fulfill({ status: 503 });
+    } else await route.fulfill({ json: catalog });
+  });
+  await loaded(page);
+  await page.locator('#learn').click();
+  await page.locator('.guide-tone[data-guide-tone="3"]').click();
+  await page.clock.runFor(150);
+  await expect(page.locator('#guide-status')).toContainText('mǎ');
+  await page.locator('#home').click();
+  expect(requests).toBe(0);
+
+  const start = page.locator('#start-adventure');
+  await page.locator('#setup-practice').click();
+  try {
+    await start.click();
+    await expect(start).toBeDisabled();
+    await expect(page.locator('#setup-status')).toContainText('Loading');
+    await expect(page.locator('#app')).toHaveAttribute('data-view', 'home');
+  } finally {
+    firstResponse.resolve();
+  }
+  await expect(page.locator('#setup-error')).toContainText('Couldn’t load the recording library');
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect(page.getByRole('heading', { name: 'Practice tones' })).toBeVisible();
+  expect(requests).toBe(2);
+});
+
 test('chooser loads no catalog and language navigation stays in Mandarin', async ({ page }) => {
   const requests = [];
   page.on('request', (r) => {
@@ -145,6 +194,7 @@ test('Mandarin practice renders five doors and accepts neutral-tone keyboard ans
   await page.locator('#setup-practice').click();
   await page.locator('[data-practice-setting="choices"]').selectOption('5');
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   await expect(page.locator('.tone-door')).toHaveCount(5);
   await expect(page.locator('.tone-door .tone-mark')).toHaveCount(5);
@@ -216,6 +266,7 @@ test('Pinyin typing supports composition, Space replay, tone buttons, and script
   await page.locator('#setup-practice').click();
   await page.locator('[data-practice-setting="variant"]').check();
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   const input = page.locator('#transcription-answer');
   await expect(page.locator('.typing-tools')).toBeVisible();
@@ -270,6 +321,8 @@ test('unavailable collection keeps the guide usable and games closed', async ({ 
     }),
   );
   await loaded(page);
+  await page.locator('#start-adventure').click();
+  await expect(page.locator('.content-preview')).toBeVisible();
   await expect(page.locator('.content-preview')).toContainText('gathering enough recordings');
   await expect(page.locator('#start-adventure')).toBeDisabled();
   await page.locator('#learn').click();
@@ -289,6 +342,7 @@ test('reduced motion and blocked local storage still allow a language game', asy
   await loaded(page);
   await page.locator('#setup-practice').click();
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   await expect(page.locator('.tone-door').first()).toBeEnabled();
   await noOverflow(page);
@@ -315,7 +369,7 @@ test('language homes have a brief introduction and guide link above the games', 
       expect(guideBox.y).toBeLessThan(titleBox.y + titleBox.height);
     }
     const introBox = await intro.boundingBox();
-    const gamesBox = await page.locator('.mode-picker').boundingBox();
+    const gamesBox = await page.locator('.mode-picker, .home-world').first().boundingBox();
     expect(introBox.y + introBox.height).toBeLessThanOrEqual(gamesBox.y);
     await intro.getByRole('link').click();
     await expect(page).toHaveURL(new RegExp('/' + language + '/guide/$'));
@@ -355,6 +409,7 @@ test('Pinyin helpers insert once across answers, pause, script changes and audio
   await page.locator('#setup-practice').click();
   await page.locator('[data-practice-setting="variant"]').check();
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   const input = page.locator('#transcription-answer');
   const check = async () => {

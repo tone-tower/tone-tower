@@ -56,14 +56,7 @@ function fire(receiver, type, options = {}) {
     type === 'keydown'
       ? new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init })
       : new Event(type, { bubbles: true, cancelable: true, ...init });
-  const node =
-    target instanceof EventTarget
-      ? target
-      : target?.tagName
-        ? document.createElement(target.tagName)
-        : receiver;
-  if (node !== receiver && !node.isConnected) document.body.append(node);
-  node.dispatchEvent(event);
+  (target ?? receiver).dispatchEvent(event);
   return event;
 }
 function harness(extra = {}, recordings = words, profile = cantonese) {
@@ -296,14 +289,14 @@ test('tone keyboard choices score once and a paused run cannot accept answers', 
   h.audio();
   await flush();
   const right = h.controller.state.word.tone;
-  fire(h.document, 'keydown', { key: String(right), repeat: true, target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: String(right), repeat: true, target: h.document.body });
   assert.strictEqual(h.controller.state.cleared, 0);
   h.controller.pause();
-  fire(h.document, 'keydown', { key: String(right), target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: String(right), target: h.document.body });
   assert.strictEqual(h.controller.state.cleared, 0);
   h.controller.resume();
-  fire(h.document, 'keydown', { key: String(right), target: { tagName: 'BODY' } });
-  fire(h.document, 'keydown', { key: String(right), target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: String(right), target: h.document.body });
+  fire(h.document, 'keydown', { key: String(right), target: h.document.body });
   assert.strictEqual(h.controller.state.cleared, 1);
   assert.strictEqual(h.controller.state.attempts, 1);
   h.controller.dispose();
@@ -315,7 +308,7 @@ test('a terminal mistake records once and offers retry in the same scene after i
   h.audio();
   await flush();
   const wrong = h.controller.state.choices.find((tone) => tone !== h.controller.state.word.tone);
-  fire(h.document, 'keydown', { key: String(wrong), target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: String(wrong), target: h.document.body });
   assert.strictEqual(h.controller.state.status, 'lost');
   assert.strictEqual(h.finished.length, 1);
   assert.strictEqual(h.controller.active, true);
@@ -325,7 +318,7 @@ test('a terminal mistake records once and offers retry in the same scene after i
   h.time.advance(2800);
   assert.strictEqual(h.app.querySelector('#retry-run').disabled, false);
   assert.strictEqual(h.app.querySelectorAll('.scene-frame').length, 1);
-  fire(h.document, 'keydown', { key: 'Enter', target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: 'Enter', target: h.document.body });
   h.time.advance(60000);
   assert.strictEqual(h.finished.length, 1);
   assert.strictEqual(h.controller.active, true);
@@ -372,7 +365,7 @@ test.each(['click', 'Enter'])(
     assert.strictEqual(depart.disabled, false);
     const requests = h.requests.length;
     if (action === 'click') depart.click();
-    else fire(depart, 'keydown', { key: 'Enter' });
+    else fire(h.document.body, 'keydown', { key: 'Enter' });
     assert.strictEqual(h.controller.phase, 'listening');
     assert.strictEqual(h.controller.state.opened, 20);
     assert.strictEqual(h.requests.length, requests + 1);
@@ -402,15 +395,21 @@ test('Tower removes in-game references and Space replays without scoring or choo
   await flush();
   assert.strictEqual(h.app.querySelector('#show-reference'), null);
   assert.strictEqual(h.app.querySelector('[data-reference-tone]'), null);
-  const requests = h.requests.length,
-    event = fire(h.document, 'keydown', { key: ' ', target: { tagName: 'BUTTON' } });
+  const requests = h.requests.length;
+  const pauseKey = fire(h.document, 'keydown', {
+    key: ' ',
+    target: h.app.querySelector('#pause-run'),
+  });
+  assert.strictEqual(pauseKey.defaultPrevented, false);
+  assert.strictEqual(h.requests.length, requests);
+  const event = fire(h.document, 'keydown', { key: ' ' });
   assert.strictEqual(event.defaultPrevented, true);
   assert.strictEqual(h.requests.length, requests + 1);
   assert.strictEqual(h.controller.state.attempts, 0);
   h.audio();
   await flush();
   const wrong = h.controller.state.choices.find((t) => t !== h.controller.state.word.tone);
-  fire(h.document, 'keydown', { key: String(wrong), target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: String(wrong), target: h.document.body });
   assert.strictEqual(h.app.querySelector('.reference-grid'), null);
   assert.ok(h.app.querySelector('.answer-mark'));
   h.controller.dispose();
@@ -429,7 +428,7 @@ test('three and four door arrows select the matching spatial door', async () => 
       await flush();
       assert.strictEqual(h.controller.state.choices.length, count);
       const expected = h.controller.state.choices[arrowChoiceIndex(count, key)];
-      const event = fire(h.document, 'keydown', { key, target: { tagName: 'BODY' } });
+      const event = fire(h.document, 'keydown', { key, target: h.document.body });
       assert.strictEqual(event.defaultPrevented, true);
       assert.strictEqual(h.controller.state.lastAnswer, expected);
       h.controller.dispose();
@@ -501,7 +500,7 @@ test('wrong door marks the correct answer without a success door', async () => {
   await flush();
   const right = h.controller.state.word.tone,
     wrong = h.controller.state.choices.find((t) => t !== right);
-  fire(h.document, 'keydown', { key: String(wrong), target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: String(wrong), target: h.document.body });
   assert.strictEqual(h.app.dataset.outcome, 'wrong');
   assert.ok(h.app.querySelector('.is-wrong'));
   assert.ok(h.app.querySelector('.is-answer'));
@@ -513,7 +512,7 @@ test('wrong door marks the correct answer without a success door', async () => {
   await flush();
   fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
-    target: { tagName: 'BODY' },
+    target: h.document.body,
   });
   assert.strictEqual(h.app.dataset.outcome, 'success');
   assert.ok(h.app.querySelector('.is-correct'));
@@ -641,7 +640,7 @@ test('Tower checkpoints name the next district, restore lives and wait for Conti
   h.controller.state.lives = 1;
   fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
-    target: { tagName: 'BODY' },
+    target: h.document.body,
   });
   assert.strictEqual(h.controller.phase, 'landing');
   assert.strictEqual(h.controller.state.lives, h.controller.state.maxLives);
@@ -697,7 +696,7 @@ test('awarding progress during clock.pause cannot advance the displayed room bef
   await flush();
   fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
-    target: { tagName: 'BODY' },
+    target: h.document.body,
   });
   const finalTick = updates.find((s) => s.phase === 'answering' && s.progress === 1);
   assert.ok(finalTick);
@@ -718,12 +717,12 @@ test('a Tower ending waits for an explicit action, including after pause and res
   await flush();
   fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
-    target: { tagName: 'BODY' },
+    target: h.document.body,
   });
   assert.strictEqual(h.controller.state.status, 'complete');
   assert.strictEqual(h.finished.length, 0);
   assert.ok(h.app.querySelector('.tower-run-end'));
-  fire(h.document, 'keydown', { key: 'Enter', target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: 'Enter', target: h.document.body });
   assert.strictEqual(h.finished.length, 0);
   h.controller.pause();
   h.time.advance(5000);
@@ -732,7 +731,7 @@ test('a Tower ending waits for an explicit action, including after pause and res
   assert.strictEqual(h.finished.length, 0);
   h.time.advance(60000);
   assert.strictEqual(h.finished.length, 0);
-  fire(h.document, 'keydown', { key: 'Enter', target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: 'Enter', target: h.document.body });
   assert.strictEqual(h.finished.length, 1);
 });
 
@@ -748,7 +747,7 @@ test('a full Tower victory stays in one scene and records without a second endin
     await flush();
     fire(h.document, 'keydown', {
       key: String(h.controller.state.word.tone),
-      target: { tagName: 'BODY' },
+      target: h.document.body,
     });
     if (floor < 100) {
       if (floor % 20 === 0) {
@@ -817,7 +816,7 @@ test('Tower plays after the entrance and keeps the pace between floors', async (
   assert.strictEqual(h.app.querySelector('[data-tone]').disabled, false);
   fire(h.document, 'keydown', {
     key: String(h.controller.state.word.tone),
-    target: { tagName: 'BODY' },
+    target: h.document.body,
   });
   h.time.advance(1699);
   assert.strictEqual(h.controller.phase, 'correct');
@@ -858,7 +857,7 @@ test('Tower offers missed-sound practice only after the run fails', async () => 
     await flush();
     fire(h.document, 'keydown', {
       key: String(h.controller.state.choices.find((t) => t !== h.controller.state.word.tone)),
-      target: { tagName: 'BODY' },
+      target: h.document.body,
     });
     assert.strictEqual(h.app.querySelector('#practise-mistakes'), null);
     if (miss < 3) {
@@ -906,7 +905,7 @@ test('practice uses its own starting scene with fixed progress and a finish acti
       if (challenge === 'tone')
         fire(h.document, 'keydown', {
           key: String(h.controller.state.word.tone),
-          target: { tagName: 'DIV' },
+          target: h.app,
         });
       else {
         const input = h.app.querySelector('#transcription-answer');
@@ -957,7 +956,7 @@ test('a wrong final practice question completes the set and can open results', a
       if (challenge === 'tone')
         fire(h.document, 'keydown', {
           key: String(h.controller.state.word.tone),
-          target: { tagName: 'DIV' },
+          target: h.app,
         });
       else {
         const input = h.app.querySelector('#transcription-answer');
@@ -971,7 +970,7 @@ test('a wrong final practice question completes the set and can open results', a
     if (challenge === 'tone')
       fire(h.document, 'keydown', {
         key: String(h.controller.state.choices.find((t) => t !== h.controller.state.word.tone)),
-        target: { tagName: 'DIV' },
+        target: h.app,
       });
     else {
       h.app.querySelector('#transcription-answer').value = 'incorrect';
@@ -1014,7 +1013,7 @@ test('Mandarin feedback explains heard tones without exposing tone marks before 
   await flush();
   assert.notMatch(h.app.innerHTML, /nǐ|hǎo|Dictionary spelling/);
   assert.strictEqual(h.app.querySelector('.recording-report'), null);
-  fire(h.document, 'keydown', { key: '2', target: { tagName: 'BODY' } });
+  fire(h.document, 'keydown', { key: '2', target: h.document.body });
   assert.match(h.app.innerHTML, /Written nǐ hǎo; listening answer ní hǎo/);
   assert.match(h.app.innerHTML, /A third tone changes before another third tone/);
   assert.ok(h.app.querySelector('.recording-report'));

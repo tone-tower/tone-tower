@@ -1102,12 +1102,12 @@ input[type='number'] {
   border-left: 1px solid #647b7c;
   padding: 23px 24px;
 }
-.home-world .home-map-layout .dock h2 {
+.home-world .home-map-layout #destination-title {
   font-size: 24px;
 }
 .home-world .home-map-layout .map-entry {
   gap: 8px;
-  margin-top: auto;
+  margin-top: 10px;
   align-items: stretch;
 }
 .home-world .home-map-layout #start-adventure {
@@ -1149,16 +1149,10 @@ input[type='number'] {
     grid-row: 1;
     border-left: 0;
     border-bottom: 1px solid #647b7c;
-    display: grid;
-    grid-template-columns: minmax(0, 1.4fr) minmax(190px, 1fr);
     gap: 20px;
   }
   .home-world .home-map-layout > .stage {
     grid-row: 2;
-  }
-  .home-world .home-map-layout .map-entry {
-    align-self: center;
-    margin: 0;
   }
   .home-world .home-map-layout .stage {
     width: 100%;
@@ -1205,13 +1199,10 @@ input[type='number'] {
     padding: 20px 17px;
     gap: 17px;
   }
-  .home-world .home-map-layout .map-entry {
-    align-self: stretch;
-  }
   .home-world .home-map-layout .stage {
     max-height: none;
   }
-  .home-world .home-map-layout .dock h2 {
+  .home-world .home-map-layout #destination-title {
     font-size: 25px;
   }
   .home-world .home-map-layout #start-adventure {
@@ -1450,7 +1441,7 @@ input[type='number'] {
 .home-world .home-map-layout > .dock {
   min-height: 530px;
 }
-.home-world .home-map-layout .dock h2 {
+.home-world .home-map-layout #destination-title {
   margin-top: 0;
   margin-bottom: 0;
 }
@@ -1923,9 +1914,6 @@ input[type='number'] {
   }
   .home-world .home-map-layout .title-variants {
     align-items: flex-start;
-  }
-  .home-world .home-map-layout .map-entry {
-    margin-top: 0;
   }
 }
 @media (max-width: 700px) {

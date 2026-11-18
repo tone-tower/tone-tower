@@ -44,6 +44,11 @@ const appBase = siteRoot();
 const app = required(document, '#app');
 const dialog = required(document, '#dialog');
 const dialogBody = required(document, '#dialog-body');
+const guideSource = query(document, '#guide-catalog');
+const guideCatalog = guideSource
+  ? validateCatalog(JSON.parse(guideSource.textContent), profile)
+  : null;
+const recordingCount = Number(guideSource?.dataset.recordingCount ?? 0);
 const player = new Player();
 const titleCase = (value: string) => value[0].toUpperCase() + value.slice(1);
 const variantName = (world: Challenge, variant: string) =>
@@ -93,11 +98,41 @@ const worldInfo = {
 };
 let progress = loadProgress(profile),
   catalog: Catalog | null = null,
+  libraryRequest: Promise<ExerciseRow[]> | null = null,
   data: ExerciseRow[] = [],
-  words: ExerciseRow[] = [],
   anchors: ExerciseRow[] = [],
   controller: ReturnType<typeof createGameController> | null = null,
+  dialogOpener: HTMLElement | null = null,
   screen = 'home';
+const availability = () => (catalog ?? guideCatalog)?.availability;
+const libraryUnavailable = () => availability()?.ready === false;
+function loadLibrary(): Promise<ExerciseRow[]> {
+  if (catalog) return Promise.resolve(data);
+  return (libraryRequest ??= (async () => {
+    const response = await fetch(siteURL('catalogs/' + profile.id + '.json'), {
+      cache: 'no-cache',
+    });
+    if (!response.ok) throw Error('The recording library could not load.');
+    const next = validateCatalog(await response.json(), profile);
+    const rows = catalogRows(next, profile, progress.settings.script);
+    const references = referenceRows(next, rows);
+    if (next.availability?.ready !== false && references.length !== profile.tones.length)
+      throw Error('The tone references are incomplete.');
+    catalog = next;
+    data = rows;
+    anchors = references;
+    return rows;
+  })().finally(() => {
+    libraryRequest = null;
+  }));
+}
+function applyScript(script: string) {
+  if (catalog) {
+    data = catalogRows(catalog, profile, script);
+    anchors = referenceRows(catalog, data);
+  }
+  controller?.setScript(script);
+}
 const persist = () => saveProgress(profile, progress);
 const rewardMessages = new WeakMap<Run, string>();
 let homecoming: string[] = [];
@@ -195,7 +230,14 @@ function home(world?: Challenge, initialPractice = false) {
   if (initialPractice) setPageLocation('practice', true);
   progress = loadProgress(profile);
   const rewards = homeRewards(progress);
-  app.innerHTML = /* HTML */ ` ${catalog?.availability?.ready === false ? '<aside class="content-preview" role="status"><strong>' + escape(profile.label) + ' is taking shape.</strong><p>We’re gathering enough recordings to open the games. Explore the ' + escape(profile.romanization) + ' guide while the collection grows.</p></aside>' : ''}
+  const hasGameChoice = profile.challenges.length > 1;
+  app.innerHTML = /* HTML */ ` <aside class="content-preview" role="status" hidden>
+      <strong>${escape(profile.label)} is taking shape.</strong>
+      <p>
+        We’re gathering enough recordings to open the games. Explore the
+        ${escape(profile.romanization)} guide while the collection grows.
+      </p>
+    </aside>
     <section class="home-intro" aria-label="Introduction">
       <p class="home-intro-title">
         Practice
@@ -207,41 +249,38 @@ function home(world?: Challenge, initialPractice = false) {
         →</a
       >
     </section>
-    <section class="mode-picker" aria-labelledby="mode-heading">
-      <div class="mode-picker-heading">
-        <h1 id="mode-heading" tabindex="-1">
-          ${profile.challenges.length > 1 ? 'Choose a game' : 'Tone Tower'}
-        </h1>
-        <p>
-          ${profile.challenges.length > 1 ? '<kbd>←</kbd> <kbd>→</kbd> choose · ' : ''}<kbd
-            >Enter</kbd
-          >
-          start
-        </p>
-      </div>
-      <div class="mode-cards">
-        <button
-          type="button"
-          class="mode-card"
-          data-mode-card
-          data-destination="tone"
-          aria-describedby="tone-mode-description"
-        >
-          <strong>Tone Tower</strong
-          ><span id="tone-mode-description">Choose the tone you hear.</span>
-        </button>
-        <button
-          type="button"
-          class="mode-card"
-          data-mode-card
-          data-destination="rail"
-          aria-describedby="rail-mode-description"
-        >
-          <strong>Skyrail</strong
-          ><span id="rail-mode-description">Type the ${profile.romanization} you hear.</span>
-        </button>
-      </div>
-    </section>
+    ${
+      hasGameChoice
+        ? /* HTML */ `<section class="mode-picker" aria-labelledby="mode-heading">
+            <div class="mode-picker-heading">
+              <h1 id="mode-heading" tabindex="-1">Choose a game</h1>
+              <p><kbd>←</kbd> <kbd>→</kbd> choose · <kbd>Enter</kbd> start</p>
+            </div>
+            <div class="mode-cards">
+              <button
+                type="button"
+                class="mode-card"
+                data-mode-card
+                data-destination="tone"
+                aria-describedby="tone-mode-description"
+              >
+                <strong>Tone Tower</strong
+                ><span id="tone-mode-description">Choose the tone you hear.</span>
+              </button>
+              <button
+                type="button"
+                class="mode-card"
+                data-mode-card
+                data-destination="rail"
+                aria-describedby="rail-mode-description"
+              >
+                <strong>Skyrail</strong
+                ><span id="rail-mode-description">Type the ${profile.romanization} you hear.</span>
+              </button>
+            </div>
+          </section>`
+        : ''
+    }
     <section class="play-frame home-world" aria-label="Choose an adventure">
       <div class="home-map-layout">
         <div class="stage">
@@ -249,7 +288,7 @@ function home(world?: Challenge, initialPractice = false) {
             class="map-canvas"
             width="480"
             height="400"
-            aria-label="Tone Tower and Skyrail above the clouds"
+            aria-label="${hasGameChoice ? 'Tone Tower and Skyrail above the clouds' : 'Tone Tower above the clouds'}"
           ></canvas>
           <div class="home-reward-interactions" aria-label="Friends at home">
             ${(
@@ -274,16 +313,17 @@ function home(world?: Challenge, initialPractice = false) {
         </div>
         <div class="dock">
           <div>
-            <h2 id="destination-title"></h2>
+            ${hasGameChoice ? '<h2 id="destination-title"></h2>' : '<h1 id="destination-title" tabindex="-1"></h1>'}
             <div class="setup-tabs" role="group" aria-label="Game or practice">
               <button type="button" id="setup-game" aria-pressed="true">Play game</button>
               <button type="button" id="setup-practice" aria-pressed="false">Practice</button>
             </div>
+            <div class="map-entry">
+              <div id="setup-error" class="error" role="alert" tabindex="-1"></div>
+              <button id="start-adventure" class="primary" type="button">Enter tower →</button>
+              <div id="setup-status" class="small" role="status"></div>
+            </div>
             <div id="map-variants" class="title-variants"></div>
-          </div>
-          <div class="map-entry">
-            <button id="start-adventure" class="primary" type="button">Enter tower →</button>
-            <div id="setup-error" class="error" role="alert" tabindex="-1"></div>
           </div>
         </div>
       </div>
@@ -298,15 +338,9 @@ function home(world?: Challenge, initialPractice = false) {
     .map((message) => message.replace(' Something new is waiting at home…', ' Welcome home.'))
     .join(' ');
   homecoming = [];
-  queryAll(app, '[data-destination]').forEach((button) => {
-    button.hidden = !profile.challenges.includes(
-      button.dataset.destination === 'rail' ? 'tide' : 'tone',
-    );
-  });
   if (!profile.challenges.includes(mapDestination === 'rail' ? 'tide' : 'tone'))
     mapDestination = profile.challenges[0] === 'tide' ? 'rail' : 'tone';
   bindInfoActions(app);
-  bindToneAudio(app);
   const canvas = required(app, '.map-canvas');
   worldAnimation = animateWorld(canvas, {
     scene: 'hub',
@@ -508,8 +542,16 @@ function home(world?: Challenge, initialPractice = false) {
       : rail
         ? 'Board Skyrail →'
         : 'Enter tower →';
-    enter.disabled = catalog?.availability?.ready === false;
-    enter.onclick = () =>
+    const status = required(app, '#setup-status');
+    const error = required(app, '#setup-error');
+    const updateAvailability = () => {
+      enter.disabled = libraryUnavailable();
+      required(app, '.content-preview').hidden = !enter.disabled;
+    };
+    updateAvailability();
+    status.textContent = '';
+    error.textContent = '';
+    const launch = () =>
       practiceMode
         ? startPractice(challenge, config.variant, config)
         : begin({
@@ -518,6 +560,29 @@ function home(world?: Challenge, initialPractice = false) {
             difficulty: progress.settings.tideDifficulty,
             practice: false,
           });
+    const start = async () => {
+      if (catalog) {
+        launch();
+        return;
+      }
+      const current = () => enter.isConnected && enter.onclick === start;
+      enter.disabled = true;
+      error.textContent = '';
+      status.textContent = 'Loading the recording library…';
+      try {
+        await loadLibrary();
+      } catch {
+        if (current()) screenError('Couldn’t load the recording library. Try again.');
+        return;
+      } finally {
+        if (current()) {
+          status.textContent = '';
+          updateAvailability();
+        }
+      }
+      if (current() && !libraryUnavailable() && !dialog.open) launch();
+    };
+    enter.onclick = start;
     selectedWorld = challenge;
     // Walking is decorative: settings and Start are ready as soon as a mode is selected.
     worldAnimation?.update({
@@ -577,7 +642,7 @@ function showWorkshop(seed?: RunInput & { challenge: Challenge; variant: string 
 }
 
 function begin(config: RunInput) {
-  if (catalog?.availability?.ready === false) {
+  if (libraryUnavailable()) {
     screenError(
       'There are not enough recordings for this collection yet. Please explore the guide for now.',
     );
@@ -586,7 +651,20 @@ function begin(config: RunInput) {
   resetView('game');
   required(document, '#pause-game').hidden = false;
   try {
-    if (!controller) throw Error('The recording library is still loading.');
+    controller ??= createGameController({
+      profile,
+      app,
+      player,
+      dialog,
+      words: data.filter((word) => !word.anchor),
+      script: progress.settings.script,
+      onFinish: finish,
+      victoryMessage,
+      onRetry: begin,
+      onHome: home,
+      onPractice: practiceFromRun,
+      onLearn: () => showLearn(),
+    });
     controller.start(config);
   } catch (error) {
     prepare(config.challenge ?? 'tone');
@@ -697,8 +775,11 @@ function practiceFromRun(run: Run) {
   showWorkshop(config);
 }
 
-function openDialog(html: string) {
-  controller?.pause();
+function openDialog(html: string, opener = document.activeElement) {
+  if (!dialog.open) {
+    dialogOpener = opener instanceof HTMLElement ? opener : null;
+    controller?.pause('dialog', opener);
+  }
   player.stop();
   dialogBody.innerHTML = html;
   localizeAssets(dialogBody, appBase);
@@ -706,15 +787,19 @@ function openDialog(html: string) {
   query(dialogBody, 'h2')?.setAttribute('tabindex', '-1');
   query(dialogBody, 'h2')?.focus();
 }
-function bindToneAudio(container: HTMLElement) {
+function bindToneAudio(
+  container: HTMLElement,
+  recordings: ExerciseRow[],
+  references: ExerciseRow[],
+) {
   let request = 0;
   queryAll(container, '[data-guide-tone],[data-guide-word]').forEach(
     (button) =>
       (button.onclick = async () => {
         const current = ++request;
         const anchor = button.dataset.guideWord
-          ? data.find((word) => word.id === button.dataset.guideWord)
-          : anchors.find((word) => String(word.tone) === button.dataset.guideTone);
+          ? recordings.find((word) => word.id === button.dataset.guideWord)
+          : references.find((word) => String(word.tone) === button.dataset.guideTone);
         const status =
           button.closest('.guide-example-block')?.querySelector('[role="status"]') ||
           required(container, '#guide-status');
@@ -815,7 +900,7 @@ function bindInfoActions(container: HTMLElement) {
       (button.onclick = () => {
         (
           ({
-            credits: showCredits,
+            credits: () => showCredits(button),
             reset: showReset,
             practice: () => {
               setPageLocation('practice');
@@ -829,18 +914,22 @@ function bindInfoActions(container: HTMLElement) {
 }
 function showInfo(page: string) {
   resetView(page);
-  app.innerHTML =
-    page === 'sounds'
-      ? soundPageMarkup(anchors, profile.toneDefinitions, data, profile)
-      : aboutPageMarkup({
-          recordingCount: data.length,
-          profile,
-          availability: catalog?.availability,
-        });
+  if (page === 'sounds') {
+    const guide = guideCatalog ?? catalog;
+    const recordings = guide ? catalogRows(guide, profile, progress.settings.script) : [];
+    const references = guide ? referenceRows(guide, recordings) : [];
+    app.innerHTML = soundPageMarkup(references, profile.toneDefinitions, recordings, profile);
+    bindToneAudio(app, recordings, references);
+  } else {
+    app.innerHTML = aboutPageMarkup({
+      recordingCount: catalog ? data.length : recordingCount,
+      profile,
+      availability: availability(),
+    });
+  }
   bindInfoActions(app);
-  if (page === 'sounds') bindToneAudio(app);
 }
-function showAboutInGame() {
+function showAboutInGame(opener?: HTMLElement) {
   const markup = aboutPageMarkup({
     recordingCount: data.length,
     profile,
@@ -848,19 +937,26 @@ function showAboutInGame() {
   })
     .replace('<h1 tabindex="-1">', '<h2 id="dialog-title">')
     .replace('</h1>', '</h2>');
-  openDialog(markup);
+  openDialog(markup, opener);
   queryAll(dialogBody, '.back-link,.info-actions,[data-start-world]').forEach((el) => el.remove());
   queryAll(dialogBody, '[data-info-action="practice"]').forEach((el) =>
     el.replaceWith(document.createTextNode(el.textContent)),
   );
   bindInfoActions(dialogBody);
 }
-function navigate(page: string, { replace = false, focus = true } = {}) {
+function navigate(
+  page: string,
+  {
+    replace = false,
+    focus = true,
+    opener,
+  }: { replace?: boolean; focus?: boolean; opener?: HTMLElement } = {},
+) {
   if (!['home', 'sounds', 'about', 'practice'].includes(page)) return;
   if (screen === 'game' && controller?.active && controller.state?.status === 'playing') {
     setPageLocation('home', true);
-    if (page === 'sounds') showLearn();
-    else if (page === 'about') showAboutInGame();
+    if (page === 'sounds') showLearn(opener);
+    else if (page === 'about') showAboutInGame(opener);
     else controller.pause();
     return;
   }
@@ -870,12 +966,12 @@ function navigate(page: string, { replace = false, focus = true } = {}) {
   else home();
   if (focus) focusTitle();
 }
-function showLearn() {
+function showLearn(opener?: HTMLElement) {
   controller?.state?.markAssisted?.();
-  openDialog(compactGuideMarkup(anchors, profile.toneDefinitions, profile));
-  bindToneAudio(dialogBody);
+  openDialog(compactGuideMarkup(anchors, profile.toneDefinitions, profile), opener);
+  bindToneAudio(dialogBody, data, anchors);
 }
-const showCredits = createCreditsDialog({ dialogBody, profile, getRows: () => data, openDialog });
+const showCredits = createCreditsDialog({ dialogBody, profile, loadRows: loadLibrary, openDialog });
 function showReset() {
   openDialog(
     '<h2 id="dialog-title">Reset saved progress?</h2><p>This removes your tower lights, home decorations and preferences for ' +
@@ -890,11 +986,7 @@ function showReset() {
     progress = resetProgress(profile);
     homecoming = [];
     if (scriptDisplay) scriptDisplay.value = progress.settings.script;
-    if (!catalog) return;
-    data = catalogRows(catalog, profile, progress.settings.script);
-    words = data.filter((w) => !w.anchor);
-    anchors = referenceRows(catalog, data);
-    controller?.setScript(progress.settings.script);
+    applyScript(progress.settings.script);
     dialog.close();
     home();
   };
@@ -905,7 +997,7 @@ queryAll(document, '[data-nav-page]').forEach(
     (link.onclick = (event) => {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
-      navigate(link.dataset.navPage ?? 'home');
+      navigate(link.dataset.navPage ?? 'home', { opener: link });
     }),
 );
 required(document, '.brand').onclick = (event) => {
@@ -914,6 +1006,28 @@ required(document, '.brand').onclick = (event) => {
   navigate('home');
 };
 bindLanguageSwitcher(document);
+document.querySelectorAll<HTMLAnchorElement>('[data-language-link]').forEach((link) => {
+  link.onclick = (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (!controller?.active || controller.state.status !== 'playing') return;
+    const language = languages[link.dataset.languageLink ?? ''];
+    if (!language) return;
+    event.preventDefault();
+    const switcher = link.closest('details');
+    if (switcher) {
+      switcher.open = false;
+      switcher.querySelector('summary')?.focus();
+    }
+    if (language.id === profile.id) return;
+    const destination = link.href;
+    controller.confirmExit({
+      title: 'Switch to ' + language.label + '?',
+      message: 'Switching languages ends the current run.',
+      action: 'End run & switch language',
+      confirm: () => location.assign(destination),
+    });
+  };
+});
 required(document, '#pause-game').onclick = () => controller?.pause();
 const scriptDisplay = query(document, '#script-display');
 if (scriptDisplay) {
@@ -921,11 +1035,7 @@ if (scriptDisplay) {
   scriptDisplay.onchange = () => {
     progress.settings.script = scriptDisplay.value;
     persist();
-    if (!catalog) return;
-    data = catalogRows(catalog, profile, scriptDisplay.value);
-    words = data.filter((w) => !w.anchor);
-    anchors = referenceRows(catalog, data);
-    controller?.setScript(scriptDisplay.value);
+    applyScript(scriptDisplay.value);
     if (screen !== 'game')
       navigate(pageFromLocation(new URL(location.href), appBase, profile), {
         replace: true,
@@ -933,11 +1043,14 @@ if (scriptDisplay) {
       });
   };
 }
-required(document, '#credits').onclick = showCredits;
+const credits = required(document, '#credits');
+credits.onclick = () => showCredits(credits);
 required(document, '#close-dialog').onclick = () => dialog.close();
 dialog.addEventListener('close', () => {
+  if (dialog.open) return;
   player.stop();
-  if (controller?.active) controller.resume();
+  if (dialogOpener?.isConnected) dialogOpener.focus({ preventScroll: true });
+  dialogOpener = null;
 });
 dialog.addEventListener('click', (event) => {
   if (event.target === dialog) {
@@ -952,47 +1065,13 @@ dialog.addEventListener('click', (event) => {
   }
 });
 window.addEventListener('popstate', () => {
-  if (controller)
-    navigate(pageFromLocation(new URL(location.href), appBase, profile), { replace: true });
+  navigate(pageFromLocation(new URL(location.href), appBase, profile), { replace: true });
 });
 
-try {
-  const response = await fetch(siteURL('catalogs/' + profile.id + '.json'));
-  if (!response.ok) throw Error('The recording library could not load.');
-  catalog = validateCatalog(await response.json(), profile);
-  data = catalogRows(catalog, profile, progress.settings.script);
-  words = data.filter((w) => !w.anchor);
-  anchors = referenceRows(catalog, data);
-  if (catalog.availability?.ready !== false && anchors.length !== profile.tones.length)
-    throw Error('The tone references are incomplete.');
-  controller = createGameController({
-    profile,
-    app,
-    player,
-    dialog,
-    words,
-    anchors,
-    script: progress.settings.script,
-    onFinish: finish,
-    victoryMessage,
-    onRetry: begin,
-    onHome: home,
-    onPractice: (run) => practiceFromRun(run),
-    onLearn: showLearn,
-  });
-  navigate(pageFromLocation(new URL(location.href), appBase, profile), {
-    replace: true,
-    focus: false,
-  });
-} catch (error) {
-  app.innerHTML = /* HTML */ `<div class="loading-state">
-    <h1>Couldn’t load Tone Tower.</h1>
-    <p>${escape(errorMessage(error))}</p>
-    <p>Check your connection, then try again.</p>
-    <button class="primary" id="reload" type="button">Try again</button>
-  </div>`;
-  required(app, '#reload').onclick = () => location.reload();
-}
+navigate(pageFromLocation(new URL(location.href), appBase, profile), {
+  replace: true,
+  focus: false,
+});
 
 function updateKeyboardViewport() {
   const viewport = window.visualViewport;

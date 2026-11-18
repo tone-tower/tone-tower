@@ -5,10 +5,10 @@ import type { LanguageProfile, ExerciseRow } from '../types.ts';
 interface Options {
   dialogBody: HTMLElement;
   profile: LanguageProfile;
-  getRows: () => ExerciseRow[];
-  openDialog: (html: string) => void;
+  loadRows: () => Promise<ExerciseRow[]>;
+  openDialog: (html: string, opener?: HTMLElement) => void;
 }
-export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }: Options) {
+export function createCreditsDialog({ dialogBody, profile, loadRows, openDialog }: Options) {
   const safeHref = (value: string | undefined) => {
     try {
       const u = new URL(value ?? '');
@@ -17,8 +17,7 @@ export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }
       return '#';
     }
   };
-  return function showCredits() {
-    const data = getRows();
+  return function showCredits(opener?: HTMLElement) {
     openDialog(
       /* HTML */ `<div class="eyebrow">Sources & licences</div>
         <h2 id="dialog-title">Voices & credits</h2>
@@ -52,14 +51,16 @@ export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }
             autocomplete="off"
         /></label>
         <div id="credit-results"></div>`,
+      opener,
     );
     const results = required(dialogBody, '#credit-results'),
       search = required(dialogBody, '#credit-search');
-    let page = 0,
+    let data: ExerciseRow[] | null = null,
+      page = 0,
       query = '',
       debounce: ReturnType<typeof setTimeout>;
     function draw() {
-      if (!results.isConnected) return;
+      if (!data || !results.isConnected) return;
       const matches = filterCredits(data, query),
         view = creditsPage(matches, page);
       page = view.page;
@@ -143,6 +144,21 @@ export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }
         draw();
       }, 120);
     });
-    draw();
+    async function load() {
+      results.innerHTML = '<p role="status">Loading recording credits…</p>';
+      try {
+        data = await loadRows();
+        draw();
+      } catch {
+        if (!results.isConnected) return;
+        results.innerHTML =
+          '<p class="error" role="alert">Couldn’t load the recording credits.</p><button class="secondary" type="button">Try again</button>';
+        required(results, 'button').onclick = () => {
+          search.focus({ preventScroll: true });
+          void load();
+        };
+      }
+    }
+    void load();
   };
 }

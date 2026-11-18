@@ -20,6 +20,12 @@ interface CountdownOptions {
   onTick?: (left: number, total: number) => void;
   onExpire?: () => void;
 }
+interface ExitConfirmation {
+  title: string;
+  message: string;
+  action: string;
+  confirm: () => void;
+}
 interface ControllerOptions {
   profile: LanguageProfile;
   app: HTMLElement;
@@ -158,7 +164,8 @@ export function createGameController({
     towerReady = true,
     outcome: RunResult | null = null,
     answeredPosition = 1;
-  let restoreFocus: string | null = null,
+  let restoreFocus: HTMLElement | null = null,
+    exitConfirmation: ExitConfirmation | null = null,
     observer: MutationObserver | null = null,
     sceneAnimator: ReturnType<typeof animateWorld> | null = null,
     entryVisual = false;
@@ -562,17 +569,19 @@ export function createGameController({
     >
       <div class="pause-card">
         <p class="eyebrow">Paused</p>
-        <h2 id="pause-title">Run paused.</h2>
-        <p>Reloading or closing this page ends the run. Resume to continue.</p>
+        <h2 id="pause-title">${escape(exitConfirmation?.title ?? 'Run paused.')}</h2>
+        <p>
+          ${escape(exitConfirmation?.message ?? 'Reloading or closing this page ends the run. Resume to continue.')}
+        </p>
         <div class="game-actions">
           <button class="primary" id="resume-game" type="button">
             Resume <span aria-hidden="true">→</span></button
-          >${run.config.practice ? '<button class="secondary" id="finish-paused-practice" type="button">Finish practice</button>' : ''}<button
+          >${run.config.practice && !exitConfirmation ? '<button class="secondary" id="finish-paused-practice" type="button">Finish practice</button>' : ''}<button
             class="quiet"
             id="end-run"
             type="button"
           >
-            End run & return
+            ${escape(exitConfirmation?.action ?? 'End run & return')}
           </button>
         </div>
       </div>
@@ -868,8 +877,9 @@ export function createGameController({
     q('#continue-game')?.addEventListener('click', advance);
     q('#resume-game')?.addEventListener('click', resume);
     q('#end-run')?.addEventListener('click', () => {
+      const leave = exitConfirmation?.confirm ?? onHome;
       dispose();
-      onHome();
+      leave();
     });
     q('#finish-practice')?.addEventListener('click', finishPractice);
     q('#finish-paused-practice')?.addEventListener('click', finishPractice);
@@ -1168,10 +1178,10 @@ export function createGameController({
     detach();
     onFinish(completed);
   }
-  function pause(reason = 'manual') {
+  function pause(reason = 'manual', opener = doc?.activeElement) {
     if (!active || paused) return;
     captureInput();
-    restoreFocus = doc?.activeElement?.id ?? null;
+    restoreFocus = opener instanceof HTMLElement ? opener : null;
     paused = true;
     pauseReason = reason;
     clock.pause();
@@ -1179,13 +1189,18 @@ export function createGameController({
     stopPlayback();
     render();
   }
+  function confirmExit(confirmation: ExitConfirmation) {
+    if (!active) return;
+    exitConfirmation = confirmation;
+    if (paused) render();
+    else pause();
+  }
   function resume() {
     if (!active || !paused || dialog?.open || doc?.hidden) return;
     paused = false;
     pauseReason = '';
+    exitConfirmation = null;
     render({ focus: false });
-    if (restoreFocus) q('#' + restoreFocus)?.focus();
-    else if (isTide()) q('#transcription-answer')?.focus();
     if (['listening', 'answering'].includes(phase)) {
       if (entryVisual) playOpening();
       else if (!audioReady) playPrompt();
@@ -1193,9 +1208,19 @@ export function createGameController({
       enableAnswers();
     } else if (towerStop() && !towerReady) unlockTowerStop();
     else if (phase === 'correct' && !towerStop()) scheduleAdvance();
+    const previous = restoreFocus?.isConnected
+      ? restoreFocus
+      : restoreFocus?.id
+        ? doc?.getElementById(restoreFocus.id)
+        : null;
+    restoreFocus = null;
+    if (previous && previous !== doc?.body && !previous.matches(':disabled'))
+      previous.focus({ preventScroll: true });
+    else if (['review', 'landing'].includes(phase)) q('#continue-game')?.focus();
+    else if (isTide()) q('#transcription-answer')?.focus();
   }
   function keydown(event: KeyboardEvent) {
-    if (!active || dialog?.open || doc?.hidden) return;
+    if (!active || event.defaultPrevented || dialog?.open || doc?.hidden) return;
     if (paused && event.key === 'Tab') {
       const controls = ['#resume-game', '#finish-paused-practice', '#end-run']
         .map(q)
@@ -1211,24 +1236,32 @@ export function createGameController({
       return;
     }
     if (event.repeat || event.isComposing) return;
-    const target = event.target instanceof HTMLElement ? event.target : null;
-    const tag = target?.tagName.toLowerCase() ?? '',
-      typing = ['input', 'textarea', 'select'].includes(tag) || target?.isContentEditable;
     if (event.key === 'Escape') {
       event.preventDefault();
       paused ? resume() : pause();
       return;
     }
     if (paused) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target !== doc?.body && target !== doc?.documentElement && !app.contains(target))
+      return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (
+      (event.key === ' ' || event.key === 'Enter') &&
+      target?.closest('button, a[href], summary, [role="button"], [role="link"]')
+    )
+      return;
+    const typing = target?.closest('input, textarea, select, [contenteditable]');
+    if (typing && typing !== q('#transcription-answer')) return;
     const replayKey =
       event.key === ' ' ||
       (event.key.toLowerCase() === 'r' && (!isTide() || !profile.allowWordSpaces));
-    if (!event.ctrlKey && !event.metaKey && !event.altKey && replayKey) {
+    if (replayKey) {
       event.preventDefault();
       replay();
       return;
     }
-    if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (typing) return;
     if (event.key === 'Enter' && (['review', 'landing'].includes(phase) || towerTerminal())) {
       event.preventDefault();
       advance();
@@ -1252,6 +1285,8 @@ export function createGameController({
     stop();
     active = false;
     paused = false;
+    exitConfirmation = null;
+    restoreFocus = null;
     phase = 'idle';
     detach();
   }
@@ -1266,6 +1301,7 @@ export function createGameController({
       return run;
     },
     pause,
+    confirmExit,
     resume,
     dispose,
     setScript(nextScript: string) {

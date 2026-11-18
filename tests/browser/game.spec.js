@@ -90,6 +90,55 @@ async function expectNoOverflow(page) {
   );
 }
 
+test('buttons keep keyboard activation and closing game dialogs restores their opener', async ({
+  page,
+}) => {
+  await start(page, 'tone');
+  await page.clock.runFor(2200);
+  const plays = () => page.evaluate(() => window.__audioPlays.length);
+  const before = await plays();
+  await page.locator('#pause-run').press('Space');
+  await expect(page.locator('#resume-game')).toBeFocused();
+  expect(await plays()).toBe(before);
+  await page.locator('#resume-game').press('Enter');
+  await expect(page.locator('#pause-run')).toBeFocused();
+
+  for (const selector of ['#learn', '#credits']) {
+    const opener = page.locator(selector);
+    await opener.press('Enter');
+    await expect(page.locator('#dialog')).toBeVisible();
+    await page.locator('#close-dialog').press('Space');
+    await expect(page.locator('#dialog')).toBeHidden();
+    await expect(page.locator('.pause-overlay')).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  }
+});
+
+test('language switching pauses a run until the player confirms or resumes', async ({ page }) => {
+  await start(page, 'tide');
+  await page.clock.runFor(150);
+  const input = page.locator('#transcription-answer');
+  await input.fill('zz');
+  const clock = page.locator('#countdown');
+  const remaining = await clock.textContent();
+  const requestSwitch = async () => {
+    await page.locator('.language-switcher summary').click();
+    await page.locator('[data-language-link="cmn"]').click();
+    await expect(page.getByRole('heading', { name: 'Switch to Mandarin?' })).toBeVisible();
+  };
+  await requestSwitch();
+  await page.clock.runFor(5000);
+  await expect(clock).toHaveText(remaining);
+  await expect(page).toHaveURL(/\/cantonese\/$/);
+  await page.locator('#resume-game').click();
+  await expect(input).toHaveValue('zz');
+  await expect(page.locator('.pause-overlay')).toHaveCount(0);
+  await requestSwitch();
+  await page.getByRole('button', { name: 'End run & switch language' }).click();
+  await expect(page).toHaveURL(/\/mandarin\/$/);
+  await expect(page.locator('#start-adventure')).toBeVisible();
+});
+
 test('Tower intro, crossing, mistake review and failed-run practice', async ({ page }) => {
   await start(page, 'tone');
   await page.clock.runFor(1900);

@@ -4,7 +4,11 @@ import { aboutPageMarkup, soundPageMarkup } from '../../src/ui/info-pages.js';
 import { catalogRows, referenceRows } from '../../src/content/catalog.ts';
 import { languageSwitcherMarkup } from '../../src/ui/site-controls.ts';
 const escape = (value) =>
-  String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  String(value).replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character],
+  );
 export const generatedFiles = [
   ...Object.values(pages).map((page) => page.path + 'index.html'),
   'sitemap.xml',
@@ -68,6 +72,34 @@ export function renderPage(template, key, catalog) {
   );
   const rows = catalog ? catalogRows(catalog, profile) : [],
     anchors = catalog ? referenceRows(catalog, rows) : [];
+  const guide = soundPageMarkup(anchors, profile.toneDefinitions, rows, profile);
+  if (catalog) {
+    // Use the recordings the guide actually resolved, including any fallback examples.
+    const guideIds = new Set([...guide.matchAll(/\bdata-guide-word="([^"]+)"/g)].map((m) => m[1]));
+    const referenceIds = new Set(catalog.references.map((reference) => reference.recordingId));
+    const recordings = catalog.recordings.filter(
+      (recording) => referenceIds.has(recording.id) || guideIds.has(escape(recording.id)),
+    );
+    const pronunciationIds = new Set(recordings.map((recording) => recording.pronunciationId));
+    const pronunciations = catalog.pronunciations.filter((p) => pronunciationIds.has(p.id));
+    const entryIds = new Set(pronunciations.map((p) => p.entryId));
+    const guideCatalog = {
+      version: catalog.version,
+      language: catalog.language,
+      transcriptionSystem: catalog.transcriptionSystem,
+      entries: catalog.entries.filter((entry) => entryIds.has(entry.id)),
+      pronunciations,
+      recordings,
+      references: catalog.references,
+      availability: catalog.availability,
+    };
+    const json = JSON.stringify(guideCatalog).replace(/</g, '\\u003c');
+    html = html.replace(
+      '</body>',
+      () =>
+        `<script type="application/json" id="guide-catalog" data-recording-count="${rows.length}">${json}</script>\n</body>`,
+    );
+  }
   let content;
   if (page === 'about')
     content = aboutPageMarkup({
@@ -75,7 +107,7 @@ export function renderPage(template, key, catalog) {
       profile,
       availability: catalog?.availability,
     });
-  if (page === 'sounds') content = soundPageMarkup(anchors, profile.toneDefinitions, rows, profile);
+  if (page === 'sounds') content = guide;
   if (page === 'practice')
     content =
       '<div class="loading-state"><h1>Practice Workshop</h1><p>' +
