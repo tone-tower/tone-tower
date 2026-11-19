@@ -153,20 +153,56 @@ test('Tower intro, crossing, mistake review and failed-run practice', async ({ p
   await page.clock.runFor(2700);
   expect(await page.evaluate(() => window.__audioPlays.length)).toBe(2);
   await expect(page.locator('[data-tone]').first()).toBeEnabled();
+  let finalTones;
   for (let miss = 1; miss <= 4; miss++) {
+    finalTones = await page
+      .locator('[data-tone]')
+      .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort());
     const correct = await currentTone(page);
     await page.locator(`[data-tone]:not([data-tone="${correct}"])`).first().click();
-    await expect(page.locator('#practise-mistakes')).toHaveCount(0);
     if (miss < 4) {
+      await expect(page.locator('#practise-mistakes')).toHaveCount(0);
       await expect(page.locator('#ending-practice')).toHaveCount(0);
       await page.locator('#continue-game').click();
       await page.clock.runFor(150);
     }
   }
   await page.clock.runFor(2900);
-  await expect(page.locator('#ending-practice')).toBeEnabled();
-  await page.locator('#ending-practice').click();
+  await expect(page.getByRole('button', { name: 'Practice your mistakes' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Practice this tone combination' }).click();
   await expect(page.getByRole('heading', { name: 'Practice tones' })).toBeVisible();
+  await expect(page.locator('.game-progress-label')).toHaveText('0 / 20');
+  expect(
+    await page
+      .locator('[data-tone]')
+      .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort()),
+  ).toEqual(finalTones);
+  await expectNoOverflow(page);
+});
+
+test('Cantonese practice labels all six tones and uses the selected pair', async ({ page }) => {
+  await page.locator('#setup-practice').click();
+  const tones = page.getByRole('group', { name: 'Tones to practise' });
+  await expect(tones.locator('.practice-tone-description')).toHaveText([
+    'High and level',
+    'Rises high',
+    'Middle and level',
+    'Low and falling',
+    'Rises from low',
+    'Low and level',
+  ]);
+  for (const tone of [1, 4, 5, 6]) {
+    const choice = tones.getByRole('button', { name: 'Tone ' + tone, exact: true });
+    await expect(choice).toHaveAttribute('aria-pressed', 'true');
+    await choice.click();
+    await expect(choice).toHaveAttribute('aria-pressed', 'false');
+  }
+  await page.locator('#start-adventure').click();
+  await page.clock.runFor(150);
+  const choices = await page
+    .locator('[data-tone]')
+    .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort());
+  expect(choices).toEqual(['2', '3']);
   await expectNoOverflow(page);
 });
 
@@ -288,7 +324,17 @@ test('missed-sound practice retains multi-syllable recordings from the tower', a
   await page.reload();
   await start(page, 'tone');
   await page.clock.runFor(2200);
+  const missed = [];
+  const prompt = () =>
+    page.evaluate(() => ({
+      audio: window.__audioPlays.at(-1),
+      target: [...document.querySelectorAll('.prompt-syllable')].findIndex((item) =>
+        item.classList.contains('is-target'),
+      ),
+      tones: [...document.querySelectorAll('[data-tone]')].map((door) => door.dataset.tone),
+    }));
   for (let miss = 0; miss < 4; miss++) {
+    missed.push(await prompt());
     const correct = await currentTone(page);
     await page
       .locator('[data-tone]:not([data-tone="' + correct + '"])')
@@ -300,7 +346,29 @@ test('missed-sound practice retains multi-syllable recordings from the tower', a
     }
   }
   await page.clock.runFor(2900);
-  await page.locator('#ending-practice').click();
+  await page.getByRole('button', { name: 'Practice your mistakes' }).click();
   await expect(page.getByRole('heading', { name: 'Practice tones' })).toBeVisible();
+  await expect(page.locator('.game-progress-label')).toHaveText('0 / 4');
+  for (let i = 0; i < missed.length; i++) {
+    await page.clock.runFor(800);
+    expect(await prompt()).toEqual(missed[i]);
+    await page
+      .locator('[data-tone]')
+      .nth(i % 2)
+      .click();
+    if (i < missed.length - 1) {
+      if ((await page.locator('#app').getAttribute('data-outcome')) === 'wrong')
+        await page.locator('#continue-game').click();
+      else await page.clock.runFor(1700);
+    }
+  }
+  await page.clock.runFor(100);
+  await page.getByRole('button', { name: 'See practice results' }).click();
+  await expect(page.getByRole('heading', { name: 'Practice complete' })).toBeVisible();
+  await expect(page.locator('.results-actions button')).toHaveCount(2);
+  await expect(page.getByText('One to listen to again')).toHaveCount(0);
+  await expect(page.getByText('Copy session summary')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Practice again' }).click();
+  await expect(page.locator('.game-progress-label')).toHaveText('0 / 4');
   await expectNoOverflow(page);
 });

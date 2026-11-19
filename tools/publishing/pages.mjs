@@ -105,7 +105,6 @@ export function renderPage(template, key, catalog) {
     content = aboutPageMarkup({
       recordingCount: rows.length,
       profile,
-      availability: catalog?.availability,
     });
   if (page === 'sounds') content = guide;
   if (page === 'practice')

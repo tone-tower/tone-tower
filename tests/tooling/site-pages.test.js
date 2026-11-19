@@ -36,7 +36,6 @@ test('language pages have static content, independent navigation, metadata and p
     assert.equal((html.match(/id="progress"/g) ?? []).length, 0);
     assert.equal((html.match(/data-nav-page="about"/g) ?? []).length, 1);
     assert.ok(!html.includes('{{'));
-    assert.equal(html.includes('id="script-display"'), profile.scripts.length > 1);
     assert.ok(html.includes(profile.guideName ?? profile.romanization + ' guide'));
     const base = new URL(
       html.match(/data-site-root="([^"]+)"/)[1],
@@ -48,13 +47,12 @@ test('language pages have static content, independent navigation, metadata and p
     if (metadata.page === 'about') {
       assert.ok(html.includes('data-info-action="reset"'));
       assert.ok(!html.includes('data-info-action="records"'));
+      assert.ok(!html.includes('Progress and privacy'));
+      assert.ok(!html.includes('What you can practise'));
       for (const heading of [
-        'What you can practise',
         'Games and practice',
         'Recordings and sources',
-        'Progress and privacy',
-        'An open-source side project',
-        'Help make it better',
+        'Contribute to Tone Tower',
       ])
         assert.ok(html.includes(heading), profile.id + ': ' + heading);
       assert.ok(html.includes('info-grid'));

@@ -107,9 +107,22 @@ test('Pinyin examples follow script settings and the in-game quick guide stays c
   page,
 }) => {
   await page.goto('/mandarin/');
-  await page.locator('.language-switcher summary').click();
-  await page.locator('#script-display').selectOption('traditional');
-  await page.keyboard.press('Escape');
+  const characters = page.getByRole('group', { name: 'Character style' });
+  const simplified = characters.getByRole('radio', { name: 'Simplified' });
+  const traditional = characters.getByRole('radio', { name: 'Traditional' });
+  await expect(simplified).toBeChecked();
+  const selectedColor = await characters
+    .locator('input:checked + span')
+    .evaluate((label) => getComputedStyle(label).backgroundColor);
+  await simplified.press('ArrowRight');
+  await expect(traditional).toBeChecked();
+  await expect(characters.locator('input:checked + span')).toHaveCSS(
+    'background-color',
+    selectedColor,
+  );
+  await expect(traditional).toBeInViewport();
+  await page.reload();
+  await expect(traditional).toBeChecked();
   await page.locator('#learn').click();
   await expect(page.locator('.guide-tones [data-guide-tone="3"]')).toContainText('馬');
   await expect(page.locator('.guide-tones [data-guide-tone="5"]')).toContainText('媽媽');

@@ -2,7 +2,12 @@ import { practiceSpelling } from '../../src/languages/jyutping.ts';
 import { cantonese } from '../../src/languages/profiles.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { createRun, defaultPractice, validatePractice } from '../../src/game/game-core.ts';
+import {
+  createRun,
+  defaultPractice,
+  practiceForRun,
+  validatePractice,
+} from '../../src/game/game-core.ts';
 
 const words = Array.from({ length: 240 }, (_, i) => {
   const tone = (i % 6) + 1;
@@ -81,6 +86,29 @@ test('Skyrail stages shorten the deadline; full typing requires tone digits', ()
     }
     assert.equal(run.status, 'won');
   }
+});
+
+test('Tower combination practice uses all doors from the final floor for 20 attempts', () => {
+  const options = { profile: cantonese, random };
+  const run = createRun({ challenge: 'tone', variant: 'extreme' }, words, options);
+  for (let i = 0; i < 20; i++) {
+    clear(run);
+    run.next();
+  }
+  run.answer(run.choices.find((tone) => tone !== run.word.tone));
+  assert.equal(run.status, 'lost');
+  assert.equal(run.choices.length, 3);
+  const review = createRun(practiceForRun(run, 'combination'), words, options);
+  const heard = new Set();
+  for (let i = 0; i < 20; i++) {
+    assert.deepEqual(review.choices, run.choices);
+    heard.add(review.word.tone);
+    review.answer(review.choices.find((tone) => tone !== review.word.tone));
+    review.next();
+  }
+  assert.deepEqual([...heard].sort(), run.choices);
+  assert.equal(review.status, 'complete');
+  assert.equal(review.mistakes, 20);
 });
 
 test('wrong typing is free; timeout and reveal cost one life without progress', () => {

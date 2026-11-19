@@ -118,7 +118,8 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await page.goto('/');
   await page.locator('.language-card--vietnamese').click();
   await expect(page).toHaveURL(/\/vietnamese\/$/);
-  await expect(page.locator('h1')).toHaveText('Tone Tower');
+  await expect(page.locator('h1')).toHaveText('Practice Vietnamese tones');
+  await expect(page.locator('#destination-title')).toHaveText('Tone Tower');
   await expect(page.locator('.mode-picker')).toHaveCount(0);
   await expect(page.locator('[data-destination="rail"]:visible')).toHaveCount(0);
   await expect(page.locator('.language-switcher')).toContainText('Vietnamese');
@@ -215,7 +216,7 @@ test('six doors show tone marks and names, and every cover leaves once a door is
     'href',
     /github\.com.*issues\/new/,
   );
-  await page.clock.runFor(1000);
+  await page.clock.runFor(1900);
   await expect(page.locator('.tone-cover.is-leaving')).toHaveCount(0);
   await expect(page.locator('.tone-cover')).toHaveCount((await current(page)).parts.length);
   await noOverflow(page);

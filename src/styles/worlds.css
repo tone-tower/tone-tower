@@ -1479,10 +1479,6 @@ html {
   color: var(--edge);
   margin: 8px 0 15px;
 }
-.run-conclusion .eyebrow {
-  font-size: 9px;
-  color: var(--gold);
-}
 .run-conclusion .ending-word {
   border-top: 1px solid #405b65;
   padding-top: 12px;
@@ -1634,10 +1630,6 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
   }
   .run-conclusion > p {
     font-size: 11px;
-  }
-  .run-conclusion .eyebrow {
-    font-size: 7px;
-    letter-spacing: 1px;
   }
   .run-conclusion .results-actions {
     gap: 8px;
@@ -1830,7 +1822,7 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
   }
 }
 
-/* Practice keeps the starting Tower or Skyrail scene, with no climb, deadline or checkpoints. */
+/* Practice shows the question count in the HUD. */
 #app[data-practice='true'] .scene-status {
   position: static !important;
   width: auto !important;
@@ -1857,44 +1849,12 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
   padding: 10px 15px;
   border-top: 1px solid #526e76;
 }
-#app[data-practice='true'] .scene-content {
-  transform: none;
-}
-#app[data-practice='true'] .tone-door.is-correct .tone-symbol,
-#app[data-practice='true'] .tone-door.is-correct .door-key {
-  animation: none;
-}
 @media (max-width: 700px) {
   #app[data-practice='true'] .scene-status {
     margin-left: auto;
   }
   #app[data-practice='true'] .game-progress-label {
     font-size: 9px;
-  }
-}
-
-.practice-tone-contour {
-  width: 42px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 4;
-  stroke-linecap: round;
-}
-.world-scene[data-count='4'] .practice-tone-contour,
-.world-scene:is([data-count='5'], [data-count='6']) .practice-tone-contour {
-  width: 27px;
-  height: 10px;
-}
-@media (max-width: 700px) {
-  .practice-tone-contour {
-    width: 30px;
-    height: 12px;
-  }
-  .world-scene[data-count='4'] .practice-tone-contour,
-  .world-scene:is([data-count='5'], [data-count='6']) .practice-tone-contour {
-    width: 20px;
-    height: 8px;
   }
 }
 
@@ -2032,6 +1992,9 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
   letter-spacing: 0;
   text-shadow: 1px 1px #172b38;
 }
+[data-language='cmn'] .tone-door.has-mark .tone-name {
+  font-weight: 500;
+}
 .tone-door.has-mark .door-key {
   margin-top: 5px;
 }
@@ -2043,12 +2006,6 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
 }
 .tone-door.has-mark .tone-name {
   white-space: nowrap;
-}
-/* The mark and its name leave no room for a pitch line on the smaller doors. */
-.world-scene:is([data-count='4'], [data-count='5'], [data-count='6'])
-  .has-mark
-  .practice-tone-contour {
-  display: none;
 }
 @media (max-width: 700px) {
   .tone-door .tone-mark {
@@ -2065,8 +2022,7 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
     margin-top: 1px;
   }
   /* Small touch doors keep the mark and its name; the number-key hint would not fit. */
-  .world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .door-key,
-  .tone-door.has-mark .practice-tone-contour {
+  .world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .door-key {
     display: none;
   }
   .world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .tone-door .tone-mark {

@@ -86,7 +86,7 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
       value: 5,
       symbol: '',
       markPath: '',
-      label: 'Neutral',
+      label: 'Neutral tone',
       name: 'Unmarked',
       description: 'Short and unstressed; pitch depends on context',
       path: 'M35 20 L65 20',

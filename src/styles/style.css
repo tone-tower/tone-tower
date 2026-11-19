@@ -353,9 +353,6 @@ p {
   color: var(--ink);
   padding: 12px;
 }
-.site-header #pause-game {
-  display: none;
-}
 .site-footer {
   display: flex;
   justify-content: space-between;
@@ -560,27 +557,6 @@ input[type='number'] {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-}
-.result-footnote,
-.result-footnote p {
-  font-size: 12px;
-  color: var(--edge);
-}
-.result-word {
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-}
-.result-word > span {
-  font-size: 32px;
-}
-.result-word small {
-  font-size: 20px;
-  display: block;
-}
-.last-word {
-  max-width: 480px;
-  margin: 22px auto;
 }
 .dialog-close {
   float: right;
@@ -825,6 +801,18 @@ input[type='number'] {
 .info-section b {
   color: var(--cream);
 }
+.recordings-disclosure {
+  padding: 0;
+}
+.recordings-disclosure[open] {
+  padding-bottom: 16px;
+}
+.recordings-disclosure summary {
+  padding: 14px 0;
+  color: var(--teal);
+  font-weight: 650;
+  cursor: pointer;
+}
 .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1028,7 +1016,7 @@ input[type='number'] {
   gap: 16px;
   margin-bottom: 12px;
 }
-.mode-picker-heading h1 {
+.mode-picker-heading h2 {
   font:
     650 15px DM,
     system-ui,
@@ -1168,7 +1156,7 @@ input[type='number'] {
     gap: 8px;
     flex-direction: column;
   }
-  .mode-picker-heading h1 {
+  .mode-picker-heading h2 {
     font-size: 15px;
   }
   .mode-picker-heading p {
@@ -1470,16 +1458,40 @@ input[type='number'] {
   justify-content: center;
   gap: 5px;
 }
-.practice-tone-options svg {
-  width: 30px;
-  height: 13px;
-  fill: none;
-  stroke: var(--cream);
-  stroke-width: 4;
-  stroke-linecap: round;
-}
 .home-world .home-map-layout .practice-tone-options button {
   min-height: 51px;
+}
+.practice-tone-options--numbered {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.home-world .home-map-layout .practice-tone-options--numbered button {
+  align-items: flex-start;
+  gap: 3px;
+  min-height: 58px;
+  padding: 8px 6px;
+  text-align: left;
+}
+.practice-tone-options--numbered .practice-tone-label {
+  color: var(--cream);
+  font:
+    700 13px/1.25 DM,
+    system-ui,
+    sans-serif;
+}
+.practice-tone-options--numbered button[aria-pressed='true'] .practice-tone-label::after {
+  content: '✓';
+  margin-inline-start: 5px;
+  color: var(--teal);
+}
+.practice-tone-description {
+  color: #c7dbd3;
+  font:
+    400 11px/1.25 DM,
+    system-ui,
+    sans-serif;
+  text-wrap: balance;
 }
 .skyrail-example {
   display: flex;
@@ -1507,9 +1519,6 @@ input[type='number'] {
   }
   .practice-setup .practice-spelling-options label {
     line-height: 1.4;
-  }
-  .practice-tone-options svg {
-    width: 25px;
   }
 }
 
@@ -1988,26 +1997,46 @@ input[type='number'] {
 .language-card > span:last-child {
   font-weight: 700;
 }
-.script-setting {
+.site-footer .script-setting {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 14px 6px 6px;
-  border-top: 1px solid #405b65;
+  min-width: 0;
+  margin: 0 0 0 auto;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid #54766e;
+  border-radius: 7px;
+  background: #162d37;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
 }
-.script-setting select {
+.script-option {
+  position: relative;
+}
+.script-option input {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  font:
-    13px DM,
-    system-ui,
-    sans-serif;
-  padding: 8px 10px;
-  border-radius: 4px;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.script-option span {
+  display: grid;
+  place-items: center;
   min-height: 44px;
-  background: var(--ink);
+  padding-inline: 10px;
+  border-radius: 4px;
+  color: #c0d5d0;
+}
+.script-option input:checked + span {
+  background: #315e46;
   color: var(--cream);
-  border: 1px solid #647b7c;
+}
+.script-option input:focus-visible + span {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
 }
 .site-header {
   justify-content: flex-start;
@@ -2078,9 +2107,6 @@ input[type='number'] {
   font-size: 11px;
   font-weight: 650;
 }
-.script-setting .language-menu-label {
-  padding: 0;
-}
 .language-options {
   display: grid;
   gap: 4px;
@@ -2122,9 +2148,6 @@ input[type='number'] {
 }
 .practice-tone-label {
   font-size: 10px;
-}
-.practice-tone-options .is-number + .practice-tone-label {
-  display: none;
 }
 @media (max-width: 700px) {
   .site-header {
@@ -2199,8 +2222,6 @@ html[data-language='vi']
     .syllable-parts b,
     .syllable-result small,
     .practice-tone-options,
-    .result-word,
-    .last-word,
     .ending-word,
     .credits-table td:first-child
   ) {
@@ -2262,9 +2283,6 @@ html[data-language='vi'] .site-header {
   .language-card {
     padding: 1.4rem;
   }
-  .script-setting {
-    flex-wrap: wrap;
-  }
 }
 
 .pinyin-guide .guide-tones {
@@ -2309,26 +2327,77 @@ html[data-language='vi'] .site-header {
   width: 14%;
   height: 17%;
 }
-.home-intro {
+.home-welcome {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px 16px;
-  margin: 18px 0 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin: 22px 0 18px;
 }
-.home-intro-title {
-  color: var(--cream);
-  font-size: 22px;
-  font-weight: 700;
+.home-welcome h1 {
   margin: 0;
+  color: var(--cream);
+  font:
+    700 clamp(23px, 4.2vw, 38px)/1.12 DM,
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
 }
-.home-guide-link {
-  margin-left: auto;
+.home-guide-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 6px 10px;
+  border: 1px solid #54766e;
+  border-radius: 8px;
+  background: #223c42;
+  color: var(--cream);
+  text-decoration: none;
+}
+.home-guide-card:hover {
+  background: #2b494e;
+  border-color: var(--teal);
+}
+.home-guide-sample {
+  display: grid;
+  place-items: center;
+  min-height: 28px;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  padding-inline: 7px;
   white-space: nowrap;
+  border-radius: 4px;
+  background: #162d37;
   color: var(--teal);
-  font-size: 13px;
-  text-underline-offset: 4px;
+  font:
+    650 14px/1 DM,
+    system-ui,
+    sans-serif;
+}
+.home-guide-card strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+.home-guide-arrow {
+  flex-shrink: 0;
+  color: var(--teal);
+  font-size: 16px;
+  line-height: 1;
+}
+.home-welcome + .mode-picker {
+  margin-top: 0;
+}
+@media (max-width: 600px) {
+  .home-welcome {
+    margin: 15px 0;
+    gap: 9px;
+  }
+  .home-guide-card {
+    width: 100%;
+  }
 }
 
 .language-chooser .site-footer {

@@ -1,5 +1,5 @@
 import { toneLabel } from '../ui/tone-presentation.ts';
-import { createGameMarkup } from './game-markup.ts';
+import { createGameMarkup, runConclusionMarkup } from './game-markup.ts';
 import { query, queryAll, required, escape, errorMessage } from '../ui/dom.ts';
 import type {
   Run,
@@ -38,7 +38,7 @@ interface ControllerOptions {
   victoryMessage?: (run: Run) => string;
   onRetry?: (config: RunInput) => void;
   onHome?: () => void;
-  onPractice?: (run: Run) => void;
+  onPractice?: (run: Run, mode: 'combination' | 'mistakes') => void;
   onLearn?: (options: { returnToGame: boolean }) => void;
   environment?: CountdownOptions & {
     document?: Document;
@@ -213,6 +213,7 @@ export function createGameController({
     attached = true;
     doc?.addEventListener('keydown', keydown);
     doc?.addEventListener('visibilitychange', visibility);
+    app.addEventListener('pointerdown', keepTypingFocus);
     dialog?.addEventListener('close', dialogClosed);
     const Observer = environment.MutationObserver ?? globalThis.MutationObserver;
     if (Observer && dialog) {
@@ -227,6 +228,7 @@ export function createGameController({
     attached = false;
     doc?.removeEventListener('keydown', keydown);
     doc?.removeEventListener('visibilitychange', visibility);
+    app.removeEventListener('pointerdown', keepTypingFocus);
     dialog?.removeEventListener('close', dialogClosed);
     observer?.disconnect();
     observer = null;
@@ -241,12 +243,20 @@ export function createGameController({
     const input = q('#transcription-answer')!;
     if (input) inputValue = input.value;
   }
+  function keepTypingFocus(event: PointerEvent) {
+    // Let the action finish before a phone keyboard can close and move its target.
+    if (
+      event.button === 0 &&
+      isTide() &&
+      doc?.activeElement === q('#transcription-answer') &&
+      event.target instanceof Element &&
+      event.target.closest('button, a[href]')
+    )
+      event.preventDefault();
+  }
   function position() {
-    if (run.config.practice && run.config.format === 'drill') return 1;
-    return Math.max(
-      1,
-      Math.min(100, phase === 'correct' || phase === 'landing' ? answeredPosition : run.opened + 1),
-    );
+    const floor = phase === 'correct' || phase === 'landing' ? answeredPosition : run.opened + 1;
+    return run.config.practice && run.config.format === 'drill' ? floor : Math.min(100, floor);
   }
   function district() {
     return (
@@ -344,7 +354,7 @@ export function createGameController({
   }
   const terminal = () => !run.config.practice && run.status !== 'playing';
   function sceneContinue() {
-    if (isTide() && run.config.practice && run.status === 'complete')
+    if (isTide() && run.config.practice && run.status !== 'playing')
       return '<div class="scene-review-action"><button class="primary" id="continue-game" type="button">See results <kbd>Enter</kbd> →</button></div>';
     return phase === 'review' && run.status === 'playing'
       ? '<div class="scene-review-action"><span>' +
@@ -378,59 +388,6 @@ export function createGameController({
       '</p>' +
       towerContinue('Depart when ready') +
       '</section>'
-    );
-  }
-  function runConclusion() {
-    if (!terminal()) return '';
-    const won = run.status === 'won';
-    return (
-      '<section class="run-conclusion ' +
-      (!towerReady ? 'is-arriving' : '') +
-      '" aria-labelledby="run-end-title"><span class="eyebrow">' +
-      (won ? 'ADVENTURE COMPLETE' : 'RUN ENDED') +
-      '</span><h2 id="run-end-title">' +
-      (won
-        ? isTide()
-          ? 'Next stop: the horizon.'
-          : 'The whole tower is alight.'
-        : isTide()
-          ? 'Skyrail run ended.'
-          : 'Tower run ended.') +
-      '</h2><p>' +
-      run.opened +
-      ' ' +
-      (isTide() ? 'spans crossed' : 'floors lit') +
-      ' · ' +
-      run.mistakes +
-      ' ' +
-      (run.mistakes === 1 ? 'miss' : 'misses') +
-      (won ? ' · Journey complete.' : '.') +
-      '</p>' +
-      (won && victoryMessage(run)
-        ? '<p class="homecoming-message" role="status">' + escape(victoryMessage(run)) + '</p>'
-        : '') +
-      (!won
-        ? '<p class="ending-word">' +
-          escape(
-            run.word.syllables
-              .map((s) => (s.text === s.transcription ? s.text : s.text + ' ' + s.transcription))
-              .join(' · '),
-          ) +
-          ' <button class="text-button" id="ending-replay" type="button">▶ Listen again <kbd>Space</kbd></button></p>'
-        : '') +
-      '<div class="results-actions"><button class="primary" id="retry-run" type="button" ' +
-      (!towerReady ? 'disabled' : '') +
-      '>' +
-      (won ? 'A new adventure' : 'Try again') +
-      ' →</button><button class="secondary" id="ending-home" type="button" ' +
-      (!towerReady ? 'disabled' : '') +
-      '>Home</button>' +
-      (!won
-        ? '<button class="text-button" id="ending-practice" type="button" ' +
-          (!towerReady ? 'disabled' : '') +
-          '>Practise these sounds</button>'
-        : '') +
-      '</div></section>'
     );
   }
   function setRailNotice(text: string, kind = 'neutral') {
@@ -509,7 +466,7 @@ export function createGameController({
       auto = null;
       if (active && !paused && own === generation) {
         towerReady = true;
-        render({ focus: false });
+        render({ focus: terminal() && doc?.activeElement === q('#run-end-title') });
       }
     }, delay);
   }
@@ -532,7 +489,9 @@ export function createGameController({
           ? '✓ The last door opens. The summit is waiting.'
           : run.status === 'lost'
             ? 'No lives remain. The correct tone is ' + said(run.word.tone) + '.'
-            : '✓ Practice complete.'
+            : review
+              ? 'Not quite. The correct tone is ' + said(run.word.tone) + '.'
+              : '✓ Correct. Floor lit.'
         : review
           ? 'Not quite' +
             (run.lives === null ? '' : ' — 1 life lost') +
@@ -628,6 +587,7 @@ export function createGameController({
       recovered: outcome?.recovered || 0,
       lives: run.lives,
       maxLives: run.maxLives,
+      practice: run.config.practice && run.config.format === 'drill',
       timed: run.timeLimit() > 0,
       remaining: (clock.total ? clock.remaining : run.timeLimit()) / 1000,
       approach:
@@ -635,23 +595,6 @@ export function createGameController({
           ? Math.min(1, Math.max(0, 1 - clock.remaining / clock.total))
           : 0,
     };
-    if (run.config.practice && run.config.format === 'drill')
-      Object.assign(sceneState, {
-        scene: isTide() ? 'rail' : 'tone',
-        progress: 0,
-        floor: 0,
-        count: isTide() ? 2 : run.choices.length,
-        phase: 'answering',
-        reason: null,
-        selected: -1,
-        answer: -1,
-        practice: true,
-        recovered: 0,
-        lives: null,
-        maxLives: null,
-        timed: false,
-        entry: false,
-      });
     sceneAnimator.update(sceneState);
   }
   function render({ focus = true } = {}) {
@@ -717,7 +660,7 @@ export function createGameController({
       </div>
       ${isTide() ? /* HTML */ `<div class="typing-slot">${typedForm()}</div>` : ''}
       <div class="game-panel">
-        ${runConclusion()}
+        ${terminal() ? runConclusionMarkup(run, towerReady, run.status === 'won' ? victoryMessage(run) : '') : ''}
         <div class="feedback-zone"></div>
         <div class="game-actions">
           ${run.config.practice && run.status === 'playing' ? '<button class="quiet" id="finish-practice" type="button">Finish practice</button>' : ''}
@@ -778,11 +721,11 @@ export function createGameController({
     syncScene();
     if (focus) {
       if (terminal() && !paused) {
-        if (towerReady) q('#retry-run')?.focus({ preventScroll: true });
+        q('#run-end-title')?.focus({ preventScroll: true });
         return;
       }
       if (paused) q('#resume-game')?.focus({ preventScroll: true });
-      else if (['review', 'landing'].includes(phase))
+      else if (q('#continue-game') && ['review', 'landing'].includes(phase))
         q('#continue-game')?.focus({ preventScroll: true });
       else if (isTide()) {
         q('#transcription-answer')?.focus({ preventScroll: true });
@@ -864,13 +807,14 @@ export function createGameController({
         onHome();
       }
     });
-    q('#ending-practice')?.addEventListener('click', () => {
-      if (towerReady) {
-        const previous = run;
-        dispose();
-        onPractice(previous);
-      }
-    });
+    function startReview(mode: 'combination' | 'mistakes') {
+      if (!towerReady) return;
+      const previous = run;
+      dispose();
+      onPractice(previous, mode);
+    }
+    q('#ending-practice')?.addEventListener('click', () => startReview('combination'));
+    q('#practise-mistakes')?.addEventListener('click', () => startReview('mistakes'));
     q('#ending-replay')?.addEventListener('click', replay);
     q('#replay-word')?.addEventListener('click', replay);
     q('#pause-run')?.addEventListener('click', () => pause());
@@ -1092,7 +1036,7 @@ export function createGameController({
         auto = null;
         if (active && !paused && own === generation) advance();
       },
-      run.config.practice ? 900 : isTide() ? 900 : 1700,
+      isTide() ? 900 : 1700,
     );
   }
   function fail(reason: FailureReason) {
@@ -1137,8 +1081,8 @@ export function createGameController({
     if (!active || paused || !audioFailed) return;
     stop({ keepScene: true });
     try {
-      run.replace();
-      beginPrompt();
+      if (run.replace()) beginPrompt();
+      else if (run.config.practice) finishPractice();
     } catch (error) {
       interrupt(error);
     }
@@ -1150,7 +1094,7 @@ export function createGameController({
     phase = 'interrupted';
     app.innerHTML = /* HTML */ `<section class="game-panel">
       <p class="eyebrow">Recording unavailable</p>
-      <h1>We couldn’t find the next recording.</h1>
+      <h1 tabindex="-1">We couldn’t find the next recording.</h1>
       <p>${escape(errorMessage(error))}</p>
       <p>Your score has not changed.</p>
       <button class="primary" id="interrupted-home" type="button">Return home</button
@@ -1161,7 +1105,7 @@ export function createGameController({
       onHome();
     });
     q('#interrupted-finish')?.addEventListener('click', finishPractice);
-    q('#interrupted-home')?.focus();
+    q('h1')?.focus();
   }
   function finishPractice() {
     if (!active || !run.config.practice) return;
@@ -1214,13 +1158,22 @@ export function createGameController({
         ? doc?.getElementById(restoreFocus.id)
         : null;
     restoreFocus = null;
-    if (previous && previous !== doc?.body && !previous.matches(':disabled'))
+    if (terminal()) q('#run-end-title')?.focus({ preventScroll: true });
+    else if (isTide()) {
+      const control = q('#continue-game') ?? q('#transcription-answer');
+      control?.focus({ preventScroll: true });
+    } else if (previous && previous !== doc?.body && !previous.matches(':disabled'))
       previous.focus({ preventScroll: true });
     else if (['review', 'landing'].includes(phase)) q('#continue-game')?.focus();
-    else if (isTide()) q('#transcription-answer')?.focus();
   }
   function keydown(event: KeyboardEvent) {
-    if (!active || event.defaultPrevented || dialog?.open || doc?.hidden) return;
+    if (!active || event.defaultPrevented || doc?.hidden || event.isComposing) return;
+    // An Enter or Space held across a focus change must not activate the next control.
+    if (event.repeat && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      return;
+    }
+    if (dialog?.open || phase === 'interrupted') return;
     if (paused && event.key === 'Tab') {
       const controls = ['#resume-game', '#finish-paused-practice', '#end-run']
         .map(q)
@@ -1235,7 +1188,7 @@ export function createGameController({
       controls[next]?.focus();
       return;
     }
-    if (event.repeat || event.isComposing) return;
+    if (event.repeat) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       paused ? resume() : pause();

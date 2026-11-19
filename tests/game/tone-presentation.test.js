@@ -25,8 +25,10 @@ test('tone presentation follows explicit profile metadata, including named tones
   assert.throws(() => toneSymbolMarkup(other, 1), /Missing tone definition/);
 });
 
-test('character controls use the available writing systems rather than a fixed Chinese toggle', () => {
+test('character styles follow the profile and select the default writing system', () => {
   assert.equal(scriptSettingMarkup(cantonese), '');
+  assert.match(scriptSettingMarkup(mandarin), /<span>Simplified<\/span>/);
+  assert.match(scriptSettingMarkup(mandarin), /<span>Traditional<\/span>/);
   const other = {
     ...mandarin,
     scripts: ['latin', 'native'],
@@ -35,7 +37,9 @@ test('character controls use the available writing systems rather than a fixed C
   };
   const markup = scriptSettingMarkup(other);
   assert.match(markup, /Latin &amp; transliteration/);
-  assert.match(markup, /value="native" selected/);
+  assert.match(markup, /Native writing/);
+  assert.match(markup, /type="radio"/);
+  assert.match(markup, /value="native"\s+checked/);
   assert.doesNotMatch(markup, /simplified|traditional/);
 });
 

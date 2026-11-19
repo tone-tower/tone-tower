@@ -3,8 +3,6 @@ import { languages } from './languages/profiles.ts';
 export const site = {
   siteUrl: 'https://tone-tower.github.io/tone-tower/',
   repository: 'https://github.com/tone-tower/tone-tower',
-  maintainer: 'john0107',
-  maintainerUrl: 'https://github.com/john0107',
 };
 export function languagePages(
   profile: LanguageProfile,

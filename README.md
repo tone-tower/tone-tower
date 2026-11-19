@@ -4,7 +4,7 @@ Browser games for Cantonese Jyutping, Mandarin Pinyin and Vietnamese tones. Each
 
 [Play Tone Tower](https://tone-tower.github.io/tone-tower/) · [Report a problem](https://github.com/tone-tower/tone-tower/issues/new?template=bug-report.yml) · [Suggest an idea](https://github.com/tone-tower/tone-tower/issues/new?template=idea.yml)
 
-Maintained by [john0107](https://github.com/john0107). Feedback and contributions are welcome through GitHub Issues; reports are public.
+Feedback and contributions are welcome on GitHub. Issues and replies are public.
 
 ## Development
 

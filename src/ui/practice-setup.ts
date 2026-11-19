@@ -21,6 +21,7 @@ export function practiceSetupMarkup(
       .join('');
   const tone = config.challenge === 'tone',
     includeTones = config.variant === 'full';
+  const numbered = profile.toneNotation === 'numbers';
   const exampleParts = profile.example.parts.map((part) => {
     const value = profile.practiceSpelling(part, config.spellingFocus);
     return includeTones ? value : value.replace(/[0-9]/g, '');
@@ -30,40 +31,35 @@ export function practiceSetupMarkup(
       tone
         ? /* HTML */ `<fieldset class="practice-tones">
               <legend>Tones to practise</legend>
-              <div class="practice-tone-options">
+              <div
+                class="practice-tone-options${numbered ? ' practice-tone-options--numbered' : ''}"
+              >
                 ${profile.tones
-                  .map(
-                    (t) =>
-                      /* HTML */ `<button
-                        type="button"
-                        data-practice-tone="${t}"
-                        aria-label="${escape(toneLabel(profile, t))}"
-                        aria-pressed="${config.tones.includes(t)}"
-                        ${config.tones.length === 2 && config.tones.includes(t) ? 'disabled' : ''}
-                      >
-                        ${toneSymbolMarkup(profile, t)}<span class="practice-tone-label"
-                          >${escape(toneDefinition(profile, t).label)}</span
-                        >${
-                          profile.toneNotation === 'numbers'
-                            ? `<svg viewBox="0 0 100 36" aria-hidden="true">
-                          <path
-                            d="${toneDefinition(profile, t).path}"
-                          />
-                        </svg>`
-                            : ''
-                        }
-                      </button>`,
-                  )
+                  .map((t, index) => {
+                    const definition = toneDefinition(profile, t);
+                    return /* HTML */ `<button
+                      type="button"
+                      data-practice-tone="${t}"
+                      aria-label="${escape(toneLabel(profile, t))}"
+                      aria-pressed="${config.tones.includes(t)}"
+                      ${numbered ? `aria-describedby="practice-pitch-${index}"` : ''}
+                      ${config.tones.length === 2 && config.tones.includes(t) ? 'disabled' : ''}
+                    >
+                      ${numbered ? '' : toneSymbolMarkup(profile, t)}
+                      <span class="practice-tone-label">${escape(definition.label)}</span>
+                      ${numbered ? `<span class="practice-tone-description" id="practice-pitch-${index}">${escape(definition.description)}</span>` : ''}
+                    </button>`;
+                  })
                   .join('')}
               </div>
-              <p>Choose two for a tone pair, or add more.</p>
+              <p>Select at least two tones.</p>
             </fieldset>
             <label
-              >Answer choices<select data-practice-setting="choices">
+              >Doors per question<select data-practice-setting="choices">
                 ${options(
                   profile.choiceCounts
                     .filter((n) => n <= config.tones.length)
-                    .map((n) => [n, n + ' tones per question']),
+                    .map((n) => [n, n + ' doors']),
                   config.choices,
                 )}
               </select></label

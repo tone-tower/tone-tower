@@ -1,4 +1,3 @@
-import { toneLabel } from './ui/tone-presentation.ts';
 import { query, queryAll, required, escape, errorMessage } from './ui/dom.ts';
 import type {
   LanguageProfile,
@@ -13,13 +12,12 @@ import { siteRoot, siteURL, localizeAssets } from './site-root.ts';
 import { recordingIssueUrl } from './ui/recording-report.ts';
 import { languages } from './languages/profiles.ts';
 import { requireProfile } from './languages/profile.ts';
-import { decodeTonePair } from './persistence/tone-pairs.ts';
 import { site, languagePages, pageFromLocation } from './site.ts';
 import { practiceSetupMarkup } from './ui/practice-setup.ts';
 import { createCreditsDialog } from './ui/credits-dialog.ts';
 import { catalogRows, referenceRows, validateCatalog } from './content/catalog.ts';
 import { Player } from './audio/audio.ts';
-import { challenges, defaultPractice, TONE_VARIANTS } from './game/game-core.ts';
+import { challenges, defaultPractice, practiceForRun, TONE_VARIANTS } from './game/game-core.ts';
 import {
   loadProgress,
   saveProgress,
@@ -33,7 +31,7 @@ import { animateWorld } from './world/world-runtime.js';
 import { destinations } from './world/pixel-world.js';
 import { soundPageMarkup, aboutPageMarkup, compactGuideMarkup } from './ui/info-pages.js';
 import { bindMapNavigation } from './ui/map-navigation.js';
-import { bindLanguageSwitcher } from './ui/site-controls.ts';
+import { bindLanguageSwitcher, scriptSettingMarkup } from './ui/site-controls.ts';
 import { textLanguage } from './languages/text-language.ts';
 import { homeRewards, homeDifficulties, rewardNames, friendDialogue } from './ui/home-rewards.ts';
 
@@ -71,31 +69,6 @@ let worldAnimation: ReturnType<typeof animateWorld> | null = null,
   mapNavigationCleanup: (() => void) | null = null,
   mapDestination = 'tone',
   mapActor = { ...destinations.tone };
-const worldInfo = {
-  tone: {
-    title: 'Tone Tower',
-    action: 'Begin the climb',
-    unit: 'floors',
-    verb: 'climbed',
-    eyebrow: 'Tone recognition',
-    description:
-      'Listen to the highlighted syllable and choose its tone. Replay as often as you like.',
-    instruction: 'Listen to the highlighted syllable. Choose the tone you hear.',
-    end: 'The summit is yours.',
-  },
-  tide: {
-    title: 'Skyrail',
-    action: 'Board Skyrail',
-    unit: 'spans',
-    verb: 'built',
-    eyebrow: profile.romanization + ' spelling',
-    description:
-      'Listen, then type the sounds in ' + profile.romanization + ' to build the next bridge. ',
-    instruction:
-      'Listen, then type the ' + profile.romanization + ' before the railcar reaches the gap.',
-    end: 'Next stop: the horizon.',
-  },
-};
 let progress = loadProgress(profile),
   catalog: Catalog | null = null,
   libraryRequest: Promise<ExerciseRow[]> | null = null,
@@ -168,7 +141,6 @@ function resetView(view: string) {
   delete app.dataset.outcome;
   document.body.classList.remove('keyboard-open');
   document.body.dataset.screen = view;
-  required(document, '#pause-game').hidden = true;
   queryAll(document, '[data-nav-page]').forEach((link) => {
     if (link.dataset.navPage === view) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
@@ -194,6 +166,7 @@ function screenError(message: string) {
 
 let selectedWorld = profile.challenges[0];
 function home(world?: Challenge, initialPractice = false) {
+  progress = loadProgress(profile);
   let practiceMode = initialPractice;
   const practiceConfigs = Object.fromEntries(
     (['tone', 'tide'] as const).map((challenge): [Challenge, ExerciseConfig] => {
@@ -206,7 +179,6 @@ function home(world?: Challenge, initialPractice = false) {
           challenge,
           format: 'drill',
           start: 1,
-          length: 20,
           spellingFocus: saved.spellingFocus || 'full',
           content: challenge === 'tide' ? 'mixed' : profile.practiceToneContent,
           target:
@@ -228,9 +200,10 @@ function home(world?: Challenge, initialPractice = false) {
   } else world = selectedWorld;
   resetView('home');
   if (initialPractice) setPageLocation('practice', true);
-  progress = loadProgress(profile);
   const rewards = homeRewards(progress);
   const hasGameChoice = profile.challenges.length > 1;
+  const subject = hasGameChoice ? profile.romanization : profile.label + ' tones';
+  const guideSample = profile.format(profile.example.parts.join(' '));
   app.innerHTML = /* HTML */ ` <aside class="content-preview" role="status" hidden>
       <strong>${escape(profile.label)} is taking shape.</strong>
       <p>
@@ -238,22 +211,21 @@ function home(world?: Challenge, initialPractice = false) {
         ${escape(profile.romanization)} guide while the collection grows.
       </p>
     </aside>
-    <section class="home-intro" aria-label="Introduction">
-      <p class="home-intro-title">
-        Practice
-        ${profile.challenges.includes('tide') ? profile.romanization : profile.label + ' tones'}
-      </p>
-      <a class="home-guide-link" href="${pages.sounds.path}" data-page="sounds"
-        >New to
-        ${profile.challenges.includes('tide') ? profile.romanization : profile.label + ' tones'}?
-        →</a
-      >
+    <section class="home-welcome" aria-labelledby="welcome-heading">
+      <h1 id="welcome-heading" tabindex="-1">Practice ${escape(subject)}</h1>
+      <a class="home-guide-card" href="${siteURL(pages.sounds.path).href}" data-page="sounds">
+        <strong>New to ${escape(subject)}?</strong>
+        <span class="home-guide-sample" lang="${escape(profile.id + '-Latn')}" aria-hidden="true">
+          ${escape(guideSample)}
+        </span>
+        <span class="home-guide-arrow" aria-hidden="true">→</span>
+      </a>
     </section>
     ${
       hasGameChoice
         ? /* HTML */ `<section class="mode-picker" aria-labelledby="mode-heading">
             <div class="mode-picker-heading">
-              <h1 id="mode-heading" tabindex="-1">Choose a game</h1>
+              <h2 id="mode-heading">Choose a game</h2>
               <p><kbd>←</kbd> <kbd>→</kbd> choose · <kbd>Enter</kbd> start</p>
             </div>
             <div class="mode-cards">
@@ -313,7 +285,7 @@ function home(world?: Challenge, initialPractice = false) {
         </div>
         <div class="dock">
           <div>
-            ${hasGameChoice ? '<h2 id="destination-title"></h2>' : '<h1 id="destination-title" tabindex="-1"></h1>'}
+            <h2 id="destination-title"></h2>
             <div class="setup-tabs" role="group" aria-label="Game or practice">
               <button type="button" id="setup-game" aria-pressed="true">Play game</button>
               <button type="button" id="setup-practice" aria-pressed="false">Practice</button>
@@ -388,7 +360,6 @@ function home(world?: Challenge, initialPractice = false) {
     mapDestination = value;
     const rail = value === 'rail',
       challenge = rail ? 'tide' : 'tone',
-      info = worldInfo[challenge],
       key = rail ? 'tideVariant' : 'toneVariant',
       variant = progress.settings[key];
     const rewardMark = (difficulty: string) => {
@@ -405,7 +376,7 @@ function home(world?: Challenge, initialPractice = false) {
     queryAll(app, '[data-destination]').forEach((b) =>
       b.setAttribute('aria-pressed', String(b.dataset.destination === value)),
     );
-    required(app, '#destination-title').textContent = info.title;
+    required(app, '#destination-title').textContent = challenges[challenge].title;
     const variants = required(app, '#map-variants');
     variants.innerHTML =
       (rail
@@ -632,11 +603,7 @@ function startPractice(challenge: Challenge = 'tone', variant = 'spelling', seed
   };
   begin(config);
 }
-function showWorkshop(seed?: RunInput & { challenge: Challenge; variant: string }) {
-  if (seed) {
-    startPractice(seed.challenge, seed.variant, seed);
-    return;
-  }
+function showWorkshop() {
   home(undefined, true);
   query(app, '#setup-practice')?.focus();
 }
@@ -649,7 +616,7 @@ function begin(config: RunInput) {
     return;
   }
   resetView('game');
-  required(document, '#pause-game').hidden = false;
+  document.querySelector<HTMLDetailsElement>('.language-switcher')?.removeAttribute('open');
   try {
     controller ??= createGameController({
       profile,
@@ -662,7 +629,7 @@ function begin(config: RunInput) {
       victoryMessage,
       onRetry: begin,
       onHome: home,
-      onPractice: practiceFromRun,
+      onPractice: (run, mode) => begin(practiceForRun(run, mode)),
       onLearn: () => showLearn(),
     });
     controller.start(config);
@@ -684,95 +651,20 @@ function finish(run: Run) {
 function showResults(run: Run) {
   resetView('results');
   app.dataset.world = run.world;
-  const info = worldInfo[run.world],
-    variant = run.config.variant;
-  const syllables = run.word?.syllables || [];
   app.innerHTML = /* HTML */ `<section class="results-view">
-    <div class="eyebrow">Practice results</div>
-    <h1 tabindex="-1">Practice complete.</h1>
-    <p class="lead">
-      ${run.cleared} correct answer${run.cleared === 1 ? '' : 's'}. Review missed recordings or
-      start another session.
-    </p>
+    <h1 tabindex="-1">Practice complete</h1>
     <div class="result-metrics">
       <div><strong>${run.cleared}</strong><span>Correct answers</span></div>
       <div><strong>${run.mistakes}</strong><span>Missed answers</span></div>
-      <div><strong>${run.assisted || 0}</strong><span>Assisted answers</span></div>
     </div>
-    ${
-      run.lastFailure && syllables.length
-        ? /* HTML */ `<div class="last-word feedback-card">
-            <span class="eyebrow">One to listen to again</span>
-            <div class="result-word">
-              ${syllables.map((s) => /* HTML */ `<span>${escape(s.text)}<small>${escape(s.text === profile.format(s.transcription) ? '' : profile.format(s.transcription))}</small></span>`).join('')}
-            </div>
-            <p>${escape(run.word.gloss)}</p>
-            ${run.lastAnswer ? /* HTML */ `<p class="small">${run.world === 'tone' ? 'You chose' : 'You typed'}: ${escape(run.world === 'tone' && (typeof run.lastAnswer === 'string' || typeof run.lastAnswer === 'number') && profile.tones.includes(run.lastAnswer) ? toneLabel(profile, run.lastAnswer) : run.lastAnswer)}</p>` : ''}<button
-              id="last-word-audio"
-              class="text-button"
-              type="button"
-            >
-              ▶ Hear it again
-            </button>
-            <p id="result-audio-status" class="small" role="status"></p>
-          </div>`
-        : ''
-    }
     <div class="results-actions">
-      <button id="retry" class="primary" type="button">
-        Another practice
-        <span aria-hidden="true">→</span></button
-      ><button id="practise-result" class="secondary" type="button">Practise this</button
-      ><button id="result-home" class="text-button" type="button">Back to Home</button>
+      <button id="retry" class="primary" type="button">Practice again</button>
+      <button id="result-home" class="text-button" type="button">Back to Home</button>
     </div>
-    <button id="copy-summary" class="text-button" type="button">Copy session summary</button>
-    <p id="copy-status" class="small" role="status"></p>
-    <p class="result-footnote">
-      Home decorations are earned in the games. Practice is always yours to explore.
-    </p>
   </section>`;
-  required(app, '#retry').onclick = () => begin({ ...run.config });
-  required(app, '#result-home').onclick = () => home();
-  query(app, '#practise-result')?.addEventListener('click', () => practiceFromRun(run));
-  query(app, '#last-word-audio')?.addEventListener('click', async () => {
-    try {
-      await player.play(run.word.audio);
-    } catch {
-      required(app, '#result-audio-status').textContent =
-        'Recording unavailable. Please try again.';
-    }
-  });
-  required(app, '#copy-summary').onclick = async () => {
-    const summary = `Tone Tower · ${info.title} · ${variantName(run.world, variant)}${run.world === 'tide' ? ' · ' + difficultyName(run.config.difficulty) : ''} · Practice\n${run.cleared} correct answers · ${run.config.format === 'rehearsal' ? `rehearsal from ${run.config.start}` : run.config.length === 'endless' ? 'open practice' : `${run.config.length}-question practice`} · ${run.mistakes} misses · ${run.assisted || 0} assisted`;
-    try {
-      await navigator.clipboard.writeText(summary);
-      required(app, '#copy-status').textContent = 'Summary copied.';
-    } catch {
-      required(app, '#copy-status').textContent = summary;
-    }
-  };
+  required(app, '#retry').onclick = () => begin(run.config);
+  required(app, '#result-home').onclick = () => home(run.world);
   focusTitle();
-}
-function practiceFromRun(run: Run) {
-  const config = {
-    ...defaultPractice(run.world, profile),
-    variant: run.config.variant,
-    focusIds: [...new Set(run.missedIds || [])],
-  };
-  // Missed recordings may contain whole words even when practice defaults to single syllables.
-  if (config.focusIds.length) config.content = 'mixed';
-  if (run.world === 'tone') {
-    const key = Object.entries(run.confusions || {}).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const pair = key ? decodeTonePair(key) : null;
-    if (pair?.length === 2) {
-      config.tones = pair;
-      config.choices = 2;
-    }
-  }
-  if (run.world === 'tide' && config.focusIds.length) {
-    config.target = run.opened >= 40 ? 'whole' : 'highlighted';
-  }
-  showWorkshop(config);
 }
 
 function openDialog(html: string, opener = document.activeElement) {
@@ -924,7 +816,6 @@ function showInfo(page: string) {
     app.innerHTML = aboutPageMarkup({
       recordingCount: catalog ? data.length : recordingCount,
       profile,
-      availability: availability(),
     });
   }
   bindInfoActions(app);
@@ -933,12 +824,13 @@ function showAboutInGame(opener?: HTMLElement) {
   const markup = aboutPageMarkup({
     recordingCount: data.length,
     profile,
-    availability: catalog?.availability,
   })
     .replace('<h1 tabindex="-1">', '<h2 id="dialog-title">')
     .replace('</h1>', '</h2>');
   openDialog(markup, opener);
-  queryAll(dialogBody, '.back-link,.info-actions,[data-start-world]').forEach((el) => el.remove());
+  queryAll(dialogBody, '.back-link,.info-actions [data-page],[data-start-world]').forEach((el) =>
+    el.remove(),
+  );
   queryAll(dialogBody, '[data-info-action="practice"]').forEach((el) =>
     el.replaceWith(document.createTextNode(el.textContent)),
   );
@@ -953,11 +845,16 @@ function navigate(
   }: { replace?: boolean; focus?: boolean; opener?: HTMLElement } = {},
 ) {
   if (!['home', 'sounds', 'about', 'practice'].includes(page)) return;
-  if (screen === 'game' && controller?.active && controller.state?.status === 'playing') {
-    setPageLocation('home', true);
+  if (screen === 'game' && controller?.active && controller.phase !== 'interrupted') {
     if (page === 'sounds') showLearn(opener);
     else if (page === 'about') showAboutInGame(opener);
-    else controller.pause();
+    else
+      controller.confirmExit({
+        title: 'Return home?',
+        message: 'Returning home ends this session.',
+        action: 'End session & return home',
+        confirm: () => home(undefined, page === 'practice'),
+      });
     return;
   }
   setPageLocation(page, replace);
@@ -985,7 +882,7 @@ function showReset() {
   required(dialogBody, '#confirm-reset').onclick = () => {
     progress = resetProgress(profile);
     homecoming = [];
-    if (scriptDisplay) scriptDisplay.value = progress.settings.script;
+    syncScriptSetting();
     applyScript(progress.settings.script);
     dialog.close();
     home();
@@ -1009,7 +906,7 @@ bindLanguageSwitcher(document);
 document.querySelectorAll<HTMLAnchorElement>('[data-language-link]').forEach((link) => {
   link.onclick = (event) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if (!controller?.active || controller.state.status !== 'playing') return;
+    if (screen !== 'game' || !controller?.active || controller.phase === 'interrupted') return;
     const language = languages[link.dataset.languageLink ?? ''];
     if (!language) return;
     event.preventDefault();
@@ -1028,19 +925,28 @@ document.querySelectorAll<HTMLAnchorElement>('[data-language-link]').forEach((li
     });
   };
 });
-required(document, '#pause-game').onclick = () => controller?.pause();
-const scriptDisplay = query(document, '#script-display');
-if (scriptDisplay) {
-  scriptDisplay.value = progress.settings.script;
-  scriptDisplay.onchange = () => {
-    progress.settings.script = scriptDisplay.value;
+const footer = required(document, '.site-footer');
+document.querySelector('.script-setting')?.remove();
+footer.insertAdjacentHTML('beforeend', scriptSettingMarkup(profile));
+const scriptOptions = queryAll(footer, '[data-script-option]');
+function syncScriptSetting() {
+  for (const option of scriptOptions) option.checked = option.value === progress.settings.script;
+}
+syncScriptSetting();
+for (const option of scriptOptions) {
+  option.onchange = () => {
+    const script = option.value;
+    if (!option.checked || !profile.scripts.includes(script)) return;
+    progress.settings.script = script;
     persist();
-    applyScript(scriptDisplay.value);
-    if (screen !== 'game')
+    applyScript(script);
+    if (screen === 'home' || screen === 'sounds') {
       navigate(pageFromLocation(new URL(location.href), appBase, profile), {
         replace: true,
         focus: false,
       });
+      option.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    }
   };
 }
 const credits = required(document, '#credits');
@@ -1065,6 +971,10 @@ dialog.addEventListener('click', (event) => {
   }
 });
 window.addEventListener('popstate', () => {
+  if (screen === 'game' && controller?.active) {
+    setPageLocation('home', true);
+    return;
+  }
   navigate(pageFromLocation(new URL(location.href), appBase, profile), { replace: true });
 });
 

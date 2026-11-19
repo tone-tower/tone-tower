@@ -14,7 +14,6 @@ export function languageSwitcherMarkup(
     <div class="language-panel">
       <span class="language-menu-label">Language</span>
       <nav class="language-options" aria-label="Choose a language">${choices.map((choice) => `<a data-language-link="${escape(choice.profile.id)}" href="${escape(choice.path)}" ${choice.profile.id === profile.id ? 'aria-current="true"' : ''}><span>${escape(choice.profile.label)}</span>${choice.profile.id === profile.id ? '<span class="language-check" aria-hidden="true">✓</span>' : ''}</a>`).join('')}</nav>
-      ${scriptSettingMarkup(profile)}
     </div>
   </details>`;
 }
@@ -40,5 +39,27 @@ export function bindLanguageSwitcher(doc: Document): void {
 
 export function scriptSettingMarkup(profile: LanguageProfile): string {
   if (profile.scripts.length < 2) return '';
-  return `<div class="script-setting"><label class="language-menu-label" for="script-display">Characters</label><select id="script-display">${profile.scripts.map((script) => `<option value="${escape(script)}" ${script === profile.defaultScript ? 'selected' : ''}>${escape(profile.scriptLabels[script] ?? script)}</option>`).join('')}</select></div>`;
+  return /* HTML */ `<fieldset id="script-display" class="script-setting">
+    <legend class="sr-only">Character style</legend>
+    ${profile.scripts
+      .map((script) => {
+        const label =
+          script === 'simplified'
+            ? 'Simplified'
+            : script === 'traditional'
+              ? 'Traditional'
+              : (profile.scriptLabels[script] ?? script);
+        return /* HTML */ `<label class="script-option">
+          <input
+            type="radio"
+            name="character-style"
+            data-script-option
+            value="${escape(script)}"
+            ${script === profile.defaultScript ? 'checked' : ''}
+          />
+          <span>${escape(label)}</span>
+        </label>`;
+      })
+      .join('')}
+  </fieldset>`;
 }
