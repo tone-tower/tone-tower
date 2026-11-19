@@ -1,4 +1,4 @@
-import { cantoneseCatalog } from '../../tools/catalog/runtime.mjs';
+import { cantoneseCatalog, withSimplifiedCantonese } from '../../tools/catalog/runtime.mjs';
 import { test, expect } from '@playwright/test';
 
 // Keep smoke tests independent of downloads and speakers. Real recording playback
@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.clock.install();
   await page.route('**/catalogs/yue.json', (route) =>
-    route.fulfill({ json: cantoneseCatalog(catalog) }),
+    route.fulfill({ json: withSimplifiedCantonese(cantoneseCatalog(catalog)) }),
   );
   await page.addInitScript(() => {
     window.__audioPlays = [];
@@ -89,6 +89,41 @@ async function expectNoOverflow(page) {
     true,
   );
 }
+
+test('Cantonese character style updates the current prompt and carries over to the guide', async ({
+  page,
+}) => {
+  const traditional = page.getByRole('radio', { name: 'Traditional' });
+  const simplified = page.getByRole('radio', { name: 'Simplified' });
+  await expect(traditional).toBeChecked();
+  await page.locator('#setup-practice').click();
+  for (const tone of [1, 2, 5, 6]) await page.locator(`[data-practice-tone="${tone}"]`).click();
+  await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
+  await page.clock.runFor(150);
+
+  const character = page.locator('.word-prompt .prompt-character');
+  await expect(character).toHaveAttribute('lang', 'yue-Hant');
+  await expect(character).toHaveText(/^[試時]$/);
+  const written = await character.innerText();
+  const tone = await currentTone(page);
+  const plays = await page.evaluate(() => window.__audioPlays.length);
+  await simplified.check();
+  await expect(character).toHaveAttribute('lang', 'yue-Hans');
+  await expect(character).toHaveText(written === '試' ? '试' : '时');
+  expect(await page.evaluate(() => window.__audioPlays.length)).toBe(plays);
+  await page.locator('.tone-door').first().press(tone);
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+
+  await page.goto('/cantonese/guide/');
+  await expect(simplified).toBeChecked();
+  const reference = page.locator('.guide-tones [data-guide-tone="5"] span[lang]');
+  await expect(reference).toHaveText('妇');
+  await expect(reference).toHaveAttribute('lang', 'yue-Hans');
+  await traditional.check();
+  await expect(reference).toHaveText('婦');
+  await expect(reference).toHaveAttribute('lang', 'yue-Hant');
+});
 
 test('buttons keep keyboard activation and closing game dialogs restores their opener', async ({
   page,

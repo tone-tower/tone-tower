@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { cantonese, mandarin } from '../../src/languages/profiles.ts';
+import { cantonese, mandarin, vietnamese } from '../../src/languages/profiles.ts';
 import { toneLabel, toneSymbolMarkup } from '../../src/ui/tone-presentation.ts';
 import { scriptSettingMarkup } from '../../src/ui/site-controls.ts';
 import { textLanguage } from '../../src/languages/text-language.ts';
@@ -26,7 +26,10 @@ test('tone presentation follows explicit profile metadata, including named tones
 });
 
 test('character styles follow the profile and select the default writing system', () => {
-  assert.equal(scriptSettingMarkup(cantonese), '');
+  assert.equal(scriptSettingMarkup(vietnamese), '');
+  assert.match(scriptSettingMarkup(cantonese), /value="traditional"\s+checked/);
+  assert.match(scriptSettingMarkup(cantonese), /<span>Simplified<\/span>/);
+  assert.equal(textLanguage(cantonese, 'simplified'), 'yue-Hans');
   assert.match(scriptSettingMarkup(mandarin), /<span>Simplified<\/span>/);
   assert.match(scriptSettingMarkup(mandarin), /<span>Traditional<\/span>/);
   const other = {

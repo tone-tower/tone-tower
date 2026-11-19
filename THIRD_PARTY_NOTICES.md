@@ -63,6 +63,11 @@ selected or adapted to identify the intended word, and readings are aligned to
 the game's syllables. Those adaptations retain the applicable share-alike terms.
 Manual corrections are recorded separately in data/audio/corrections.json.
 
+Simplified Cantonese spellings are generated at build time with
+[OpenCC-JS](https://github.com/nk2028/opencc-js), which bundles
+[OpenCC](https://github.com/BYVoid/OpenCC) conversion data. OpenCC-JS code uses
+the MIT licence and the conversion data uses the Apache License 2.0.
+
 Expansion selection also cross-checks written forms and readings against Cantonese
 Wordnet, by Joanna Ut-Seong Sio and Luis Morgado da Costa:
 https://github.com/lmorgadodacosta/CantoneseWN

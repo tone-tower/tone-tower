@@ -1,6 +1,6 @@
 import { validateCatalog } from '../../src/content/catalog.ts';
 import { cantonese } from '../../src/languages/profiles.ts';
-import { cantoneseCatalog } from './runtime.mjs';
+import { cantoneseCatalog, withSimplifiedCantonese } from './runtime.mjs';
 import { buildMandarinCatalog } from '../content/mandarin.mjs';
 import { writeVietnameseCatalog } from '../content/vietnamese.mjs';
 import { mkdir } from 'node:fs/promises';
@@ -252,11 +252,11 @@ export async function cantoneseReviewCatalog(root = process.cwd(), { validateFil
 
 export async function buildCatalog(root = process.cwd()) {
   return withCurationLock(root, 'yue', async () => {
-    const runtime = validateCatalog(
-      await applyCatalogReviews(root, await cantoneseReviewCatalog(root)),
-      cantonese,
-      { publication: true },
-    );
+    const reviewed = await applyCatalogReviews(root, await cantoneseReviewCatalog(root));
+    // Display forms are added after review matching so existing review fingerprints stay valid.
+    const runtime = validateCatalog(withSimplifiedCantonese(reviewed), cantonese, {
+      publication: true,
+    });
     await mkdir(path.join(root, 'catalogs'), { recursive: true });
     await atomicText(path.join(root, 'catalogs/yue.json'), JSON.stringify(runtime) + '\n');
     return runtime;

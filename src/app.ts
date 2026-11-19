@@ -810,7 +810,13 @@ function showInfo(page: string) {
     const guide = guideCatalog ?? catalog;
     const recordings = guide ? catalogRows(guide, profile, progress.settings.script) : [];
     const references = guide ? referenceRows(guide, recordings) : [];
-    app.innerHTML = soundPageMarkup(references, profile.toneDefinitions, recordings, profile);
+    app.innerHTML = soundPageMarkup(
+      references,
+      profile.toneDefinitions,
+      recordings,
+      profile,
+      progress.settings.script,
+    );
     bindToneAudio(app, recordings, references);
   } else {
     app.innerHTML = aboutPageMarkup({
@@ -865,7 +871,10 @@ function navigate(
 }
 function showLearn(opener?: HTMLElement) {
   controller?.state?.markAssisted?.();
-  openDialog(compactGuideMarkup(anchors, profile.toneDefinitions, profile), opener);
+  openDialog(
+    compactGuideMarkup(anchors, profile.toneDefinitions, profile, progress.settings.script),
+    opener,
+  );
   bindToneAudio(dialogBody, data, anchors);
 }
 const showCredits = createCreditsDialog({ dialogBody, profile, loadRows: loadLibrary, openDialog });

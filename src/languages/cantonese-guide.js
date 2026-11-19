@@ -5,7 +5,9 @@ const escape = (value) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character],
   );
 
-function toneExamples(anchors, toneDefinitions) {
+const writtenExample = (text, lang) => `<span lang="${escape(lang)}">${escape(text)}</span>`;
+
+function toneExamples(anchors, toneDefinitions, lang) {
   return /* HTML */ `<div class="guide-tones">
       ${toneDefinitions
         .map((tone) => {
@@ -19,10 +21,7 @@ function toneExamples(anchors, toneDefinitions) {
             <span class="guide-tone-number">${escape(tone.value)}</span>
             <svg viewBox="0 0 100 36" aria-hidden="true"><path d="${escape(tone.path)}" /></svg>
             <strong>${escape(word?.transcription || '')}</strong>
-            <span
-              ><span lang="zh-Hant">${escape(word?.text || '')}</span> ·
-              ${escape(word?.gloss || '')}</span
-            >
+            <span>${writtenExample(word?.text || '', lang)} · ${escape(word?.gloss || '')}</span>
             <small>${escape(tone.description)}</small>
           </button>`;
         })
@@ -90,7 +89,7 @@ export function guideResourcesMarkup() {
   </div>`;
 }
 
-function inlineWordAudio(recordings, jyutping, recordingId) {
+function inlineWordAudio(recordings, jyutping, recordingId, lang) {
   const word =
     recordings.find((entry) => entry.id === recordingId && entry.transcription === jyutping) ||
     recordings.find((entry) => entry.transcription === jyutping);
@@ -102,13 +101,15 @@ function inlineWordAudio(recordings, jyutping, recordingId) {
     aria-label="Hear ${escape(word.transcription)}, ${escape(word.text)}"
   >
     <span aria-hidden="true">▶</span> <b>${escape(word.transcription)}</b>
-    <span lang="zh-Hant">${escape(word.text)}</span>
+    ${writtenExample(word.text, lang)}
   </button>`;
 }
 
-export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
+export function soundPageMarkup(anchors, toneDefinitions, recordings = [], lang = 'yue-Hant') {
   const example = anchors.find((word) => word.tone === 2);
-  const audio = (jyutping, recordingId) => inlineWordAudio(recordings, jyutping, recordingId);
+  const audio = (jyutping, recordingId) => inlineWordAudio(recordings, jyutping, recordingId, lang);
+  const character = (traditional, simplified = traditional) =>
+    writtenExample(lang === 'yue-Hans' ? simplified : traditional, lang);
   const audioStatus = /* HTML */ `<span
     class="sr-only guide-example-status"
     role="status"
@@ -117,7 +118,7 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
   return /* HTML */ `<article class="info-page sound-page">
     <header class="page-heading">
       <button class="text-button back-link" data-page="home" type="button">← Home</button>
-      <span class="eyebrow" lang="zh-Hant">粵拼</span>
+      <span class="eyebrow" lang="${escape(lang)}">${lang === 'yue-Hans' ? '粤拼' : '粵拼'}</span>
       <h1 tabindex="-1">Jyutping guide</h1>
       <p class="lead guide-introduction">
         Jyutping is a system for writing Cantonese pronunciation with Latin letters and tone
@@ -150,8 +151,7 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
           <span class="lesson-result"
             ><b>fu2</b
             ><small
-              ><span lang="zh-Hant">${escape(example?.text || '虎')}</span> ·
-              ${escape(example?.gloss || 'tiger')}</small
+              >${character(example?.text || '虎')} · ${escape(example?.gloss || 'tiger')}</small
             ></span
           >
         </div>
@@ -160,14 +160,13 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
         </button>
       </div>
       <p class="guide-example-block">
-        In <b>gong2</b> (<span lang="zh-Hant">講</span>, speak), the parts are <b>g + ong + 2</b>.
-        The final is <b>ong</b>: the vowel <b>o</b> and the ending <b>ng</b>. Hear
-        ${audio('gong2')}. ${audioStatus}
+        In <b>gong2</b> (${character('講', '讲')}, speak), the parts are <b>g + ong + 2</b>. The
+        final is <b>ong</b>: the vowel <b>o</b> and the ending <b>ng</b>. Hear ${audio('gong2')}.
+        ${audioStatus}
       </p>
       <p class="small">
         Some syllables have no initial: <b>aa3</b> starts directly with a vowel. Keep the tone digit
-        after each syllable, on the same line: <b>nei5 hou2</b> (<span lang="zh-Hant">你好</span>,
-        hello).
+        after each syllable, on the same line: <b>nei5 hou2</b> (${character('你好')}, hello).
       </p>
       <p class="small">
         See the
@@ -426,7 +425,7 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
         Tone is part of a word’s pronunciation: changing it can change the meaning. These six words
         keep <b>fu</b> the same, so you can concentrate on the pitch.
       </p>
-      ${toneExamples(anchors, toneDefinitions)}
+      ${toneExamples(anchors, toneDefinitions, lang)}
       <div class="guide-note">
         <p>
           Tones <b>1, 3 and 6</b> are level: high, mid and low respectively. Tones
@@ -451,10 +450,10 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
         <summary>Why do some resources say Cantonese has nine tones?</summary>
         <p>
           The difference comes from how syllables with a stop ending are counted. An
-          <b>entering tone</b> (<span lang="zh-Hant">入聲</span>), also called a
-          <b>checked tone</b>, is a traditional category for syllables ending in
-          <b>-p, -t or -k</b>. The lips or tongue close to cut off the sound. “Entering” names this
-          category; it does not mean that the pitch rises.
+          <b>entering tone</b> (${character('入聲', '入声')}), also called a <b>checked tone</b>, is
+          a traditional category for syllables ending in <b>-p, -t or -k</b>. The lips or tongue
+          close to cut off the sound. “Entering” names this category; it does not mean that the
+          pitch rises.
         </p>
         <p>
           These syllables normally have a high, middle or low level pitch. The traditional count
@@ -500,10 +499,9 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
           ends; the <b>1</b> still marks its pitch.
         </p>
         <p>
-          Some words have more than one tone reading. For example,
-          <span lang="zh-Hant">碟</span> (dish) has the regular reading <b>dip6</b> and the changed
-          reading <b>dip2</b>. This is why a stop-final syllable can sometimes have a rising tone.
-          See
+          Some words have more than one tone reading. For example, ${character('碟')} (dish) has the
+          regular reading <b>dip6</b> and the changed reading <b>dip2</b>. This is why a stop-final
+          syllable can sometimes have a rising tone. See
           <a
             href="https://corpus.eduhk.hk/cantonese/eng/chapter3/3-0.html"
             target="_blank"
@@ -585,11 +583,11 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
         </p>
         <p>
           <b>Why do Mandarin third-tone characters often have Cantonese tone 2 or 5?</b> This split
-          reflects an older distinction between <b>yin</b> (<span lang="zh-Hant">陰</span>, upper
-          register) and <b>yang</b> (<span lang="zh-Hant">陽</span>, lower register). Cantonese
-          tones <b>1, 2 and 3</b> belong to the yin group; <b>4, 5 and 6</b> to the yang group. Tone
-          <b>2</b> is traditionally called <span lang="zh-Hant">陰上</span>, yin rising, and tone
-          <b>5</b> <span lang="zh-Hant">陽上</span>, yang rising.
+          reflects an older distinction between <b>yin</b> (${character('陰', '阴')}, upper
+          register) and <b>yang</b> (${character('陽', '阳')}, lower register). Cantonese tones
+          <b>1, 2 and 3</b> belong to the yin group; <b>4, 5 and 6</b> to the yang group. Tone
+          <b>2</b> is traditionally called ${character('陰上', '阴上')}, yin rising, and tone
+          <b>5</b> ${character('陽上', '阳上')}, yang rising.
         </p>
         <p>
           Historically, syllables with <b>voiceless</b> initials tended to develop yin tones, and
@@ -607,8 +605,8 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
           tone <b>5</b>: <i lang="cmn-Latn">mǎ</i> → ${audio('maa5')} and
           <i lang="cmn-Latn">nǐ</i> → ${audio('nei5', 'commons-147747458')}. Compare
           <i lang="cmn-Latn">hǎo</i> → ${audio('hou2')} and <i lang="cmn-Latn">shǒu</i> →
-          ${audio('sau2')}. There are exceptions to this pattern: <span lang="zh-Hant">扭</span> and
-          <span lang="zh-Hant">紐</span> are both <i lang="cmn-Latn">niǔ</i> in Mandarin and
+          ${audio('sau2')}. There are exceptions to this pattern: ${character('扭')} and
+          ${character('紐', '纽')} are both <i lang="cmn-Latn">niǔ</i> in Mandarin and
           <b>nau2</b> in Cantonese. ${audioStatus}
         </p>
         <p>
@@ -628,9 +626,9 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
         <summary>Why might everyday speech sound different from the dictionary?</summary>
         <p>
           <b>Pronunciation variants.</b> Some speakers say <b>lei5</b> where a reference spelling
-          gives <b>nei5</b> (<span lang="zh-Hant">你</span>, you), or <b>o5</b> for
-          <b>ngo5</b> (<span lang="zh-Hant">我</span>, I). These are common differences in how
-          speakers pronounce the sounds. The
+          gives <b>nei5</b> (${character('你')}, you), or <b>o5</b> for
+          <b>ngo5</b> (${character('我')}, I). These are common differences in how speakers
+          pronounce the sounds. The
           <a
             href="https://opencantonese.org/books/cantonese-life-1/unit-0/5-cantonese-pronunciation"
             target="_blank"
@@ -643,14 +641,14 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
           <b>Changed tones.</b> A character can take a different tone in a particular word.
           ${audio('tau4', 'commons-88201954')} means “head.” In
           ${audio('fu2 tau2', 'commons-149277076')} (“axe”), the same character
-          <span lang="zh-Hant">頭</span> is pronounced <b>tau2</b>. Compare the second syllable of
+          ${character('頭', '头')} is pronounced <b>tau2</b>. Compare the second syllable of
           <b>fu2 tau2</b> with <b>tau4</b>: the tone changes from low falling to high rising.
           ${audioStatus}
         </p>
         <p>
           The
           <a href="https://cantowords.com/dictionary/%E9%A0%AD" target="_blank" rel="noopener"
-            >Cantowords entry for 頭</a
+            >Cantowords entry for ${character('頭', '头')}</a
           >
           lists words that use <b>tau4</b> and words that use the changed tone <b>tau2</b>.
         </p>
@@ -704,14 +702,14 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = []) {
   </article>`;
 }
 
-export function compactGuideMarkup(anchors, toneDefinitions) {
+export function compactGuideMarkup(anchors, toneDefinitions, lang = 'yue-Hant') {
   return /* HTML */ `<h2 id="dialog-title">Jyutping at a glance</h2>
     <p>
       Read each syllable as <b>initial + final + tone</b>: <b>f + u + 2 = fu2</b>. A final includes
       the vowel and any ending: <b>g + ong + 2 = gong2</b>. Some syllables have no initial.
     </p>
     <h3>Hear the six tones.</h3>
-    ${toneExamples(anchors, toneDefinitions)}
+    ${toneExamples(anchors, toneDefinitions, lang)}
     <p class="small">
       The lines show simplified pitch shapes. Compare the level tones 1, 3, 6, then the rising tones
       2, 5. Tone 4 falls low.

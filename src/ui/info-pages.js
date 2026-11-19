@@ -4,6 +4,7 @@ import {
 } from '../languages/cantonese-guide.js';
 import { mandarinGuide } from '../languages/mandarin-guide.js';
 import { vietnameseGuide } from '../languages/vietnamese-guide.js';
+import { textLanguage } from '../languages/text-language.ts';
 const guideName = (profile) => profile.guideName ?? profile.romanization + ' guide';
 import { site } from '../site.ts';
 const guides = {
@@ -14,11 +15,17 @@ const guides = {
   },
   vi: { full: (a, d) => vietnameseGuide(a, d), compact: (a, d) => vietnameseGuide(a, d, true) },
 };
-export function soundPageMarkup(anchors, definitions, rows, profile) {
-  return guides[profile.id].full(anchors, definitions, rows);
+export function soundPageMarkup(
+  anchors,
+  definitions,
+  rows,
+  profile,
+  script = profile.defaultScript,
+) {
+  return guides[profile.id].full(anchors, definitions, rows, textLanguage(profile, script));
 }
-export function compactGuideMarkup(anchors, definitions, profile) {
-  return guides[profile.id].compact(anchors, definitions);
+export function compactGuideMarkup(anchors, definitions, profile, script = profile.defaultScript) {
+  return guides[profile.id].compact(anchors, definitions, textLanguage(profile, script));
 }
 export function aboutPageMarkup({ recordingCount, profile } = {}) {
   const learningResources = (profile.learningResources ?? [])
