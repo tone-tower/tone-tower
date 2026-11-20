@@ -141,7 +141,8 @@ export function aboutPageMarkup(profile) {
     <section class="info-section" aria-labelledby="project-heading">
       <h2 id="project-heading">Project and feedback</h2>
       <p>
-        Tone Tower is open source. You can find the code in the <a href="${site.repository}">GitHub repository</a>.
+        Tone Tower is open source. You can find the code in the
+        <a href="${site.repository}">GitHub repository</a>.
       </p>
       <p>
         If a recording or answer seems wrong, use the report link in the game’s answer feedback or

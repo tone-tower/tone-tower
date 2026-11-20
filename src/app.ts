@@ -227,7 +227,9 @@ function home(world?: Challenge, initialPractice = false) {
                 aria-describedby="tone-mode-description"
               >
                 <strong>Tone Tower</strong
-                ><span id="tone-mode-description">Identify the correct tones to climb the tower.</span>
+                ><span id="tone-mode-description"
+                  >Identify the correct tones to climb the tower.</span
+                >
               </button>
               <button
                 type="button"
@@ -237,7 +239,9 @@ function home(world?: Challenge, initialPractice = false) {
                 aria-describedby="rail-mode-description"
               >
                 <strong>Skyrail</strong
-                ><span id="rail-mode-description">Type the correct ${profile.romanization} spelling before the time runs out.</span>
+                ><span id="rail-mode-description"
+                  >Type the correct ${profile.romanization} spelling before the time runs out.</span
+                >
               </button>
             </div>
           </section>`
