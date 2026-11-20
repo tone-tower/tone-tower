@@ -40,7 +40,6 @@ const guideSource = query(document, '#guide-catalog');
 const guideCatalog = guideSource
   ? validateCatalog(JSON.parse(guideSource.textContent), profile)
   : null;
-const recordingCount = Number(guideSource?.dataset.recordingCount ?? 0);
 const player = new Player();
 const titleCase = (value: string) => value[0].toUpperCase() + value.slice(1);
 const variantName = (world: Challenge, variant: string) =>
@@ -193,8 +192,8 @@ function home(world?: Challenge, initialPractice = false) {
   if (initialPractice) setPageLocation('practice', true);
   const rewards = homeRewards(progress);
   const hasGameChoice = profile.challenges.length > 1;
-  const subject = hasGameChoice ? profile.romanization : profile.label + ' tones';
-  const guideSample = profile.format(profile.example.parts.join(' '));
+  const subject = profile.id === 'vi' ? profile.label : profile.romanization;
+  const guideLabel = profile.id === 'vi' ? 'Vietnamese tone guide' : 'New to ' + subject + '?';
   app.innerHTML = /* HTML */ ` <aside class="content-preview" role="status" hidden>
       <strong>${escape(profile.label)} is taking shape.</strong>
       <p>
@@ -205,9 +204,9 @@ function home(world?: Challenge, initialPractice = false) {
     <section class="home-welcome" aria-labelledby="welcome-heading">
       <h1 id="welcome-heading" tabindex="-1">Practice ${escape(subject)}</h1>
       <a class="home-guide-card" href="${siteURL(pages.sounds.path).href}" data-page="sounds">
-        <strong>New to ${escape(subject)}?</strong>
-        <span class="home-guide-sample" lang="${escape(profile.id + '-Latn')}" aria-hidden="true">
-          ${escape(guideSample)}
+        <span>
+          <strong>${escape(guideLabel)}</strong>
+          Open the guide
         </span>
         <span class="home-guide-arrow" aria-hidden="true">→</span>
       </a>
@@ -228,7 +227,7 @@ function home(world?: Challenge, initialPractice = false) {
                 aria-describedby="tone-mode-description"
               >
                 <strong>Tone Tower</strong
-                ><span id="tone-mode-description">Choose the tone you hear.</span>
+                ><span id="tone-mode-description">Identify the correct tones to climb the tower.</span>
               </button>
               <button
                 type="button"
@@ -238,7 +237,7 @@ function home(world?: Challenge, initialPractice = false) {
                 aria-describedby="rail-mode-description"
               >
                 <strong>Skyrail</strong
-                ><span id="rail-mode-description">Type the ${profile.romanization} you hear.</span>
+                ><span id="rail-mode-description">Type the correct ${profile.romanization} spelling before the time runs out.</span>
               </button>
             </div>
           </section>`
@@ -789,10 +788,7 @@ function showInfo(page: string) {
     );
     bindToneAudio(app, recordings, references);
   } else {
-    app.innerHTML = aboutPageMarkup({
-      recordingCount: catalog ? data.length : recordingCount,
-      profile,
-    });
+    app.innerHTML = aboutPageMarkup(profile);
   }
   bindInfoActions(app);
 }

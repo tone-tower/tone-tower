@@ -10,10 +10,10 @@ for (const base of [
       try {
         const page = await context.newPage();
         await page.goto(base + 'cantonese/about/');
-        await expect(page.getByRole('region', { name: 'Voices & credits' })).toBeVisible();
+        await expect(page.getByRole('region', { name: 'Recordings' })).toBeVisible();
         await page
           .getByRole('region', { name: 'Other languages' })
-          .getByRole('link', { name: 'Vietnamese →' })
+          .getByRole('link', { name: 'Play Tone Tower in Vietnamese' })
           .click();
         await expect(page).toHaveURL(base + 'vietnamese/');
       } finally {
@@ -102,6 +102,7 @@ for (const base of [
         await expect(page).toHaveURL(base + language + '/');
         await page.goto(base + language + '/about/');
         await expect(page.locator('.about-page h1')).toHaveText('About Tone Tower');
+        await page.getByText('Data and software credits').click();
         const license = page.getByRole('link', { name: 'MIT licensed code' });
         await expect(license).toHaveAttribute('href', base + 'LICENSE');
         await expect(page.getByRole('link', { name: 'DM Sans font licence' })).toHaveAttribute(

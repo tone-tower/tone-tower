@@ -67,13 +67,14 @@ export const vietnamese = Object.freeze<LanguageProfile>({
     gloss: 'forever',
   },
   copy: {
-    homeTitle: 'Tone Tower · Vietnamese tone games',
-    homeDescription: 'Practise recognising Vietnamese tones with recordings and focused exercises.',
+    homeTitle: 'Tone Tower · Practice Vietnamese',
+    homeDescription:
+      'Practise Vietnamese by listening to words and matching their written tone marks.',
     guideDescription:
       'Learn the six Vietnamese tones and their marks with playable pronunciation examples.',
     practiceDescription: 'Practise Vietnamese tones at your own pace, without a timer or lives.',
     loading: 'Play Tone Tower to practise the six Vietnamese tones.',
     recordings:
-      'recordings use synthetic speech generated with the ElevenLabs voice “Tuan Anh”. Synthetic speech can produce incorrect tones. Contributors compiled the word list and English meanings.',
+      'The recordings use synthetic speech generated with the ElevenLabs voice “Tuan Anh”. The generated speech can get a tone wrong.',
   },
 });

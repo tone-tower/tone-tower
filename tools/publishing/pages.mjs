@@ -86,16 +86,11 @@ export function renderPage(template, key, catalog) {
     const json = JSON.stringify(guideCatalog).replace(/</g, '\\u003c');
     html = html.replace(
       '</body>',
-      () =>
-        `<script type="application/json" id="guide-catalog" data-recording-count="${rows.length}">${json}</script>\n</body>`,
+      () => `<script type="application/json" id="guide-catalog">${json}</script>\n</body>`,
     );
   }
   let content;
-  if (page === 'about')
-    content = aboutPageMarkup({
-      recordingCount: rows.length,
-      profile,
-    });
+  if (page === 'about') content = aboutPageMarkup(profile);
   if (page === 'sounds') content = guide;
   if (page === 'practice')
     content =

@@ -118,7 +118,7 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await page.goto('/');
   await page.locator('.language-card--vietnamese').click();
   await expect(page).toHaveURL(/\/vietnamese\/$/);
-  await expect(page.locator('h1')).toHaveText('Practice Vietnamese tones');
+  await expect(page.locator('h1')).toHaveText('Practice Vietnamese');
   await expect(page.locator('#destination-title')).toHaveText('Tone Tower');
   await expect(page.locator('.mode-picker')).toHaveCount(0);
   await expect(page.locator('[data-destination="rail"]:visible')).toHaveCount(0);
@@ -126,7 +126,7 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await expect(page.locator('#setup-practice')).toBeVisible();
   await expect(page.locator('#script-display')).toHaveCount(0);
   await page.locator('#about').click();
-  const credits = page.getByRole('region', { name: 'Voices & credits' });
+  const credits = page.getByRole('region', { name: 'Recordings' });
   await expect(credits).toContainText('ElevenLabs voice “Tuan Anh”');
   await credits.getByRole('button', { name: 'Browse recordings' }).click();
   await expect(page.locator('#dialog')).toContainText('Fixture · synthetic voice');
@@ -327,11 +327,10 @@ test('Vietnamese saves stay separate and About links to each language home', asy
   expect(saves.cmn).toBe('mandarin-sentinel');
   await page.locator('#about').click();
   const otherLanguages = page.getByRole('region', { name: 'Other languages' });
-  await expect(otherLanguages.getByRole('link', { name: 'Mandarin →' })).toHaveAttribute(
-    'href',
-    /mandarin\/$/,
-  );
-  await otherLanguages.getByRole('link', { name: 'Cantonese →' }).click();
+  await expect(
+    otherLanguages.getByRole('link', { name: 'Play Tone Tower in Mandarin' }),
+  ).toHaveAttribute('href', /mandarin\/$/);
+  await otherLanguages.getByRole('link', { name: 'Play Tone Tower in Cantonese' }).click();
   await expect(page).toHaveURL(/cantonese\/$/);
 });
 

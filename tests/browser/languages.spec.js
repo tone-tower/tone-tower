@@ -152,8 +152,9 @@ test('chooser loads no catalog and language navigation stays in Mandarin', async
   await page.locator('.language-card--mandarin').click();
   await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
   await page.locator('#about').click();
-  const credits = page.getByRole('region', { name: 'Voices & credits' });
-  await expect(credits).toContainText('CC-CEDICT');
+  const credits = page.getByRole('region', { name: 'Recordings' });
+  await credits.getByText('Data and software credits').click();
+  await expect(credits.getByRole('link', { name: 'CC-CEDICT' })).toBeVisible();
   await expect(credits).not.toContainText('CC-Canto');
   expect(requests).toEqual([]);
   const browse = credits.getByRole('button', { name: 'Browse recordings' });
@@ -408,17 +409,17 @@ test('reduced motion and blocked local storage still allow a language game', asy
 test('language homes have a brief introduction and guide link above the games', async ({
   page,
 }) => {
-  for (const [language, subject, greeting] of [
-    ['cantonese', 'Jyutping', 'nei5 hou2'],
-    ['mandarin', 'Pinyin', 'nǐ hǎo'],
-    ['vietnamese', 'Vietnamese tones', 'xin chào'],
+  for (const [language, subject] of [
+    ['cantonese', 'Jyutping'],
+    ['mandarin', 'Pinyin'],
+    ['vietnamese', 'Vietnamese'],
   ]) {
     await page.goto('/' + language + '/');
     const intro = page.locator('.home-welcome');
     const heading = intro.getByRole('heading', { level: 1 });
-    const link = intro.getByRole('link', { name: `New to ${subject}?`, exact: true });
+    const guideLabel = language === 'vietnamese' ? 'Vietnamese tone guide' : `New to ${subject}?`;
+    const link = intro.getByRole('link', { name: guideLabel + ' Open the guide', exact: true });
     await expect(heading).toHaveText('Practice ' + subject);
-    await expect(link.locator('.home-guide-sample')).toHaveText(greeting);
     await expect(link).toHaveAttribute(
       'href',
       new URL('/' + language + '/guide/', page.url()).href,
@@ -442,17 +443,33 @@ test('language homes have a brief introduction and guide link above the games', 
 });
 
 test('About covers games, recordings, and ways to contribute', async ({ page }) => {
-  for (const language of ['cantonese', 'mandarin', 'vietnamese']) {
+  for (const [language, subject] of Object.entries({
+    cantonese: 'Jyutping',
+    mandarin: 'Pinyin',
+    vietnamese: 'Vietnamese',
+  })) {
     await page.goto('/' + language + '/about/');
     await expect(page.locator('.about-page h1')).toHaveText('About Tone Tower');
     await expect(page.locator('.about-page .info-card')).toHaveCount(
       language === 'vietnamese' ? 1 : 2,
     );
-    await expect(page.getByRole('heading', { name: 'Games and practice' })).toBeVisible();
-    const recordings = page.getByRole('region', { name: 'Voices & credits' });
-    await expect(recordings.getByRole('heading', { name: 'Voices & credits' })).toBeVisible();
+    await expect(page.locator('.about-heading .lead')).toContainText(
+      'Tone Tower is a browser game for practising ' + subject,
+    );
+    await expect(page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Practice Mode', exact: true })).toHaveAttribute(
+      'href',
+      new URL('/' + language + '/practice/', page.url()).href,
+    );
+    const recordings = page.getByRole('region', { name: 'Recordings' });
     await expect(recordings.getByRole('button', { name: 'Browse recordings' })).toBeVisible();
-    await expect(recordings.getByRole('link', { name: 'MIT licensed code' })).toBeVisible();
+    const license = recordings.getByRole('link', {
+      name: 'MIT licensed code',
+      includeHidden: true,
+    });
+    await expect(license).toBeHidden();
+    await recordings.getByText('Data and software credits').click();
+    await expect(license).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reset saved progress…' })).toHaveCount(0);
     const contributions = page.getByRole('region', { name: 'Project and feedback' });
     for (const name of ['GitHub repository', 'Report a problem ↗', 'Suggest an idea ↗'])
@@ -465,6 +482,14 @@ test('About covers games, recordings, and ways to contribute', async ({ page }) 
         new URL('/' + other + '/', page.url()).href,
       );
     await noOverflow(page);
+    const home = page.getByRole('link', { name: '← Home' });
+    await home.click();
+    await expect(page).toHaveURL(new URL('/' + language + '/', page.url()).href);
+    await page.goBack();
+    await page.getByRole('link', { name: 'New to ' + subject + '? Open the guide' }).click();
+    await expect(page).toHaveURL(new URL('/' + language + '/guide/', page.url()).href);
+    await page.locator('.page-heading .back-link').click();
+    await expect(page).toHaveURL(new URL('/' + language + '/', page.url()).href);
   }
 });
 

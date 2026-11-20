@@ -8,7 +8,7 @@ does not replace the licences of the material below.
 Recordings come from Wikimedia Commons. Each recording keeps its own licence:
 CC BY-SA 4.0, CC BY 4.0 or CC0. The published catalog.json identifies its creator,
 source page, licence URL and conversion credit. The same information is available
-in the game's Voices & credits dialog. The source inventory is data/audio/content.json.
+in the game's recording directory. The source inventory is data/audio/content.json.
 Recordings converted from Ogg to MP3 retain their pronunciation; individual
 conversion notes describe the processing. Share-alike recordings and adaptations
 remain under their indicated licence.
@@ -35,14 +35,14 @@ licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 The excerpts are trimmed and converted to MP3; pitch and speed are unchanged.
 These audio adaptations retain CC BY-SA 4.0. Source evidence, cut points and
 checksums are retained in data/audio/mandarin-tone-examples.json. Published
-catalog entries and Voices & credits include their attribution and processing notes.
+catalog entries and the recording directory include their attribution and processing notes.
 
 ## Synthetic speech recordings
 
 The Vietnamese word recordings in audio/vi/ are synthetic speech. No person
 recorded them: each clip was generated with ElevenLabs (model Eleven v4) using the
 voice named in data/content/vi/words.json, and is published unchanged. That file
-lists every clip with its size and SHA-256 hash. The game's Voices & credits dialog
+lists every clip with its size and SHA-256 hash. The game's recording directory
 and About page identify these clips as synthetic. The Vietnamese word list, its
 frequency ranks and its English meanings were supplied with the recordings by the
 contributor who generated them.

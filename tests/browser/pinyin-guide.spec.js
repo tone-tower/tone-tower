@@ -95,7 +95,7 @@ test('Pinyin lessons use marked spelling, contextual audio and accessible detail
   expect(errors).toEqual([]);
   await page
     .locator('.pinyin-guide')
-    .getByRole('link', { name: 'Voices & credits on About', exact: true })
+    .getByRole('link', { name: 'recording directory on the About page', exact: true })
     .click();
   await page.getByRole('button', { name: 'Browse recordings' }).click();
   await page.locator('#credit-search').fill('Wolfdog');

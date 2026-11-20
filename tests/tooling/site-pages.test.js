@@ -36,9 +36,19 @@ test('language pages have static content, independent navigation, metadata and p
     assert.equal(base.href, 'https://example.org/a/renamed/');
     assert.equal(new URL('src/app.ts', base).href, 'https://example.org/a/renamed/src/app.ts');
     assert.ok(sitemap().includes(url));
+    if (metadata.page === 'about' || key === 'vi:sounds') {
+      assert.ok(
+        html.includes(
+          '<a class="text-button back-link" href="' +
+            prefix +
+            profile.slug +
+            '/" data-page="home">← Home</a>',
+        ),
+      );
+    }
     if (metadata.page === 'about') {
       assert.ok(!html.includes('data-info-action="reset"'));
-      for (const heading of ['Games and practice', 'Voices &amp; credits', 'Other languages'])
+      for (const heading of ['Games', 'Recordings', 'Other languages'])
         assert.ok(html.includes(heading), profile.id + ': ' + heading);
       assert.ok(html.includes('Browse recordings'));
       assert.ok(html.includes('Report a problem'));

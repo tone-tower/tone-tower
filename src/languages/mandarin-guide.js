@@ -603,7 +603,7 @@ export function mandarinGuide(anchors, definitions, recordings = []) {
       <p class="small">
         Changing simplified/traditional characters changes the writing shown, not the recording.
         Recordings retain their source attribution and licences in
-        <a href="about/" data-page="about">Voices &amp; credits on About</a>.
+        <a href="about/" data-page="about">recording directory on the About page</a>.
       </p>
     </section>
     <div class="info-actions">

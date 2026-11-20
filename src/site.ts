@@ -52,9 +52,9 @@ export function languagePages(
       path: root + 'about/',
       title: 'About · ' + profile.label + ' Tone Tower',
       description:
-        'About the open-source ' +
-        profile.label +
-        ' pronunciation games. Find recording credits, source code, and feedback links.',
+        'Practise ' +
+        (profile.id === 'vi' ? profile.label : profile.romanization) +
+        ' with Tone Tower. Explore the games, recordings, and open-source project.',
     },
   };
 }
