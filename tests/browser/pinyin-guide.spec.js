@@ -95,15 +95,16 @@ test('Pinyin lessons use marked spelling, contextual audio and accessible detail
   expect(errors).toEqual([]);
   await page
     .locator('.pinyin-guide')
-    .getByRole('button', { name: 'Voices & credits', exact: true })
+    .getByRole('link', { name: 'Voices & credits on About', exact: true })
     .click();
+  await page.getByRole('button', { name: 'Browse recordings' }).click();
   await page.locator('#credit-search').fill('Wolfdog');
   await expect(page.locator('#credit-results tbody tr')).toHaveCount(4);
   await expect(page.locator('#credit-results')).toContainText('CC-BY-SA-4.0');
   await expect(page.locator('#credit-results')).toContainText('Pitch and speed unchanged');
 });
 
-test('Pinyin examples follow script settings and the in-game quick guide stays compact', async ({
+test('Pinyin examples follow script settings when a run exits to the full guide', async ({
   page,
 }) => {
   await page.goto('/mandarin/');
@@ -131,13 +132,14 @@ test('Pinyin examples follow script settings and the in-game quick guide stays c
   await page.locator('#start-adventure').click();
   await expect(page.locator('.tone-door').first()).toBeEnabled();
   await page.locator('#learn').click();
-  await expect(page.getByRole('heading', { name: 'Pinyin at a glance' })).toBeVisible();
-  await expect(page.locator('#dialog .guide-tone')).toHaveCount(5);
-  await page.locator('#dialog [data-guide-tone="3"]').click();
-  await expect(page.locator('#dialog #guide-status')).toContainText('mǎ');
+  await expect(page.getByRole('heading', { name: 'Go to Pinyin guide?' })).toBeVisible();
+  await expect(page.locator('#dialog')).toBeHidden();
+  await page.getByRole('button', { name: 'End run & go to Pinyin guide' }).click();
+  await expect(page).toHaveURL(/mandarin\/guide\/$/);
+  await expect(page.locator('.guide-tone')).toHaveCount(5);
+  await page.locator('.guide-tones [data-guide-tone="3"]').click();
+  await expect(page.locator('#guide-status')).toContainText('mǎ');
   await expect
     .poll(() => page.evaluate(() => window.__guideAudio.at(-1)))
     .toMatch(/commons-83387745-ma3-[a-f0-9]{12}\.mp3$/);
-  await page.locator('#close-dialog').click();
-  await expect(page.locator('#dialog')).not.toBeVisible();
 });

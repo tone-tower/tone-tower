@@ -50,32 +50,11 @@ test('saved completions decorate home, persist, and stay separate for each langu
   await expect(page.locator('.earned-reward')).toHaveCount(0);
 });
 
-test('About provides a deliberate reset, which clears only the current language', async ({
-  page,
-}) => {
-  await page.goto('/cantonese/');
-  await page.evaluate((progress) => {
-    for (const language of ['cantonese', 'mandarin'])
-      localStorage.setItem('soundbound-' + language + '-v1', JSON.stringify(progress));
-  }, saved);
-  await page.goto('/cantonese/about/');
-  await page.getByRole('button', { name: 'Reset saved progress…' }).click();
-  await expect(page.getByRole('button', { name: 'Keep my progress' })).toBeFocused();
-  await page.getByRole('button', { name: 'Keep my progress' }).click();
-  await expect(page.locator('#dialog')).not.toBeVisible();
-  await page.getByRole('button', { name: 'Reset saved progress…' }).click();
-  await page.getByRole('button', { name: 'Reset everything' }).click();
-  await expect(page.locator('.mode-cards')).toBeVisible();
-  await expect(page.locator('.home-friend')).toHaveCount(0);
-  await expect(page.locator('.earned-reward')).toHaveCount(0);
-  await page.goto('/mandarin/');
-  await expect(page.locator('.home-friend')).toHaveCount(5);
-});
-
 test('cat targets follow roaming sprites, hold still for focus, and respect reduced motion', async ({
   page,
 }) => {
   await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 1000));
   await page.addInitScript(
     (progress) => localStorage.setItem('soundbound-cantonese-v1', JSON.stringify(progress)),
     saved,
@@ -83,7 +62,6 @@ test('cat targets follow roaming sprites, hold still for focus, and respect redu
   await page.goto('/cantonese/');
   const cat = page.getByRole('button', { name: 'Pet the rooftop cat' });
   await expect(cat).toBeVisible();
-  await page.clock.pauseAt(new Date(Date.now() + 100));
   const position = () => cat.evaluate((button) => button.style.left);
   const first = await position();
   await page.clock.runFor(10000);

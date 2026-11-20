@@ -77,11 +77,11 @@ URLs.
 Games ask words of two or more syllables. Isolated syllables are left out
 because a synthetic voice reads them less reliably than words. The guide’s tone
 references are words too, chosen so that both syllables carry the same tone:
-`chú ý`, `hoàn toàn`, `đảm bảo`, `mãi mãi`, `hiện tại` and `hôm nay`. They are ordinary words and can also be asked. The shared home, practice controls, language switcher and rewards use the current application UI.
+`chú ý`, `hoàn toàn`, `đảm bảo`, `mãi mãi`, `hiện tại` and `hôm nay`. They are ordinary words and can also be asked. The shared home, practice controls and rewards use the current application UI.
 
 The recordings are synthetic speech generated with ElevenLabs, not recordings of
 a person. The catalog marks each one `synthetic` and credits the voice, and the
-About page and Voices & credits say so.
+Voices & credits section on About identifies the voice.
 
 Import a voice from a frequency list and a folder of clips named
 `<rank>_<word>.mp3`:

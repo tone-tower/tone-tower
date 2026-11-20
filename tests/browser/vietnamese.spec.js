@@ -122,10 +122,13 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await expect(page.locator('#destination-title')).toHaveText('Tone Tower');
   await expect(page.locator('.mode-picker')).toHaveCount(0);
   await expect(page.locator('[data-destination="rail"]:visible')).toHaveCount(0);
-  await expect(page.locator('.language-switcher')).toContainText('Vietnamese');
+  await expect(page.locator('.site-language')).toContainText('Vietnamese');
   await expect(page.locator('#setup-practice')).toBeVisible();
-  await page.locator('#credits').click();
-  await expect(page.locator('#dialog')).toContainText('Synthetic speech generated with ElevenLabs');
+  await expect(page.locator('#script-display')).toHaveCount(0);
+  await page.locator('#about').click();
+  const credits = page.getByRole('region', { name: 'Voices & credits' });
+  await expect(credits).toContainText('ElevenLabs voice “Tuan Anh”');
+  await credits.getByRole('button', { name: 'Browse recordings' }).click();
   await expect(page.locator('#dialog')).toContainText('Fixture · synthetic voice');
   await expect(page.locator('#dialog')).not.toContainText(/undefined|Wikimedia|Original/);
   await page.locator('#close-dialog').click();
@@ -305,9 +308,7 @@ test('reduced motion shows the answer without the leaving cover', async ({ page 
   await expect(page.locator('.tone-cover').first()).toBeHidden();
 });
 
-test('Vietnamese saves stay separate while the newer language switcher preserves the page', async ({
-  page,
-}) => {
+test('Vietnamese saves stay separate and About links to each language home', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('soundbound-cantonese-v1', 'cantonese-sentinel');
     localStorage.setItem('soundbound-mandarin-v1', 'mandarin-sentinel');
@@ -324,16 +325,14 @@ test('Vietnamese saves stay separate while the newer language switcher preserves
   expect(saves.vi).toBeTruthy();
   expect(saves.yue).toBe('cantonese-sentinel');
   expect(saves.cmn).toBe('mandarin-sentinel');
-  await page.locator('#learn').click();
-  await page.locator('.language-switcher summary').click();
-  await expect(page.locator('[data-language-link="cmn"]')).toHaveAttribute(
+  await page.locator('#about').click();
+  const otherLanguages = page.getByRole('region', { name: 'Other languages' });
+  await expect(otherLanguages.getByRole('link', { name: 'Mandarin →' })).toHaveAttribute(
     'href',
-    /mandarin\/guide\/$/,
+    /mandarin\/$/,
   );
-  await expect(page.locator('[data-language-link="yue"]')).toHaveAttribute(
-    'href',
-    /cantonese\/guide\/$/,
-  );
+  await otherLanguages.getByRole('link', { name: 'Cantonese →' }).click();
+  await expect(page).toHaveURL(/cantonese\/$/);
 });
 
 test('home keyboard shortcuts keep Vietnamese on its supported tower', async ({ page }) => {

@@ -30,19 +30,16 @@ interface ControllerOptions {
   profile: LanguageProfile;
   app: HTMLElement;
   player: AudioPlayer;
-  dialog: HTMLDialogElement;
+  siteHeader?: HTMLElement;
   words: ExerciseRow[];
-  anchors?: ExerciseRow[];
   script?: string;
   onFinish?: (run: Run) => void;
   victoryMessage?: (run: Run) => string;
   onRetry?: (config: RunInput) => void;
   onHome?: () => void;
   onPractice?: (run: Run, mode: 'combination' | 'mistakes') => void;
-  onLearn?: (options: { returnToGame: boolean }) => void;
   environment?: CountdownOptions & {
     document?: Document;
-    MutationObserver?: typeof MutationObserver;
     animateWorld?: typeof animateWorld;
   };
 }
@@ -131,16 +128,14 @@ export function createGameController({
   profile,
   app,
   player,
-  dialog,
+  siteHeader,
   words,
-  anchors = [],
   script: initialScript = profile.defaultScript,
   onFinish = () => {},
   victoryMessage = () => '',
   onRetry = () => {},
   onHome = () => {},
   onPractice = () => {},
-  onLearn = () => {},
   environment = {},
 }: ControllerOptions) {
   requireProfile(profile);
@@ -152,7 +147,6 @@ export function createGameController({
   let phase: ControllerPhase = 'idle',
     active = false,
     paused = false,
-    pauseReason = '',
     attached = false;
   let generation = 0,
     audioGeneration = 0,
@@ -164,9 +158,8 @@ export function createGameController({
     towerReady = true,
     outcome: RunResult | null = null,
     answeredPosition = 1;
-  let restoreFocus: HTMLElement | null = null,
-    exitConfirmation: ExitConfirmation | null = null,
-    observer: MutationObserver | null = null,
+  let exitConfirmation: ExitConfirmation | null = null,
+    spaceTarget: HTMLElement | null = null,
     sceneAnimator: ReturnType<typeof animateWorld> | null = null,
     entryVisual = false;
   let script = initialScript;
@@ -175,13 +168,7 @@ export function createGameController({
   const qa = <S extends string>(selector: S) => queryAll(app, selector);
   const isTide = () => run?.config.challenge === 'tide';
   const answering = () =>
-    active &&
-    !paused &&
-    phase === 'answering' &&
-    audioReady &&
-    !audioFailed &&
-    !dialog?.open &&
-    !doc?.hidden;
+    active && !paused && phase === 'answering' && audioReady && !audioFailed && !doc?.hidden;
   const clock = createCountdown({
     now: environment.now,
     setTimeout: later,
@@ -211,33 +198,22 @@ export function createGameController({
   function attach() {
     if (attached) return;
     attached = true;
-    doc?.addEventListener('keydown', keydown);
+    doc.addEventListener('keydown', keydown, true);
+    doc.addEventListener('keyup', keyup, true);
     doc?.addEventListener('visibilitychange', visibility);
     app.addEventListener('pointerdown', keepTypingFocus);
-    dialog?.addEventListener('close', dialogClosed);
-    const Observer = environment.MutationObserver ?? globalThis.MutationObserver;
-    if (Observer && dialog) {
-      observer = new Observer(() => {
-        if (active && dialog.open) pause('dialog');
-      });
-      observer.observe(dialog, { attributes: true, attributeFilter: ['open'] });
-    }
   }
   function detach() {
     if (!attached) return;
     attached = false;
-    doc?.removeEventListener('keydown', keydown);
+    doc.removeEventListener('keydown', keydown, true);
+    doc.removeEventListener('keyup', keyup, true);
     doc?.removeEventListener('visibilitychange', visibility);
     app.removeEventListener('pointerdown', keepTypingFocus);
-    dialog?.removeEventListener('close', dialogClosed);
-    observer?.disconnect();
-    observer = null;
   }
   function visibility() {
-    if (active && doc.hidden) pause('hidden');
-  }
-  function dialogClosed() {
-    if (paused && pauseReason === 'dialog') resume();
+    spaceTarget = null;
+    if (active && doc.hidden && phase !== 'interrupted') pause();
   }
   function captureInput() {
     const input = q('#transcription-answer')!;
@@ -597,8 +573,23 @@ export function createGameController({
     };
     sceneAnimator.update(sceneState);
   }
+  function focusGameplay() {
+    if (!active) return;
+    const target = paused
+      ? q('#resume-game')
+      : terminal()
+        ? q('#run-end-title')
+        : q('#continue-game')
+          ? q('.scene-question')
+          : isTide() && !q('#transcription-answer')?.disabled
+            ? q('#transcription-answer')
+            : q('.game-layout');
+    target?.focus({ preventScroll: true });
+  }
   function render({ focus = true } = {}) {
     if (!active) return;
+    const previousFocus = doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
+    const focusedInGame = previousFocus && app.contains(previousFocus);
     const d = district(),
       previousFrame = q('.scene-frame')!,
       previousScene = q('.world-scene')!;
@@ -614,6 +605,7 @@ export function createGameController({
     app.dataset.outcome = presentation();
     const markup = /* HTML */ `<div
       class="game-layout"
+      tabindex="-1"
       data-outcome="${presentation()}"
       data-terminal="${terminal()}"
       data-landing="${phase === 'landing'}"
@@ -640,7 +632,7 @@ export function createGameController({
           Ⅱ
         </button>
       </div>
-      <div class="scene-question">
+      <div class="scene-question" tabindex="-1">
         ${isTide() ? railFeedback() : towerFeedback()}${promptMarkup(['review', 'correct', 'landing'].includes(phase))}
         <div class="prompt-actions">
           <button
@@ -719,21 +711,20 @@ export function createGameController({
     bind();
     updateClock(clock.remaining, clock.total);
     syncScene();
-    if (focus) {
-      if (terminal() && !paused) {
-        q('#run-end-title')?.focus({ preventScroll: true });
-        return;
-      }
-      if (paused) q('#resume-game')?.focus({ preventScroll: true });
-      else if (q('#continue-game') && ['review', 'landing'].includes(phase))
-        q('#continue-game')?.focus({ preventScroll: true });
-      else if (isTide()) {
-        q('#transcription-answer')?.focus({ preventScroll: true });
-        q('#transcription-answer')?.setSelectionRange(inputValue.length, inputValue.length);
+    if (focus) focusGameplay();
+    else if (previousFocus && app.contains(previousFocus)) {
+      if (previousFocus.matches(':disabled')) focusGameplay();
+    } else if (previousFocus && focusedInGame) {
+      const replacement = previousFocus.id && doc.getElementById(previousFocus.id);
+      if (replacement && !replacement.matches(':disabled')) {
+        replacement.focus({ preventScroll: true });
+      } else {
+        focusGameplay();
       }
     }
   }
   function bind() {
+    if (siteHeader) siteHeader.inert = paused;
     qa('.game-layout > :not(.pause-overlay)').forEach((element) => {
       element.inert = paused;
     });
@@ -816,7 +807,10 @@ export function createGameController({
     q('#ending-practice')?.addEventListener('click', () => startReview('combination'));
     q('#practise-mistakes')?.addEventListener('click', () => startReview('mistakes'));
     q('#ending-replay')?.addEventListener('click', replay);
-    q('#replay-word')?.addEventListener('click', replay);
+    q('#replay-word')?.addEventListener('click', (event) => {
+      replay();
+      if (event.detail > 0) focusGameplay();
+    });
     q('#pause-run')?.addEventListener('click', () => pause());
     q('#continue-game')?.addEventListener('click', advance);
     q('#resume-game')?.addEventListener('click', resume);
@@ -829,11 +823,6 @@ export function createGameController({
     q('#finish-paused-practice')?.addEventListener('click', finishPractice);
     q('#reveal-answer')?.addEventListener('click', () => fail('reveal'));
     q('#replace-recording')?.addEventListener('click', replace);
-    q('#game-learn')?.addEventListener('click', () => {
-      run.markAssisted();
-      pause('dialog');
-      onLearn({ returnToGame: true });
-    });
   }
   function updateClock(left: number, total: number) {
     if (!active) return;
@@ -865,7 +854,7 @@ export function createGameController({
     }
   }
   async function playPrompt() {
-    if (!active || paused || dialog?.open || doc?.hidden) return;
+    if (!active || paused || doc?.hidden) return;
     const own = ++audioGeneration,
       current = generation,
       first = !audioReady;
@@ -914,7 +903,7 @@ export function createGameController({
     }
   }
   function replay() {
-    if (!active || paused || dialog?.open || doc?.hidden) return;
+    if (!active || paused || doc?.hidden) return;
     if (entryVisual) {
       cancelAuto();
       entryVisual = false;
@@ -958,7 +947,7 @@ export function createGameController({
     answeredPosition = run.opened + 1;
     render();
     player.preload?.([run.word.audio]);
-    if (doc?.hidden || dialog?.open) pause(doc?.hidden ? 'hidden' : 'dialog');
+    if (doc?.hidden) pause();
     else if (entryVisual) playOpening();
     else playPrompt();
   }
@@ -1122,12 +1111,10 @@ export function createGameController({
     detach();
     onFinish(completed);
   }
-  function pause(reason = 'manual', opener = doc?.activeElement) {
+  function pause() {
     if (!active || paused) return;
     captureInput();
-    restoreFocus = opener instanceof HTMLElement ? opener : null;
     paused = true;
-    pauseReason = reason;
     clock.pause();
     cancelAuto();
     stopPlayback();
@@ -1140,9 +1127,8 @@ export function createGameController({
     else pause();
   }
   function resume() {
-    if (!active || !paused || dialog?.open || doc?.hidden) return;
+    if (!active || !paused || doc?.hidden) return;
     paused = false;
-    pauseReason = '';
     exitConfirmation = null;
     render({ focus: false });
     if (['listening', 'answering'].includes(phase)) {
@@ -1152,38 +1138,31 @@ export function createGameController({
       enableAnswers();
     } else if (towerStop() && !towerReady) unlockTowerStop();
     else if (phase === 'correct' && !towerStop()) scheduleAdvance();
-    const previous = restoreFocus?.isConnected
-      ? restoreFocus
-      : restoreFocus?.id
-        ? doc?.getElementById(restoreFocus.id)
-        : null;
-    restoreFocus = null;
-    if (terminal()) q('#run-end-title')?.focus({ preventScroll: true });
-    else if (isTide()) {
-      const control = q('#continue-game') ?? q('#transcription-answer');
-      control?.focus({ preventScroll: true });
-    } else if (previous && previous !== doc?.body && !previous.matches(':disabled'))
-      previous.focus({ preventScroll: true });
-    else if (['review', 'landing'].includes(phase)) q('#continue-game')?.focus();
+    focusGameplay();
   }
   function keydown(event: KeyboardEvent) {
-    if (!active || event.defaultPrevented || doc?.hidden || event.isComposing) return;
-    // An Enter or Space held across a focus change must not activate the next control.
+    if (!active || event.defaultPrevented || doc.hidden || event.isComposing) return;
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const input = q('#transcription-answer');
+    if (target === input && input?.composing) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+    // A held activation key can outlive the button or view that first received it.
     if (event.repeat && (event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault();
       return;
     }
-    if (dialog?.open || phase === 'interrupted') return;
+    if (event.key === ' ') spaceTarget = target;
+    if (phase === 'interrupted') return;
+
     if (paused && event.key === 'Tab') {
-      const controls = ['#resume-game', '#finish-paused-practice', '#end-run']
-        .map(q)
-        .filter(Boolean);
-      const index = controls.findIndex((control) => control === doc?.activeElement),
-        next = event.shiftKey
-          ? index <= 0
-            ? controls.length - 1
-            : index - 1
-          : (index + 1) % controls.length;
+      const controls = qa('.pause-overlay button');
+      const index = controls.findIndex((control) => control === doc.activeElement);
+      const next = event.shiftKey
+        ? index <= 0
+          ? controls.length - 1
+          : index - 1
+        : (index + 1) % controls.length;
       event.preventDefault();
       controls[next]?.focus();
       return;
@@ -1194,52 +1173,45 @@ export function createGameController({
       paused ? resume() : pause();
       return;
     }
-    if (paused) return;
-    const target = event.target instanceof Element ? event.target : null;
-    if (target && target !== doc?.body && target !== doc?.documentElement && !app.contains(target))
-      return;
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (
-      (event.key === ' ' || event.key === 'Enter') &&
-      target?.closest('button, a[href], summary, [role="button"], [role="link"]')
+      paused ||
+      (target && target !== doc.body && target !== doc.documentElement && !app.contains(target))
     )
       return;
+    if (target?.closest('button, a[href], summary, [role="button"], [role="link"]')) return;
     const typing = target?.closest('input, textarea, select, [contenteditable]');
-    if (typing && typing !== q('#transcription-answer')) return;
-    const replayKey =
+    if (typing && typing !== input) return;
+
+    if (
       event.key === ' ' ||
-      (event.key.toLowerCase() === 'r' && (!isTide() || !profile.allowWordSpaces));
-    if (replayKey) {
+      (event.key.toLowerCase() === 'r' && (!isTide() || !profile.allowWordSpaces))
+    ) {
       event.preventDefault();
       replay();
-      return;
-    }
-    if (typing) return;
-    if (event.key === 'Enter' && (['review', 'landing'].includes(phase) || towerTerminal())) {
+    } else if (!typing && event.key === 'Enter' && q('#continue-game')) {
       event.preventDefault();
       advance();
-      return;
-    }
-    if (!isTide() && answering()) {
+    } else if (!typing && !isTide() && answering()) {
       const keyed = /^[1-9]$/.test(event.key) ? profile.tones[Number(event.key) - 1] : undefined;
-      if (keyed !== undefined) {
+      const index = arrowChoiceIndex(run.choices.length, event.key);
+      if (keyed !== undefined || index !== null) {
         event.preventDefault();
-        choose(keyed);
-      } else {
-        const index = arrowChoiceIndex(run.choices.length, event.key);
-        if (index !== null) {
-          event.preventDefault();
-          choose(run.choices[index]);
-        }
+        choose(keyed ?? (index === null ? undefined : run.choices[index]));
       }
     }
+  }
+  function keyup(event: KeyboardEvent) {
+    if (event.key !== ' ') return;
+    if (event.target !== spaceTarget) event.preventDefault();
+    spaceTarget = null;
   }
   function dispose() {
     stop();
     active = false;
     paused = false;
     exitConfirmation = null;
-    restoreFocus = null;
+    spaceTarget = null;
+    if (siteHeader) siteHeader.inert = false;
     phase = 'idle';
     detach();
   }
@@ -1255,6 +1227,7 @@ export function createGameController({
     },
     pause,
     confirmExit,
+    focusGameplay,
     resume,
     dispose,
     setScript(nextScript: string) {

@@ -112,7 +112,8 @@ test('Cantonese character style updates the current prompt and carries over to t
   await expect(character).toHaveAttribute('lang', 'yue-Hans');
   await expect(character).toHaveText(written === '試' ? '试' : '时');
   expect(await page.evaluate(() => window.__audioPlays.length)).toBe(plays);
-  await page.locator('.tone-door').first().press(tone);
+  await expect(page.locator('.game-layout')).toBeFocused();
+  await page.keyboard.press(tone);
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
 
   await page.goto('/cantonese/guide/');
@@ -125,9 +126,7 @@ test('Cantonese character style updates the current prompt and carries over to t
   await expect(reference).toHaveAttribute('lang', 'yue-Hant');
 });
 
-test('buttons keep keyboard activation and closing game dialogs restores their opener', async ({
-  page,
-}) => {
+test('pause and resume buttons keep keyboard activation', async ({ page }) => {
   await start(page, 'tone');
   await page.clock.runFor(2200);
   const plays = () => page.evaluate(() => window.__audioPlays.length);
@@ -136,42 +135,61 @@ test('buttons keep keyboard activation and closing game dialogs restores their o
   await expect(page.locator('#resume-game')).toBeFocused();
   expect(await plays()).toBe(before);
   await page.locator('#resume-game').press('Enter');
-  await expect(page.locator('#pause-run')).toBeFocused();
 
-  for (const selector of ['#learn', '#credits']) {
-    const opener = page.locator(selector);
-    await opener.press('Enter');
-    await expect(page.locator('#dialog')).toBeVisible();
-    await page.locator('#close-dialog').press('Space');
-    await expect(page.locator('#dialog')).toBeHidden();
-    await expect(page.locator('.pause-overlay')).toHaveCount(0);
-    await expect(opener).toBeFocused();
-  }
+  await expect(page.locator('.game-layout')).toBeFocused();
 });
 
-test('language switching pauses a run until the player confirms or resumes', async ({ page }) => {
+test('header navigation pauses an unfinished run and confirms the full destination', async ({
+  page,
+}) => {
   await start(page, 'tide');
   await page.clock.runFor(150);
   const input = page.locator('#transcription-answer');
   await input.fill('zz');
   const clock = page.locator('#countdown');
   const remaining = await clock.textContent();
-  const requestSwitch = async () => {
-    await page.locator('.language-switcher summary').click();
-    await page.locator('[data-language-link="cmn"]').click();
-    await expect(page.getByRole('heading', { name: 'Switch to Mandarin?' })).toBeVisible();
-  };
-  await requestSwitch();
+  const resume = page.getByRole('button', { name: 'Resume' });
+
+  await page.locator('#replay-word').focus();
+  await page.keyboard.down('Space');
+  await page.locator('.brand').click();
+  await page.keyboard.up('Space');
+  await expect(page.getByRole('heading', { name: 'Go to Home?' })).toBeVisible();
+  await expect(resume).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: 'End run & go to Home' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(resume).toBeFocused();
   await page.clock.runFor(5000);
   await expect(clock).toHaveText(remaining);
-  await expect(page).toHaveURL(/\/cantonese\/$/);
-  await page.locator('#resume-game').click();
+  await expect(page).toHaveURL(/cantonese\/$/);
+  await resume.click();
+  await expect(input).toBeFocused();
   await expect(input).toHaveValue('zz');
-  await expect(page.locator('.pause-overlay')).toHaveCount(0);
-  await requestSwitch();
-  await page.getByRole('button', { name: 'End run & switch language' }).click();
-  await expect(page).toHaveURL(/\/mandarin\/$/);
-  await expect(page.locator('#start-adventure')).toBeVisible();
+
+  await page.locator('#learn').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Go to Jyutping guide?' })).toBeVisible();
+  await page.getByRole('button', { name: 'End run & go to Jyutping guide' }).press('Enter');
+  await expect(page).toHaveURL(/cantonese\/guide\/$/);
+  await expect(page.getByRole('heading', { name: 'Jyutping guide', exact: true })).toBeFocused();
+});
+
+test('Tower returns pointer replay focus to gameplay and keeps arrow shortcuts off buttons', async ({
+  page,
+}) => {
+  await start(page, 'tone');
+  await page.clock.runFor(2200);
+  const game = page.locator('.game-layout');
+  const replay = page.locator('#replay-word');
+  await expect(game).toBeFocused();
+  await replay.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.tone-door:enabled')).not.toHaveCount(0);
+  await expect(replay).toBeFocused();
+  await replay.click();
+  await expect(game).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.tone-door:enabled')).toHaveCount(0);
 });
 
 test('Tower intro, crossing, mistake review and failed-run practice', async ({ page }) => {
@@ -282,6 +300,7 @@ test('phone keyboard keeps the rail journey visible above the typing field', asy
   const scene = page.locator('.world-scene');
   await expect(scene).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('textbox')).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('.site-header')).toBeVisible();
   const rail = await scene.boundingBox();
   const field = await page.getByRole('textbox').boundingBox();
   expect(rail.height).toBeGreaterThanOrEqual(88);

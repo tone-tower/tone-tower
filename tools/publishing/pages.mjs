@@ -2,7 +2,7 @@ import { pages, site, languagePages } from '../../src/site.ts';
 import { languages } from '../../src/languages/profiles.ts';
 import { aboutPageMarkup, soundPageMarkup } from '../../src/ui/info-pages.js';
 import { catalogRows, referenceRows } from '../../src/content/catalog.ts';
-import { languageSwitcherMarkup } from '../../src/ui/site-controls.ts';
+import { scriptSettingMarkup } from '../../src/ui/site-controls.ts';
 const escape = (value) =>
   String(value).replace(
     /[&<>"']/g,
@@ -45,18 +45,8 @@ export function renderPage(template, key, catalog) {
           profile.romanization +
           ' spelling.',
     ),
-    shareAlt: escape(
-      'Tone Tower. Train your ear for ' +
-        profile.label +
-        '. A little sprout, a tower and a railway above the clouds.',
-    ),
-    languageSwitcher: languageSwitcherMarkup(
-      profile,
-      Object.values(languages).map((language) => ({
-        profile: language,
-        path: languagePages(language)[page].path,
-      })),
-    ),
+    shareAlt: 'Tone Tower illustrated with a tower and a railway.',
+    scriptSetting: scriptSettingMarkup(profile),
   };
   let html = localizeLinks(template, profile).replace(/\{\{(\w+)\}\}/g, (_, token) => {
     if (!(token in values)) throw Error('Unknown page token: ' + token);
@@ -123,7 +113,7 @@ export function renderPage(template, key, catalog) {
   // Page links are relative to the deployment root; Vite owns source asset URLs.
   html = html.replace(/\b(href|src)="([^"]+)"/g, (match, attr, ref) => {
     if (/^(?:[a-z][\w+.-]*:|\/\/|#|\/)/i.test(ref)) return match;
-    if (ref.startsWith('src/') || ref.startsWith('assets/') || ref === 'favicon.ico')
+    if (ref.startsWith('src/') || ref.startsWith('assets/brand/') || ref === 'favicon.ico')
       return attr + '="/' + ref + '"';
     return attr + '="' + rootPrefix + ref + '"';
   });

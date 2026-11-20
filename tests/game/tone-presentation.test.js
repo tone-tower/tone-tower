@@ -28,10 +28,10 @@ test('tone presentation follows explicit profile metadata, including named tones
 test('character styles follow the profile and select the default writing system', () => {
   assert.equal(scriptSettingMarkup(vietnamese), '');
   assert.match(scriptSettingMarkup(cantonese), /value="traditional"\s+checked/);
-  assert.match(scriptSettingMarkup(cantonese), /<span>Simplified<\/span>/);
+  assert.match(scriptSettingMarkup(cantonese), /aria-label="Simplified"/);
   assert.equal(textLanguage(cantonese, 'simplified'), 'yue-Hans');
-  assert.match(scriptSettingMarkup(mandarin), /<span>Simplified<\/span>/);
-  assert.match(scriptSettingMarkup(mandarin), /<span>Traditional<\/span>/);
+  assert.match(scriptSettingMarkup(mandarin), /aria-label="Simplified"/);
+  assert.match(scriptSettingMarkup(mandarin), /aria-label="Traditional"/);
   const other = {
     ...mandarin,
     scripts: ['latin', 'native'],

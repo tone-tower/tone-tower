@@ -34,7 +34,7 @@ export type SelectorElement<S extends string> = S extends '#transcription-answer
                         | '[data-practice-tone]'
                         | '[data-guide-tone],[data-guide-word]'
                         | '[data-start-world]'
-                        | '[data-info-action]'
+                        | '[data-info-action="credits"]'
                     ? HTMLButtonElement
                     : HTMLElement;
 export function query<S extends string>(root: ParentNode, selector: S): SelectorElement<S> | null {

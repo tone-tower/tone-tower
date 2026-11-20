@@ -633,9 +633,6 @@
     line-height: 1.5;
   }
 }
-body.keyboard-open[data-screen='game'] .site-header {
-  display: none;
-}
 body.keyboard-open #app[data-world='tide'] .scene-frame {
   max-height: 74px;
   overflow: hidden;
@@ -643,9 +640,6 @@ body.keyboard-open #app[data-world='tide'] .scene-frame {
 body.keyboard-open #app[data-world='tide'] .world-scene {
   height: 74px;
   aspect-ratio: auto;
-}
-body.keyboard-open[data-screen='game'] .site-footer {
-  display: none;
 }
 body.keyboard-open .game-layout {
   margin-top: 5px;
@@ -670,10 +664,6 @@ body.keyboard-open .form-controls .small {
   display: none;
 }
 @media (max-width: 700px) and (max-height: 540px) {
-  body[data-screen='game'] .site-header,
-  body[data-screen='game'] .site-footer {
-    display: none;
-  }
   .game-layout {
     margin-top: 5px;
   }

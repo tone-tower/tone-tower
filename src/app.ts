@@ -18,20 +18,13 @@ import { createCreditsDialog } from './ui/credits-dialog.ts';
 import { catalogRows, referenceRows, validateCatalog } from './content/catalog.ts';
 import { Player } from './audio/audio.ts';
 import { challenges, defaultPractice, practiceForRun, TONE_VARIANTS } from './game/game-core.ts';
-import {
-  loadProgress,
-  saveProgress,
-  recordRun,
-  resetProgress,
-  challengeRecords,
-} from './persistence/progress.ts';
+import { loadProgress, saveProgress, recordRun, challengeRecords } from './persistence/progress.ts';
 import { createGameController } from './game/game-controller.ts';
 import { districts } from './world/worlds.js';
 import { animateWorld } from './world/world-runtime.js';
 import { destinations } from './world/pixel-world.js';
-import { soundPageMarkup, aboutPageMarkup, compactGuideMarkup } from './ui/info-pages.js';
+import { soundPageMarkup, aboutPageMarkup } from './ui/info-pages.js';
 import { bindMapNavigation } from './ui/map-navigation.js';
-import { bindLanguageSwitcher, scriptSettingMarkup } from './ui/site-controls.ts';
 import { textLanguage } from './languages/text-language.ts';
 import { homeRewards, homeDifficulties, rewardNames, friendDialogue } from './ui/home-rewards.ts';
 
@@ -40,6 +33,7 @@ const pages = languagePages(profile);
 const appBase = siteRoot();
 
 const app = required(document, '#app');
+const siteHeader = required(document, '.site-header');
 const dialog = required(document, '#dialog');
 const dialogBody = required(document, '#dialog-body');
 const guideSource = query(document, '#guide-catalog');
@@ -73,7 +67,6 @@ let progress = loadProgress(profile),
   catalog: Catalog | null = null,
   libraryRequest: Promise<ExerciseRow[]> | null = null,
   data: ExerciseRow[] = [],
-  anchors: ExerciseRow[] = [],
   controller: ReturnType<typeof createGameController> | null = null,
   dialogOpener: HTMLElement | null = null,
   screen = 'home';
@@ -93,7 +86,6 @@ function loadLibrary(): Promise<ExerciseRow[]> {
       throw Error('The tone references are incomplete.');
     catalog = next;
     data = rows;
-    anchors = references;
     return rows;
   })().finally(() => {
     libraryRequest = null;
@@ -102,7 +94,6 @@ function loadLibrary(): Promise<ExerciseRow[]> {
 function applyScript(script: string) {
   if (catalog) {
     data = catalogRows(catalog, profile, script);
-    anchors = referenceRows(catalog, data);
   }
   controller?.setScript(script);
 }
@@ -616,13 +607,12 @@ function begin(config: RunInput) {
     return;
   }
   resetView('game');
-  document.querySelector<HTMLDetailsElement>('.language-switcher')?.removeAttribute('open');
   try {
     controller ??= createGameController({
       profile,
       app,
       player,
-      dialog,
+      siteHeader,
       words: data.filter((word) => !word.anchor),
       script: progress.settings.script,
       onFinish: finish,
@@ -630,7 +620,6 @@ function begin(config: RunInput) {
       onRetry: begin,
       onHome: home,
       onPractice: (run, mode) => begin(practiceForRun(run, mode)),
-      onLearn: () => showLearn(),
     });
     controller.start(config);
   } catch (error) {
@@ -670,7 +659,6 @@ function showResults(run: Run) {
 function openDialog(html: string, opener = document.activeElement) {
   if (!dialog.open) {
     dialogOpener = opener instanceof HTMLElement ? opener : null;
-    controller?.pause('dialog', opener);
   }
   player.stop();
   dialogBody.innerHTML = html;
@@ -742,10 +730,6 @@ function setPageLocation(page: string, replace = false) {
     if (link.dataset.navPage === page) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
-  document.querySelectorAll<HTMLAnchorElement>('[data-language-link]').forEach((link) => {
-    const language = languages[link.dataset.languageLink ?? ''];
-    if (language) link.href = new URL(languagePages(language)[page].path, appBase).href;
-  });
   const metadata = pages[page];
   document.title = metadata.title;
   for (const selector of [
@@ -787,22 +771,8 @@ function bindInfoActions(container: HTMLElement) {
         prepare(button.dataset.startWorld === 'tide' ? 'tide' : 'tone');
       }),
   );
-  queryAll(container, '[data-info-action]').forEach(
-    (button) =>
-      (button.onclick = () => {
-        (
-          ({
-            credits: () => showCredits(button),
-            reset: showReset,
-            practice: () => {
-              setPageLocation('practice');
-              showWorkshop();
-              focusTitle();
-            },
-          }) as Record<string, () => void>
-        )[button.dataset.infoAction ?? '']?.();
-      }),
-  );
+  const credits = query(container, '[data-info-action="credits"]');
+  if (credits) credits.onclick = () => showCredits(credits);
 }
 function showInfo(page: string) {
   resetView(page);
@@ -826,41 +796,29 @@ function showInfo(page: string) {
   }
   bindInfoActions(app);
 }
-function showAboutInGame(opener?: HTMLElement) {
-  const markup = aboutPageMarkup({
-    recordingCount: data.length,
-    profile,
-  })
-    .replace('<h1 tabindex="-1">', '<h2 id="dialog-title">')
-    .replace('</h1>', '</h2>');
-  openDialog(markup, opener);
-  queryAll(dialogBody, '.back-link,.info-actions [data-page],[data-start-world]').forEach((el) =>
-    el.remove(),
-  );
-  queryAll(dialogBody, '[data-info-action="practice"]').forEach((el) =>
-    el.replaceWith(document.createTextNode(el.textContent)),
-  );
-  bindInfoActions(dialogBody);
-}
 function navigate(
   page: string,
-  {
-    replace = false,
-    focus = true,
-    opener,
-  }: { replace?: boolean; focus?: boolean; opener?: HTMLElement } = {},
+  { replace = false, focus = true }: { replace?: boolean; focus?: boolean } = {},
 ) {
   if (!['home', 'sounds', 'about', 'practice'].includes(page)) return;
-  if (screen === 'game' && controller?.active && controller.phase !== 'interrupted') {
-    if (page === 'sounds') showLearn(opener);
-    else if (page === 'about') showAboutInGame(opener);
-    else
-      controller.confirmExit({
-        title: 'Return home?',
-        message: 'Returning home ends this session.',
-        action: 'End session & return home',
-        confirm: () => home(undefined, page === 'practice'),
-      });
+  if (
+    screen === 'game' &&
+    controller?.active &&
+    controller.phase !== 'interrupted' &&
+    !controller.state?.recorded
+  ) {
+    const destination = {
+      home: 'Home',
+      sounds: profile.guideName ?? profile.romanization + ' guide',
+      about: 'About',
+      practice: 'Practice',
+    }[page];
+    controller.confirmExit({
+      title: 'Go to ' + destination + '?',
+      message: 'Opening this page ends the current run.',
+      action: 'End run & go to ' + destination,
+      confirm: () => navigate(page),
+    });
     return;
   }
   setPageLocation(page, replace);
@@ -869,41 +827,13 @@ function navigate(
   else home();
   if (focus) focusTitle();
 }
-function showLearn(opener?: HTMLElement) {
-  controller?.state?.markAssisted?.();
-  openDialog(
-    compactGuideMarkup(anchors, profile.toneDefinitions, profile, progress.settings.script),
-    opener,
-  );
-  bindToneAudio(dialogBody, data, anchors);
-}
 const showCredits = createCreditsDialog({ dialogBody, profile, loadRows: loadLibrary, openDialog });
-function showReset() {
-  openDialog(
-    '<h2 id="dialog-title">Reset saved progress?</h2><p>This removes your tower lights, home decorations and preferences for ' +
-      escape(profile.label) +
-      ' in this browser.</p><div class="reset-actions"><button id="cancel-reset" class="secondary" type="button">Keep my progress</button><button id="confirm-reset" class="danger-button" type="button">Reset everything</button></div>',
-  );
-  required(dialogBody, '#cancel-reset').focus();
-  required(dialogBody, '#cancel-reset').onclick = () => {
-    dialog.close();
-  };
-  required(dialogBody, '#confirm-reset').onclick = () => {
-    progress = resetProgress(profile);
-    homecoming = [];
-    syncScriptSetting();
-    applyScript(progress.settings.script);
-    dialog.close();
-    home();
-  };
-}
-
 queryAll(document, '[data-nav-page]').forEach(
   (link) =>
     (link.onclick = (event) => {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
-      navigate(link.dataset.navPage ?? 'home', { opener: link });
+      navigate(link.dataset.navPage ?? 'home');
     }),
 );
 required(document, '.brand').onclick = (event) => {
@@ -911,38 +841,16 @@ required(document, '.brand').onclick = (event) => {
   event.preventDefault();
   navigate('home');
 };
-bindLanguageSwitcher(document);
-document.querySelectorAll<HTMLAnchorElement>('[data-language-link]').forEach((link) => {
-  link.onclick = (event) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if (screen !== 'game' || !controller?.active || controller.phase === 'interrupted') return;
-    const language = languages[link.dataset.languageLink ?? ''];
-    if (!language) return;
-    event.preventDefault();
-    const switcher = link.closest('details');
-    if (switcher) {
-      switcher.open = false;
-      switcher.querySelector('summary')?.focus();
-    }
-    if (language.id === profile.id) return;
-    const destination = link.href;
-    controller.confirmExit({
-      title: 'Switch to ' + language.label + '?',
-      message: 'Switching languages ends the current run.',
-      action: 'End run & switch language',
-      confirm: () => location.assign(destination),
-    });
-  };
-});
-const footer = required(document, '.site-footer');
-document.querySelector('.script-setting')?.remove();
-footer.insertAdjacentHTML('beforeend', scriptSettingMarkup(profile));
-const scriptOptions = queryAll(footer, '[data-script-option]');
+const scriptOptions = queryAll(siteHeader, '[data-script-option]');
 function syncScriptSetting() {
   for (const option of scriptOptions) option.checked = option.value === progress.settings.script;
 }
 syncScriptSetting();
 for (const option of scriptOptions) {
+  option.onclick = (event) => {
+    if (event.detail > 0 && screen === 'game' && controller?.phase !== 'interrupted')
+      controller?.focusGameplay();
+  };
   option.onchange = () => {
     const script = option.value;
     if (!option.checked || !profile.scripts.includes(script)) return;
@@ -958,8 +866,6 @@ for (const option of scriptOptions) {
     }
   };
 }
-const credits = required(document, '#credits');
-credits.onclick = () => showCredits(credits);
 required(document, '#close-dialog').onclick = () => dialog.close();
 dialog.addEventListener('close', () => {
   if (dialog.open) return;
@@ -994,21 +900,25 @@ navigate(pageFromLocation(new URL(location.href), appBase, profile), {
 
 function updateKeyboardViewport() {
   const viewport = window.visualViewport;
-  const input = document.activeElement;
-  const typing = screen === 'game' && input?.id === 'transcription-answer';
-  document.body.classList.toggle(
-    'keyboard-open',
-    Boolean(
-      typing &&
-      viewport &&
-      viewport.width <= 700 &&
-      (Math.max(window.innerHeight, document.documentElement.clientHeight) - viewport.height >
-        110 ||
-        viewport.height < 540),
-    ),
-  );
-  if (viewport)
-    document.documentElement.style.setProperty('--visual-height', viewport.height + 'px');
+  if (!viewport) return;
+  const input = query(app, '#transcription-answer');
+  const keyboardOpen =
+    screen === 'game' &&
+    input === document.activeElement &&
+    viewport.width <= 700 &&
+    (Math.max(window.innerHeight, document.documentElement.clientHeight) - viewport.height > 110 ||
+      viewport.height < 540);
+  document.body.classList.toggle('keyboard-open', keyboardOpen);
+  document.documentElement.style.setProperty('--visual-height', viewport.height + 'px');
+
+  const scene = keyboardOpen && query(app, '.scene-frame');
+  if (!scene || !input) return;
+  const top = viewport.offsetTop + 8;
+  const bottom = viewport.offsetTop + viewport.height - 8;
+  const sceneTop = scene.getBoundingClientRect().top;
+  const inputBottom = input.getBoundingClientRect().bottom;
+  const scroll = Math.min(sceneTop - top, Math.max(0, inputBottom - bottom));
+  if (scroll) window.scrollBy({ top: scroll, behavior: 'instant' });
 }
 window.visualViewport?.addEventListener('resize', updateKeyboardViewport);
 document.addEventListener('focusin', updateKeyboardViewport);

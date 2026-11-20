@@ -208,11 +208,6 @@ export function recordRun(progress: Progress, run: Run): Progress {
   }
   return progress;
 }
-export function resetProgress(profile: LanguageProfile, storage?: StorageLike): Progress {
-  const p = emptyProgress(profile);
-  saveProgress(profile, p, storage);
-  return p;
-}
 export function challengeRecord(
   progress: Progress,
   world: Challenge,

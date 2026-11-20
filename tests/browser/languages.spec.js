@@ -116,7 +116,7 @@ test('guide playback works before the game library is requested, and Start can r
   await page.locator('.guide-tone[data-guide-tone="3"]').click();
   await page.clock.runFor(150);
   await expect(page.locator('#guide-status')).toContainText('mǎ');
-  await page.locator('#home').click();
+  await page.locator('.brand').click();
   expect(requests).toBe(0);
 
   const start = page.locator('#start-adventure');
@@ -151,19 +151,25 @@ test('chooser loads no catalog and language navigation stays in Mandarin', async
   ]);
   await page.locator('.language-card--mandarin').click();
   await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
-  await page.locator('#credits').click();
-  await expect(page.locator('#dialog')).toContainText('CC-CEDICT');
-  await expect(page.locator('#dialog')).not.toContainText('CC-Canto');
+  await page.locator('#about').click();
+  const credits = page.getByRole('region', { name: 'Voices & credits' });
+  await expect(credits).toContainText('CC-CEDICT');
+  await expect(credits).not.toContainText('CC-Canto');
+  expect(requests).toEqual([]);
+  const browse = credits.getByRole('button', { name: 'Browse recordings' });
+  await browse.click();
+  await expect(page.getByRole('heading', { name: 'Recording directory' })).toBeVisible();
+  const search = page.getByRole('searchbox', { name: 'Find a recording' });
+  await search.fill('hao');
+  await expect(page.locator('#credit-results [role="status"]')).toHaveText('1–1 of 1 recordings');
+  await expect(page.locator('#credit-results tbody')).toContainText('nǐ hǎo');
   await page.locator('#close-dialog').click();
+  await expect(browse).toBeFocused();
   expect(
     requests.filter((url) => url.includes('/catalogs/')).every((url) => url.endsWith('/cmn.json')),
   ).toBe(true);
   await page.locator('#learn').click();
   await expect(page.locator('.brand')).toHaveAttribute(
-    'href',
-    new URL('/mandarin/', page.url()).href,
-  );
-  await expect(page.locator('#home')).toHaveAttribute(
     'href',
     new URL('/mandarin/', page.url()).href,
   );
@@ -227,37 +233,23 @@ test('navigation separates language switching, learning, and project information
   page,
 }) => {
   await loaded(page);
-  await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Home', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Records', exact: true })).toHaveCount(0);
   await expect(page.locator('[data-nav-page="about"]')).toHaveCount(1);
   await expect(page.locator('.site-header [data-nav-page="about"]')).toHaveText('About');
-  await expect(page.locator('.site-footer a')).toHaveCount(0);
+  await expect(page.locator('.site-footer')).toHaveCount(0);
+  await expect(page.locator('.site-language')).toHaveText('Mandarin');
   await expect(
-    page.locator('.site-footer').getByRole('radio', { name: 'Simplified' }),
+    page.locator('.site-header').getByRole('radio', { name: 'Simplified' }),
   ).toBeChecked();
-  await expect(page.locator('.language-switcher #script-display')).toHaveCount(0);
-  await expect(page.locator('.learning-toolbar')).toHaveCount(0);
   await page.locator('#learn').click();
-  const switcher = page.locator('.language-switcher');
-  await switcher.locator('summary').click();
-  await expect(page.locator('[data-language-link="yue"]')).toHaveAttribute(
-    'href',
-    /\/cantonese\/guide\/$/,
-  );
-  await expect(page.locator('[data-language-link="cmn"]')).toHaveAttribute(
-    'href',
-    /\/mandarin\/guide\/$/,
-  );
-  await page.keyboard.press('Escape');
-  await expect(switcher).not.toHaveAttribute('open');
-  await expect(switcher.locator('summary')).toBeFocused();
-  await expect(page.getByRole('button', { name: 'Records', exact: true })).toHaveCount(0);
-  await page.locator('#home').click();
+  await expect(page.getByRole('heading', { name: 'Pinyin guide', exact: true })).toBeVisible();
+  await page.locator('.brand').click();
   await page.locator('#setup-practice').click();
   await page.locator('[data-mode-card][data-destination="rail"]').click();
   await expect(page.locator('#setup-practice')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#start-adventure')).toHaveText('Start spelling practice →');
-  await expect(page.locator('#home')).toHaveAttribute(
+  await expect(page.locator('.brand')).toHaveAttribute(
     'href',
     new URL('/mandarin/', page.url()).href,
   );
@@ -329,30 +321,29 @@ test('rapid Skyrail keys cannot activate navigation or dismiss a finished run', 
   await input.fill('zz');
 
   await page.locator('#about').click();
-  await expect(page.locator('#dialog')).toBeVisible();
-  await expect(page).toHaveURL(/\/mandarin\/$/);
-  await page.locator('#close-dialog').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Go to About?' })).toBeVisible();
+  await expect(page.locator('#dialog')).toBeHidden();
+  await expect(page).toHaveURL(/mandarin\/$/);
+  await page.keyboard.press('Escape');
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('zz');
 
   await page.evaluate(() => history.pushState(null, '', '/mandarin/about/'));
   await page.goBack();
-  await expect(page).toHaveURL(/\/mandarin\/$/);
+  await expect(page).toHaveURL(/mandarin\/$/);
   await expect(page.locator('.pause-overlay')).toHaveCount(0);
 
-  await page.locator('.language-switcher summary').click();
-  await page.locator('#app').focus();
+  await page.locator('.game-layout').focus();
   await page.keyboard.down('Enter');
-  const vietnamese = page.locator('[data-language-link="vi"]');
-  await vietnamese.focus();
-  await expect(vietnamese).toBeFocused();
+  const about = page.locator('#about');
+  await about.focus();
   await page.keyboard.down('Enter');
   await page.keyboard.up('Enter');
   await expect(page.locator('.pause-overlay')).toHaveCount(0);
-  await expect(page).toHaveURL(/\/mandarin\/$/);
+  await expect(page).toHaveURL(/mandarin\/$/);
 
-  await vietnamese.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Switch to Vietnamese?' })).toBeVisible();
+  await about.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Go to About?' })).toBeVisible();
   await page.keyboard.down('Enter');
   await page.keyboard.down('Enter');
   await page.keyboard.up('Enter');
@@ -368,8 +359,9 @@ test('rapid Skyrail keys cannot activate navigation or dismiss a finished run', 
   await page.keyboard.press('Space');
   await expect(page.locator('.run-conclusion')).toBeVisible();
   await expect(page).toHaveURL(/\/mandarin\/$/);
-  await page.getByRole('button', { name: 'Back to Home' }).click();
-  await expect(page.locator('#app')).toHaveAttribute('data-view', 'home');
+  await page.locator('#about').click();
+  await expect(page).toHaveURL(/mandarin\/about\/$/);
+  await expect(page.locator('.pause-overlay')).toHaveCount(0);
 });
 
 test('unavailable collection keeps the guide usable and games closed', async ({ page }) => {
@@ -444,7 +436,7 @@ test('language homes have a brief introduction and guide link above the games', 
     expect(introBox.y + introBox.height).toBeLessThanOrEqual(gamesBox.y);
     await link.click();
     await expect(page).toHaveURL(new RegExp('/' + language + '/guide/$'));
-    await page.locator('#home').click();
+    await page.locator('.brand').click();
     await noOverflow(page);
   }
 });
@@ -457,25 +449,21 @@ test('About covers games, recordings, and ways to contribute', async ({ page }) 
       language === 'vietnamese' ? 1 : 2,
     );
     await expect(page.getByRole('heading', { name: 'Games and practice' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'What you can practise' })).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: 'Progress and privacy' })).toHaveCount(0);
-    await expect(
-      page.locator('.info-actions').getByRole('button', { name: 'Reset saved progress…' }),
-    ).toBeVisible();
-    const recordings = page.locator('.recordings-disclosure');
-    await expect(recordings).not.toHaveAttribute('open');
-    await recordings.getByText('Recordings and sources', { exact: true }).click();
-    await expect(recordings.getByRole('button', { name: /Browse voices/ })).toBeVisible();
-    await expect(recordings).not.toContainText('Source labels and dictionary readings');
-    const contributions = page.getByRole('region', { name: 'Contribute to Tone Tower' });
-    for (const name of [
-      'MIT licensed',
-      'browse the code on GitHub ↗',
-      'Report a problem ↗',
-      'Suggest an idea ↗',
-    ])
+    const recordings = page.getByRole('region', { name: 'Voices & credits' });
+    await expect(recordings.getByRole('heading', { name: 'Voices & credits' })).toBeVisible();
+    await expect(recordings.getByRole('button', { name: 'Browse recordings' })).toBeVisible();
+    await expect(recordings.getByRole('link', { name: 'MIT licensed code' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reset saved progress…' })).toHaveCount(0);
+    const contributions = page.getByRole('region', { name: 'Project and feedback' });
+    for (const name of ['GitHub repository', 'Report a problem ↗', 'Suggest an idea ↗'])
       await expect(contributions.getByRole('link', { name })).toBeVisible();
-    await expect(contributions).not.toContainText('john0107');
+    const others = page.getByRole('region', { name: 'Other languages' });
+    await expect(others.getByRole('link')).toHaveCount(2);
+    for (const other of ['cantonese', 'mandarin', 'vietnamese'].filter((item) => item !== language))
+      await expect(others.getByRole('link', { name: new RegExp(other, 'i') })).toHaveAttribute(
+        'href',
+        new URL('/' + other + '/', page.url()).href,
+      );
     await noOverflow(page);
   }
 });

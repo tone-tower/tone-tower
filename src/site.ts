@@ -16,11 +16,11 @@ export function languagePages(
         copy.homeTitle ?? 'Tone Tower · ' + profile.label + ' ' + profile.romanization + ' games',
       description:
         copy.homeDescription ??
-        'Train your ear for ' +
+        'Practise ' +
           profile.label +
-          '. Play Tone Tower, Skyrail, and focused ' +
+          ' tones and ' +
           profile.romanization +
-          ' practice with human recordings.',
+          ' spelling with recordings in Tone Tower, Skyrail and focused exercises.',
     },
     sounds: {
       path: root + 'guide/',

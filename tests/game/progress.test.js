@@ -5,7 +5,6 @@ import {
   loadProgress,
   saveProgress,
   recordRun,
-  resetProgress,
   emptyProgress,
 } from '../../src/persistence/progress.ts';
 import { createRun, defaultPractice } from '../../src/game/game-core.ts';
@@ -88,7 +87,6 @@ test('malformed, blocked and unavailable storage fail safely', () => {
   };
   assert.deepEqual(loadProgress(cantonese, blocked), emptyProgress(cantonese));
   assert.equal(saveProgress(cantonese, emptyProgress(cantonese), blocked), false);
-  assert.equal(resetProgress(cantonese, blocked).version, 3);
   const invalid = storage({
     [PROGRESS_KEY]: {
       version: emptyProgress(cantonese).version,
@@ -101,15 +99,6 @@ test('malformed, blocked and unavailable storage fail safely', () => {
   assert.equal(safe.settings.toneVariant, 'normal');
   assert.deepEqual(safe.records.tone.normal, { runs: 0, wins: 0, best: 100, fewest: null });
   assert.deepEqual(safe.missedIds, ['a']);
-});
-
-test('reset clears current records and preferences', () => {
-  const current = emptyProgress(cantonese);
-  current.settings.toneVariant = 'hard';
-  current.records.tone.normal.runs = 8;
-  const target = storage({ [PROGRESS_KEY]: current });
-  resetProgress(cantonese, target);
-  assert.deepEqual(loadProgress(cantonese, target), emptyProgress(cantonese));
 });
 
 test('unsupported save versions start fresh', () => {

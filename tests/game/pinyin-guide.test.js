@@ -5,13 +5,10 @@ import { mandarin } from '../../src/languages/profiles.ts';
 
 test('missing or mismatched examples remain text and do not relabel another recording', () => {
   const wrongWord = { id: 'commons-124599289', transcription: 'pa1', text: 'wrong' };
-  const html = mandarinGuide([], mandarin.toneDefinitions, false, [wrongWord]);
+  const html = mandarinGuide([], mandarin.toneDefinitions, [wrongWord]);
   assert.doesNotMatch(html, /data-guide-word=/);
   assert.match(html, /<b>bā<\/b>/);
   assert.equal((html.match(/recording unavailable/g) || []).length, 5);
-  const compact = mandarinGuide([], mandarin.toneDefinitions, true);
-  assert.match(compact, /Pinyin at a glance/);
-  assert.doesNotMatch(compact, /data-guide-word=/);
 });
 
 test('catalog text and Pinyin in reference cards are escaped', () => {

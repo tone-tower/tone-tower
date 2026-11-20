@@ -688,9 +688,7 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = [], lang 
         </div>
       </div>
       <p>
-        <button class="text-button inline-link" data-info-action="practice" type="button">
-          Practice
-        </button>
+        <a href="practice/" data-page="practice">Practice</a>
         offers exercises without a timer or lives. You can focus on a tone pair, initials, finals or
         full spelling.
       </p>
@@ -700,25 +698,4 @@ export function soundPageMarkup(anchors, toneDefinitions, recordings = [], lang 
       ><button class="text-button" data-page="about" type="button">About Tone Tower</button>
     </div>
   </article>`;
-}
-
-export function compactGuideMarkup(anchors, toneDefinitions, lang = 'yue-Hant') {
-  return /* HTML */ `<h2 id="dialog-title">Jyutping at a glance</h2>
-    <p>
-      Read each syllable as <b>initial + final + tone</b>: <b>f + u + 2 = fu2</b>. A final includes
-      the vowel and any ending: <b>g + ong + 2 = gong2</b>. Some syllables have no initial.
-    </p>
-    <h3>Hear the six tones.</h3>
-    ${toneExamples(anchors, toneDefinitions, lang)}
-    <p class="small">
-      The lines show simplified pitch shapes. Compare the level tones 1, 3, 6, then the rising tones
-      2, 5. Tone 4 falls low.
-    </p>
-    <h3>Pronunciation resources</h3>
-    ${guideResourcesMarkup()}
-    <h3>Answering in the games</h3>
-    <p>
-      In Tone Tower, choose the highlighted syllable’s tone number. In Skyrail, Spelling accepts
-      <b>fu</b>; Full Jyutping requires <b>fu2</b>. Spaces between syllables are optional.
-    </p>`;
 }

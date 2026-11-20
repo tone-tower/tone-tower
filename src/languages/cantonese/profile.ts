@@ -9,13 +9,6 @@ export const cantonese: LanguageProfile = Object.freeze<LanguageProfile>({
   slug: 'cantonese',
   label: 'Cantonese',
   toneSummary: 'six tones',
-  learningResources: [
-    [
-      'https://opencantonese.org/books/cantonese-life-1/pronunciation-guide',
-      'Open Cantonese pronunciation course',
-    ],
-    ['https://jyutping.org/en/learn/', 'Jyutping.org’s guide'],
-  ],
   romanization: 'Jyutping',
   transcriptionSystem: 'jyutping',
   practiceToneContent: 'single',

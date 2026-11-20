@@ -96,7 +96,6 @@ function harness(extra = {}, recordings = words, profile = cantonese) {
     player,
     dialog,
     words: recordings,
-    anchors: words.slice(0, 6).map((word) => ({ ...word, anchor: true })),
     onFinish: (run) => finished.push(run),
     onHome: () => homes.push(true),
     environment: {
@@ -165,7 +164,7 @@ test('Tide starts after audio, replay never resets time, and timeout costs one l
   h.controller.dispose();
 });
 
-test('pause, hidden pages and dialogs freeze time and keep typed text', async () => {
+test('pause and hidden pages freeze time and keep typed text', async () => {
   const h = harness();
   h.controller.start({ challenge: 'tide' });
   h.audio();
@@ -186,12 +185,6 @@ test('pause, hidden pages and dialogs freeze time and keep typed text', async ()
   assert.ok(h.app.querySelector('#resume-game'));
   h.document.hidden = false;
   h.controller.resume();
-  h.dialog.open = true;
-  h.controller.pause('dialog');
-  h.time.advance(30000);
-  assert.strictEqual(h.controller.state.mistakes, 0);
-  h.dialog.open = false;
-  fire(h.dialog, 'close');
   h.time.advance(20000);
   assert.strictEqual(h.controller.state.mistakes, 1);
   h.controller.dispose();
