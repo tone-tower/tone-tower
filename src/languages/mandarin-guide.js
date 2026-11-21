@@ -138,7 +138,7 @@ const audioStatus = /* HTML */ `<span
   aria-live="polite"
 ></span>`;
 
-export function mandarinGuide(anchors, definitions, compact = false, recordings = []) {
+export function mandarinGuide(anchors, definitions, recordings = []) {
   const tones = toneExamples(anchors, definitions);
   const matchedTones = [1, 2, 3, 4].every((tone) =>
     anchors.some(
@@ -162,33 +162,6 @@ export function mandarinGuide(anchors, definitions, compact = false, recordings 
         >. Trimmed and converted to MP3; pitch and speed unchanged.
       </p>`
     : '';
-  if (compact)
-    return /* HTML */ `<h2 id="dialog-title">Pinyin at a glance</h2>
-      <p>
-        Pinyin spells Mandarin pronunciation. Read <b>mǎ</b> as <b>m</b> (initial) +
-        <b>a</b> (final), with the <b>third tone</b>. A final includes the vowel and any ending.
-      </p>
-      <h3>Hear the tones</h3>
-      ${tones} ${toneCredit}
-      <p class="small">
-        First tone is high and level; second rises; third is low or dipping; fourth falls. Neutral
-        tone is short and unstressed, with pitch that depends on context.
-      </p>
-      <h3>Spelling reminders</h3>
-      <p>
-        <b>ü</b> is a rounded vowel: say <b>i</b> with rounded lips. Its dots disappear after
-        <b>j/q/x</b> and in <b>yu</b> spellings. The <b>i</b> in <b>shì</b> differs from the vowel
-        in <b>nǐ</b>. Pinyin letters follow Mandarin sound rules.
-      </p>
-      <h3>Pronunciation resources</h3>
-      ${resourcesMarkup()}
-      <h3>Answering in the games</h3>
-      <p>
-        In Tone Tower, choose the highlighted syllable’s spoken tone. Skyrail uses dictionary
-        Pinyin: Spelling accepts <b>ni hao</b>; With tones accepts <b>nǐ hǎo</b> or <b>ni3 hao3</b>.
-        Neutral tone accepts an unmarked syllable, <b>5</b> or <b>0</b>.
-      </p>`;
-
   const audio = (id, transcription) => inlineWordAudio(recordings, id, transcription);
   return /* HTML */ `<article class="info-page sound-page pinyin-guide">
     <header class="page-heading">
@@ -591,9 +564,7 @@ export function mandarinGuide(anchors, definitions, compact = false, recordings 
         </div>
       </div>
       <p>
-        <button class="text-button inline-link" data-info-action="practice" type="button">
-          Practice
-        </button>
+        <a href="practice/" data-page="practice">Practice</a>
         offers exercises without a timer or lives. Focus on a tone pair, initials, finals or full
         spelling.
       </p>
@@ -632,9 +603,7 @@ export function mandarinGuide(anchors, definitions, compact = false, recordings 
       <p class="small">
         Changing simplified/traditional characters changes the writing shown, not the recording.
         Recordings retain their source attribution and licences in
-        <button class="text-button inline-link" data-info-action="credits" type="button">
-          Voices &amp; credits</button
-        >.
+        <a href="about/" data-page="about">recording directory on the About page</a>.
       </p>
     </section>
     <div class="info-actions">

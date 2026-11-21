@@ -1,5 +1,5 @@
 import { toneLabel } from '../ui/tone-presentation.ts';
-import { createGameMarkup } from './game-markup.ts';
+import { createGameMarkup, runConclusionMarkup } from './game-markup.ts';
 import { query, queryAll, required, escape, errorMessage } from '../ui/dom.ts';
 import type {
   Run,
@@ -20,23 +20,26 @@ interface CountdownOptions {
   onTick?: (left: number, total: number) => void;
   onExpire?: () => void;
 }
+interface ExitConfirmation {
+  title: string;
+  message: string;
+  action: string;
+  confirm: () => void;
+}
 interface ControllerOptions {
   profile: LanguageProfile;
   app: HTMLElement;
   player: AudioPlayer;
-  dialog: HTMLDialogElement;
+  siteHeader?: HTMLElement;
   words: ExerciseRow[];
-  anchors?: ExerciseRow[];
   script?: string;
   onFinish?: (run: Run) => void;
   victoryMessage?: (run: Run) => string;
   onRetry?: (config: RunInput) => void;
   onHome?: () => void;
-  onPractice?: (run: Run) => void;
-  onLearn?: (options: { returnToGame: boolean }) => void;
+  onPractice?: (run: Run, mode: 'combination' | 'mistakes') => void;
   environment?: CountdownOptions & {
     document?: Document;
-    MutationObserver?: typeof MutationObserver;
     animateWorld?: typeof animateWorld;
   };
 }
@@ -125,16 +128,14 @@ export function createGameController({
   profile,
   app,
   player,
-  dialog,
+  siteHeader,
   words,
-  anchors = [],
   script: initialScript = profile.defaultScript,
   onFinish = () => {},
   victoryMessage = () => '',
   onRetry = () => {},
   onHome = () => {},
   onPractice = () => {},
-  onLearn = () => {},
   environment = {},
 }: ControllerOptions) {
   requireProfile(profile);
@@ -146,7 +147,6 @@ export function createGameController({
   let phase: ControllerPhase = 'idle',
     active = false,
     paused = false,
-    pauseReason = '',
     attached = false;
   let generation = 0,
     audioGeneration = 0,
@@ -158,8 +158,8 @@ export function createGameController({
     towerReady = true,
     outcome: RunResult | null = null,
     answeredPosition = 1;
-  let restoreFocus: string | null = null,
-    observer: MutationObserver | null = null,
+  let exitConfirmation: ExitConfirmation | null = null,
+    spaceTarget: HTMLElement | null = null,
     sceneAnimator: ReturnType<typeof animateWorld> | null = null,
     entryVisual = false;
   let script = initialScript;
@@ -168,13 +168,7 @@ export function createGameController({
   const qa = <S extends string>(selector: S) => queryAll(app, selector);
   const isTide = () => run?.config.challenge === 'tide';
   const answering = () =>
-    active &&
-    !paused &&
-    phase === 'answering' &&
-    audioReady &&
-    !audioFailed &&
-    !dialog?.open &&
-    !doc?.hidden;
+    active && !paused && phase === 'answering' && audioReady && !audioFailed && !doc?.hidden;
   const clock = createCountdown({
     now: environment.now,
     setTimeout: later,
@@ -204,42 +198,41 @@ export function createGameController({
   function attach() {
     if (attached) return;
     attached = true;
-    doc?.addEventListener('keydown', keydown);
+    doc.addEventListener('keydown', keydown, true);
+    doc.addEventListener('keyup', keyup, true);
     doc?.addEventListener('visibilitychange', visibility);
-    dialog?.addEventListener('close', dialogClosed);
-    const Observer = environment.MutationObserver ?? globalThis.MutationObserver;
-    if (Observer && dialog) {
-      observer = new Observer(() => {
-        if (active && dialog.open) pause('dialog');
-      });
-      observer.observe(dialog, { attributes: true, attributeFilter: ['open'] });
-    }
+    app.addEventListener('pointerdown', keepTypingFocus);
   }
   function detach() {
     if (!attached) return;
     attached = false;
-    doc?.removeEventListener('keydown', keydown);
+    doc.removeEventListener('keydown', keydown, true);
+    doc.removeEventListener('keyup', keyup, true);
     doc?.removeEventListener('visibilitychange', visibility);
-    dialog?.removeEventListener('close', dialogClosed);
-    observer?.disconnect();
-    observer = null;
+    app.removeEventListener('pointerdown', keepTypingFocus);
   }
   function visibility() {
-    if (active && doc.hidden) pause('hidden');
-  }
-  function dialogClosed() {
-    if (paused && pauseReason === 'dialog') resume();
+    spaceTarget = null;
+    if (active && doc.hidden && phase !== 'interrupted') pause();
   }
   function captureInput() {
     const input = q('#transcription-answer')!;
     if (input) inputValue = input.value;
   }
+  function keepTypingFocus(event: PointerEvent) {
+    // Let the action finish before a phone keyboard can close and move its target.
+    if (
+      event.button === 0 &&
+      isTide() &&
+      doc?.activeElement === q('#transcription-answer') &&
+      event.target instanceof Element &&
+      event.target.closest('button, a[href]')
+    )
+      event.preventDefault();
+  }
   function position() {
-    if (run.config.practice && run.config.format === 'drill') return 1;
-    return Math.max(
-      1,
-      Math.min(100, phase === 'correct' || phase === 'landing' ? answeredPosition : run.opened + 1),
-    );
+    const floor = phase === 'correct' || phase === 'landing' ? answeredPosition : run.opened + 1;
+    return run.config.practice && run.config.format === 'drill' ? floor : Math.min(100, floor);
   }
   function district() {
     return (
@@ -337,7 +330,7 @@ export function createGameController({
   }
   const terminal = () => !run.config.practice && run.status !== 'playing';
   function sceneContinue() {
-    if (isTide() && run.config.practice && run.status === 'complete')
+    if (isTide() && run.config.practice && run.status !== 'playing')
       return '<div class="scene-review-action"><button class="primary" id="continue-game" type="button">See results <kbd>Enter</kbd> →</button></div>';
     return phase === 'review' && run.status === 'playing'
       ? '<div class="scene-review-action"><span>' +
@@ -371,59 +364,6 @@ export function createGameController({
       '</p>' +
       towerContinue('Depart when ready') +
       '</section>'
-    );
-  }
-  function runConclusion() {
-    if (!terminal()) return '';
-    const won = run.status === 'won';
-    return (
-      '<section class="run-conclusion ' +
-      (!towerReady ? 'is-arriving' : '') +
-      '" aria-labelledby="run-end-title"><span class="eyebrow">' +
-      (won ? 'ADVENTURE COMPLETE' : 'RUN ENDED') +
-      '</span><h2 id="run-end-title">' +
-      (won
-        ? isTide()
-          ? 'Next stop: the horizon.'
-          : 'The whole tower is alight.'
-        : isTide()
-          ? 'Skyrail run ended.'
-          : 'Tower run ended.') +
-      '</h2><p>' +
-      run.opened +
-      ' ' +
-      (isTide() ? 'spans crossed' : 'floors lit') +
-      ' · ' +
-      run.mistakes +
-      ' ' +
-      (run.mistakes === 1 ? 'miss' : 'misses') +
-      (won ? ' · Journey complete.' : '.') +
-      '</p>' +
-      (won && victoryMessage(run)
-        ? '<p class="homecoming-message" role="status">' + escape(victoryMessage(run)) + '</p>'
-        : '') +
-      (!won
-        ? '<p class="ending-word">' +
-          escape(
-            run.word.syllables
-              .map((s) => (s.text === s.transcription ? s.text : s.text + ' ' + s.transcription))
-              .join(' · '),
-          ) +
-          ' <button class="text-button" id="ending-replay" type="button">▶ Listen again <kbd>Space</kbd></button></p>'
-        : '') +
-      '<div class="results-actions"><button class="primary" id="retry-run" type="button" ' +
-      (!towerReady ? 'disabled' : '') +
-      '>' +
-      (won ? 'A new adventure' : 'Try again') +
-      ' →</button><button class="secondary" id="ending-home" type="button" ' +
-      (!towerReady ? 'disabled' : '') +
-      '>Home</button>' +
-      (!won
-        ? '<button class="text-button" id="ending-practice" type="button" ' +
-          (!towerReady ? 'disabled' : '') +
-          '>Practise these sounds</button>'
-        : '') +
-      '</div></section>'
     );
   }
   function setRailNotice(text: string, kind = 'neutral') {
@@ -502,7 +442,7 @@ export function createGameController({
       auto = null;
       if (active && !paused && own === generation) {
         towerReady = true;
-        render({ focus: false });
+        render({ focus: terminal() && doc?.activeElement === q('#run-end-title') });
       }
     }, delay);
   }
@@ -525,7 +465,9 @@ export function createGameController({
           ? '✓ The last door opens. The summit is waiting.'
           : run.status === 'lost'
             ? 'No lives remain. The correct tone is ' + said(run.word.tone) + '.'
-            : '✓ Practice complete.'
+            : review
+              ? 'Not quite. The correct tone is ' + said(run.word.tone) + '.'
+              : '✓ Correct. Floor lit.'
         : review
           ? 'Not quite' +
             (run.lives === null ? '' : ' — 1 life lost') +
@@ -562,17 +504,19 @@ export function createGameController({
     >
       <div class="pause-card">
         <p class="eyebrow">Paused</p>
-        <h2 id="pause-title">Run paused.</h2>
-        <p>Reloading or closing this page ends the run. Resume to continue.</p>
+        <h2 id="pause-title">${escape(exitConfirmation?.title ?? 'Run paused.')}</h2>
+        <p>
+          ${escape(exitConfirmation?.message ?? 'Reloading or closing this page ends the run. Resume to continue.')}
+        </p>
         <div class="game-actions">
           <button class="primary" id="resume-game" type="button">
             Resume <span aria-hidden="true">→</span></button
-          >${run.config.practice ? '<button class="secondary" id="finish-paused-practice" type="button">Finish practice</button>' : ''}<button
+          >${run.config.practice && !exitConfirmation ? '<button class="secondary" id="finish-paused-practice" type="button">Finish practice</button>' : ''}<button
             class="quiet"
             id="end-run"
             type="button"
           >
-            End run & return
+            ${escape(exitConfirmation?.action ?? 'End run & return')}
           </button>
         </div>
       </div>
@@ -619,6 +563,7 @@ export function createGameController({
       recovered: outcome?.recovered || 0,
       lives: run.lives,
       maxLives: run.maxLives,
+      practice: run.config.practice && run.config.format === 'drill',
       timed: run.timeLimit() > 0,
       remaining: (clock.total ? clock.remaining : run.timeLimit()) / 1000,
       approach:
@@ -626,27 +571,25 @@ export function createGameController({
           ? Math.min(1, Math.max(0, 1 - clock.remaining / clock.total))
           : 0,
     };
-    if (run.config.practice && run.config.format === 'drill')
-      Object.assign(sceneState, {
-        scene: isTide() ? 'rail' : 'tone',
-        progress: 0,
-        floor: 0,
-        count: isTide() ? 2 : run.choices.length,
-        phase: 'answering',
-        reason: null,
-        selected: -1,
-        answer: -1,
-        practice: true,
-        recovered: 0,
-        lives: null,
-        maxLives: null,
-        timed: false,
-        entry: false,
-      });
     sceneAnimator.update(sceneState);
+  }
+  function focusGameplay() {
+    if (!active) return;
+    const target = paused
+      ? q('#resume-game')
+      : terminal()
+        ? q('#run-end-title')
+        : q('#continue-game')
+          ? q('.scene-question')
+          : isTide() && !q('#transcription-answer')?.disabled
+            ? q('#transcription-answer')
+            : q('.game-layout');
+    target?.focus({ preventScroll: true });
   }
   function render({ focus = true } = {}) {
     if (!active) return;
+    const previousFocus = doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
+    const focusedInGame = previousFocus && app.contains(previousFocus);
     const d = district(),
       previousFrame = q('.scene-frame')!,
       previousScene = q('.world-scene')!;
@@ -662,6 +605,7 @@ export function createGameController({
     app.dataset.outcome = presentation();
     const markup = /* HTML */ `<div
       class="game-layout"
+      tabindex="-1"
       data-outcome="${presentation()}"
       data-terminal="${terminal()}"
       data-landing="${phase === 'landing'}"
@@ -688,7 +632,7 @@ export function createGameController({
           Ⅱ
         </button>
       </div>
-      <div class="scene-question">
+      <div class="scene-question" tabindex="-1">
         ${isTide() ? railFeedback() : towerFeedback()}${promptMarkup(['review', 'correct', 'landing'].includes(phase))}
         <div class="prompt-actions">
           <button
@@ -708,7 +652,7 @@ export function createGameController({
       </div>
       ${isTide() ? /* HTML */ `<div class="typing-slot">${typedForm()}</div>` : ''}
       <div class="game-panel">
-        ${runConclusion()}
+        ${terminal() ? runConclusionMarkup(run, towerReady, run.status === 'won' ? victoryMessage(run) : '') : ''}
         <div class="feedback-zone"></div>
         <div class="game-actions">
           ${run.config.practice && run.status === 'playing' ? '<button class="quiet" id="finish-practice" type="button">Finish practice</button>' : ''}
@@ -767,21 +711,20 @@ export function createGameController({
     bind();
     updateClock(clock.remaining, clock.total);
     syncScene();
-    if (focus) {
-      if (terminal() && !paused) {
-        if (towerReady) q('#retry-run')?.focus({ preventScroll: true });
-        return;
-      }
-      if (paused) q('#resume-game')?.focus({ preventScroll: true });
-      else if (['review', 'landing'].includes(phase))
-        q('#continue-game')?.focus({ preventScroll: true });
-      else if (isTide()) {
-        q('#transcription-answer')?.focus({ preventScroll: true });
-        q('#transcription-answer')?.setSelectionRange(inputValue.length, inputValue.length);
+    if (focus) focusGameplay();
+    else if (previousFocus && app.contains(previousFocus)) {
+      if (previousFocus.matches(':disabled')) focusGameplay();
+    } else if (previousFocus && focusedInGame) {
+      const replacement = previousFocus.id && doc.getElementById(previousFocus.id);
+      if (replacement && !replacement.matches(':disabled')) {
+        replacement.focus({ preventScroll: true });
+      } else {
+        focusGameplay();
       }
     }
   }
   function bind() {
+    if (siteHeader) siteHeader.inert = paused;
     qa('.game-layout > :not(.pause-overlay)').forEach((element) => {
       element.inert = paused;
     });
@@ -855,31 +798,31 @@ export function createGameController({
         onHome();
       }
     });
-    q('#ending-practice')?.addEventListener('click', () => {
-      if (towerReady) {
-        const previous = run;
-        dispose();
-        onPractice(previous);
-      }
-    });
+    function startReview(mode: 'combination' | 'mistakes') {
+      if (!towerReady) return;
+      const previous = run;
+      dispose();
+      onPractice(previous, mode);
+    }
+    q('#ending-practice')?.addEventListener('click', () => startReview('combination'));
+    q('#practise-mistakes')?.addEventListener('click', () => startReview('mistakes'));
     q('#ending-replay')?.addEventListener('click', replay);
-    q('#replay-word')?.addEventListener('click', replay);
+    q('#replay-word')?.addEventListener('click', (event) => {
+      replay();
+      if (event.detail > 0) focusGameplay();
+    });
     q('#pause-run')?.addEventListener('click', () => pause());
     q('#continue-game')?.addEventListener('click', advance);
     q('#resume-game')?.addEventListener('click', resume);
     q('#end-run')?.addEventListener('click', () => {
+      const leave = exitConfirmation?.confirm ?? onHome;
       dispose();
-      onHome();
+      leave();
     });
     q('#finish-practice')?.addEventListener('click', finishPractice);
     q('#finish-paused-practice')?.addEventListener('click', finishPractice);
     q('#reveal-answer')?.addEventListener('click', () => fail('reveal'));
     q('#replace-recording')?.addEventListener('click', replace);
-    q('#game-learn')?.addEventListener('click', () => {
-      run.markAssisted();
-      pause('dialog');
-      onLearn({ returnToGame: true });
-    });
   }
   function updateClock(left: number, total: number) {
     if (!active) return;
@@ -911,7 +854,7 @@ export function createGameController({
     }
   }
   async function playPrompt() {
-    if (!active || paused || dialog?.open || doc?.hidden) return;
+    if (!active || paused || doc?.hidden) return;
     const own = ++audioGeneration,
       current = generation,
       first = !audioReady;
@@ -960,7 +903,7 @@ export function createGameController({
     }
   }
   function replay() {
-    if (!active || paused || dialog?.open || doc?.hidden) return;
+    if (!active || paused || doc?.hidden) return;
     if (entryVisual) {
       cancelAuto();
       entryVisual = false;
@@ -1004,7 +947,7 @@ export function createGameController({
     answeredPosition = run.opened + 1;
     render();
     player.preload?.([run.word.audio]);
-    if (doc?.hidden || dialog?.open) pause(doc?.hidden ? 'hidden' : 'dialog');
+    if (doc?.hidden) pause();
     else if (entryVisual) playOpening();
     else playPrompt();
   }
@@ -1082,7 +1025,7 @@ export function createGameController({
         auto = null;
         if (active && !paused && own === generation) advance();
       },
-      run.config.practice ? 900 : isTide() ? 900 : 1700,
+      isTide() ? 900 : 1700,
     );
   }
   function fail(reason: FailureReason) {
@@ -1127,8 +1070,8 @@ export function createGameController({
     if (!active || paused || !audioFailed) return;
     stop({ keepScene: true });
     try {
-      run.replace();
-      beginPrompt();
+      if (run.replace()) beginPrompt();
+      else if (run.config.practice) finishPractice();
     } catch (error) {
       interrupt(error);
     }
@@ -1140,7 +1083,7 @@ export function createGameController({
     phase = 'interrupted';
     app.innerHTML = /* HTML */ `<section class="game-panel">
       <p class="eyebrow">Recording unavailable</p>
-      <h1>We couldn’t find the next recording.</h1>
+      <h1 tabindex="-1">We couldn’t find the next recording.</h1>
       <p>${escape(errorMessage(error))}</p>
       <p>Your score has not changed.</p>
       <button class="primary" id="interrupted-home" type="button">Return home</button
@@ -1151,7 +1094,7 @@ export function createGameController({
       onHome();
     });
     q('#interrupted-finish')?.addEventListener('click', finishPractice);
-    q('#interrupted-home')?.focus();
+    q('h1')?.focus();
   }
   function finishPractice() {
     if (!active || !run.config.practice) return;
@@ -1168,24 +1111,26 @@ export function createGameController({
     detach();
     onFinish(completed);
   }
-  function pause(reason = 'manual') {
+  function pause() {
     if (!active || paused) return;
     captureInput();
-    restoreFocus = doc?.activeElement?.id ?? null;
     paused = true;
-    pauseReason = reason;
     clock.pause();
     cancelAuto();
     stopPlayback();
     render();
   }
+  function confirmExit(confirmation: ExitConfirmation) {
+    if (!active) return;
+    exitConfirmation = confirmation;
+    if (paused) render();
+    else pause();
+  }
   function resume() {
-    if (!active || !paused || dialog?.open || doc?.hidden) return;
+    if (!active || !paused || doc?.hidden) return;
     paused = false;
-    pauseReason = '';
+    exitConfirmation = null;
     render({ focus: false });
-    if (restoreFocus) q('#' + restoreFocus)?.focus();
-    else if (isTide()) q('#transcription-answer')?.focus();
     if (['listening', 'answering'].includes(phase)) {
       if (entryVisual) playOpening();
       else if (!audioReady) playPrompt();
@@ -1193,65 +1138,80 @@ export function createGameController({
       enableAnswers();
     } else if (towerStop() && !towerReady) unlockTowerStop();
     else if (phase === 'correct' && !towerStop()) scheduleAdvance();
+    focusGameplay();
   }
   function keydown(event: KeyboardEvent) {
-    if (!active || dialog?.open || doc?.hidden) return;
+    if (!active || event.defaultPrevented || doc.hidden || event.isComposing) return;
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const input = q('#transcription-answer');
+    if (target === input && input?.composing) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+    // A held activation key can outlive the button or view that first received it.
+    if (event.repeat && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === ' ') spaceTarget = target;
+    if (phase === 'interrupted') return;
+
     if (paused && event.key === 'Tab') {
-      const controls = ['#resume-game', '#finish-paused-practice', '#end-run']
-        .map(q)
-        .filter(Boolean);
-      const index = controls.findIndex((control) => control === doc?.activeElement),
-        next = event.shiftKey
-          ? index <= 0
-            ? controls.length - 1
-            : index - 1
-          : (index + 1) % controls.length;
+      const controls = qa('.pause-overlay button');
+      const index = controls.findIndex((control) => control === doc.activeElement);
+      const next = event.shiftKey
+        ? index <= 0
+          ? controls.length - 1
+          : index - 1
+        : (index + 1) % controls.length;
       event.preventDefault();
       controls[next]?.focus();
       return;
     }
-    if (event.repeat || event.isComposing) return;
-    const target = event.target instanceof HTMLElement ? event.target : null;
-    const tag = target?.tagName.toLowerCase() ?? '',
-      typing = ['input', 'textarea', 'select'].includes(tag) || target?.isContentEditable;
+    if (event.repeat) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       paused ? resume() : pause();
       return;
     }
-    if (paused) return;
-    const replayKey =
+    if (
+      paused ||
+      (target && target !== doc.body && target !== doc.documentElement && !app.contains(target))
+    )
+      return;
+    if (target?.closest('button, a[href], summary, [role="button"], [role="link"]')) return;
+    const typing = target?.closest('input, textarea, select, [contenteditable]');
+    if (typing && typing !== input) return;
+
+    if (
       event.key === ' ' ||
-      (event.key.toLowerCase() === 'r' && (!isTide() || !profile.allowWordSpaces));
-    if (!event.ctrlKey && !event.metaKey && !event.altKey && replayKey) {
+      (event.key.toLowerCase() === 'r' && (!isTide() || !profile.allowWordSpaces))
+    ) {
       event.preventDefault();
       replay();
-      return;
-    }
-    if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.key === 'Enter' && (['review', 'landing'].includes(phase) || towerTerminal())) {
+    } else if (!typing && event.key === 'Enter' && q('#continue-game')) {
       event.preventDefault();
       advance();
-      return;
-    }
-    if (!isTide() && answering()) {
+    } else if (!typing && !isTide() && answering()) {
       const keyed = /^[1-9]$/.test(event.key) ? profile.tones[Number(event.key) - 1] : undefined;
-      if (keyed !== undefined) {
+      const index = arrowChoiceIndex(run.choices.length, event.key);
+      if (keyed !== undefined || index !== null) {
         event.preventDefault();
-        choose(keyed);
-      } else {
-        const index = arrowChoiceIndex(run.choices.length, event.key);
-        if (index !== null) {
-          event.preventDefault();
-          choose(run.choices[index]);
-        }
+        choose(keyed ?? (index === null ? undefined : run.choices[index]));
       }
     }
+  }
+  function keyup(event: KeyboardEvent) {
+    if (event.key !== ' ') return;
+    if (event.target !== spaceTarget) event.preventDefault();
+    spaceTarget = null;
   }
   function dispose() {
     stop();
     active = false;
     paused = false;
+    exitConfirmation = null;
+    spaceTarget = null;
+    if (siteHeader) siteHeader.inert = false;
     phase = 'idle';
     detach();
   }
@@ -1266,6 +1226,8 @@ export function createGameController({
       return run;
     },
     pause,
+    confirmExit,
+    focusGameplay,
     resume,
     dispose,
     setScript(nextScript: string) {

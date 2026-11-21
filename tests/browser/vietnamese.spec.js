@@ -86,7 +86,7 @@ test.beforeEach(async ({ page }) => {
 });
 async function loaded(page, url = '/vietnamese/') {
   await page.goto(url);
-  await expect(page.locator('.mode-cards')).toBeVisible();
+  await expect(page.locator('#start-adventure')).toBeVisible();
   await page.clock.pauseAt(new Date(Date.now() + 1000));
 }
 async function practice(page, choices) {
@@ -94,6 +94,7 @@ async function practice(page, choices) {
   await page.locator('#setup-practice').click();
   if (choices) await page.locator('[data-practice-setting="choices"]').selectOption(choices);
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   await expect(page.locator('.tone-door').first()).toBeEnabled();
 }
@@ -117,13 +118,17 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await page.goto('/');
   await page.locator('.language-card--vietnamese').click();
   await expect(page).toHaveURL(/\/vietnamese\/$/);
-  await expect(page.locator('h1')).toHaveText('Tone Tower');
-  await expect(page.locator('[data-mode-card]:visible')).toHaveCount(1);
+  await expect(page.locator('h1')).toHaveText('Practice Vietnamese');
+  await expect(page.locator('#destination-title')).toHaveText('Tone Tower');
+  await expect(page.locator('.mode-picker')).toHaveCount(0);
   await expect(page.locator('[data-destination="rail"]:visible')).toHaveCount(0);
-  await expect(page.locator('.language-switcher')).toContainText('Vietnamese');
+  await expect(page.locator('.site-language')).toContainText('Vietnamese');
   await expect(page.locator('#setup-practice')).toBeVisible();
-  await page.locator('#credits').click();
-  await expect(page.locator('#dialog')).toContainText('Synthetic speech generated with ElevenLabs');
+  await expect(page.locator('#script-display')).toHaveCount(0);
+  await page.locator('#about').click();
+  const credits = page.getByRole('region', { name: 'Recordings' });
+  await expect(credits).toContainText('ElevenLabs voice “Tuan Anh”');
+  await credits.getByRole('button', { name: 'Browse recordings' }).click();
   await expect(page.locator('#dialog')).toContainText('Fixture · synthetic voice');
   await expect(page.locator('#dialog')).not.toContainText(/undefined|Wikimedia|Original/);
   await page.locator('#close-dialog').click();
@@ -138,7 +143,7 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
     references.map(([text]) => text),
   );
   await page.locator('.guide-tone').nth(3).click();
-  expect(await page.evaluate(() => window.__audioPlays.at(-1))).toMatch(/voice-3\.mp3$/);
+  expect(await page.evaluate(() => window.__audioPlays.at(-1))).toMatch(/tuananh-mai4-mai4\.mp3$/);
   await page.goto('/vietnamese/about/');
   await expect(page.locator('.about-page .info-card')).toHaveCount(1);
   await expect(page.locator('.about-page')).toContainText('synthetic speech');
@@ -214,7 +219,7 @@ test('six doors show tone marks and names, and every cover leaves once a door is
     'href',
     /github\.com.*issues\/new/,
   );
-  await page.clock.runFor(1000);
+  await page.clock.runFor(1900);
   await expect(page.locator('.tone-cover.is-leaving')).toHaveCount(0);
   await expect(page.locator('.tone-cover')).toHaveCount((await current(page)).parts.length);
   await noOverflow(page);
@@ -243,6 +248,7 @@ for (const text of ['trung học chuyên nghiệp', 'nghiêng nghiêng', 'phòng
     await loaded(page);
     // A climb with a single word asks that word on its first floor.
     await page.locator('#start-adventure').click();
+    await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
     await page.clock.runFor(2300);
     await expect(page.locator('.tone-door').first()).toBeEnabled();
     expect((await shown(page)).normalize('NFD')).toBe(toneless(text));
@@ -273,6 +279,7 @@ test('a meaning that quotes Vietnamese shows it without tones until a door is ch
   );
   await loaded(page);
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(2300);
   await expect(page.locator('.tone-door').first()).toBeEnabled();
   await expect(page.locator('.prompt-gloss')).toHaveText('lifesaving (ao cưu sinh)');
@@ -301,9 +308,7 @@ test('reduced motion shows the answer without the leaving cover', async ({ page 
   await expect(page.locator('.tone-cover').first()).toBeHidden();
 });
 
-test('Vietnamese saves stay separate while the newer language switcher preserves the page', async ({
-  page,
-}) => {
+test('Vietnamese saves stay separate and About links to each language home', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('soundbound-cantonese-v1', 'cantonese-sentinel');
     localStorage.setItem('soundbound-mandarin-v1', 'mandarin-sentinel');
@@ -320,16 +325,13 @@ test('Vietnamese saves stay separate while the newer language switcher preserves
   expect(saves.vi).toBeTruthy();
   expect(saves.yue).toBe('cantonese-sentinel');
   expect(saves.cmn).toBe('mandarin-sentinel');
-  await page.locator('#learn').click();
-  await page.locator('.language-switcher summary').click();
-  await expect(page.locator('[data-language-link="cmn"]')).toHaveAttribute(
-    'href',
-    /mandarin\/guide\/$/,
-  );
-  await expect(page.locator('[data-language-link="yue"]')).toHaveAttribute(
-    'href',
-    /cantonese\/guide\/$/,
-  );
+  await page.locator('#about').click();
+  const otherLanguages = page.getByRole('region', { name: 'Other languages' });
+  await expect(
+    otherLanguages.getByRole('link', { name: 'Play Tone Tower in Mandarin' }),
+  ).toHaveAttribute('href', /mandarin\/$/);
+  await otherLanguages.getByRole('link', { name: 'Play Tone Tower in Cantonese' }).click();
+  await expect(page).toHaveURL(/cantonese\/$/);
 });
 
 test('home keyboard shortcuts keep Vietnamese on its supported tower', async ({ page }) => {

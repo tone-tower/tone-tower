@@ -11,12 +11,6 @@ export const vietnamese = Object.freeze<LanguageProfile>({
   slug: 'vietnamese',
   label: 'Vietnamese',
   toneSummary: 'six tones',
-  learningResources: [
-    [
-      'https://en.wikipedia.org/wiki/Vietnamese_phonology#Tone',
-      'Wikipedia’s overview of Vietnamese tones',
-    ],
-  ],
   romanization: 'Quốc ngữ',
   guideName: 'Tone guide',
   transcriptionSystem: 'quoc-ngu',
@@ -73,15 +67,14 @@ export const vietnamese = Object.freeze<LanguageProfile>({
     gloss: 'forever',
   },
   copy: {
-    homeTitle: 'Tone Tower · Vietnamese tone games',
+    homeTitle: 'Tone Tower · Practice Vietnamese',
     homeDescription:
-      'Train your ear for Vietnamese. Climb Tone Tower and practise the six tones with a synthetic voice.',
+      'Practise Vietnamese by listening to words and matching their written tone marks.',
     guideDescription:
       'Learn the six Vietnamese tones and their marks with playable pronunciation examples.',
     practiceDescription: 'Practise Vietnamese tones at your own pace, without a timer or lives.',
     loading: 'Play Tone Tower to practise the six Vietnamese tones.',
     recordings:
-      'recordings are synthetic speech: each word was generated with ElevenLabs using the voice “Tuan Anh”. They are not recordings of a person, and a synthetic voice can get a tone wrong, so please report any clip that sounds off. The word list and English meanings were compiled by the project’s contributors.',
-    credits: 'Synthetic speech generated with ElevenLabs. No person recorded these words.',
+      'The recordings use synthetic speech generated with the ElevenLabs voice “Tuan Anh”. The generated speech can get a tone wrong.',
   },
 });

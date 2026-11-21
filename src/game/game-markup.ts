@@ -21,9 +21,9 @@ export function createGameMarkup(state: () => Presentation) {
   function progressMarkup() {
     const { run } = state();
     const drill = run.config.practice && run.config.format === 'drill',
-      finite = drill && run.config.length !== 'endless';
+      finite = drill && run.goal !== 'endless';
     const label = drill
-      ? run.attempts + (finite ? ' / ' + run.config.length : '')
+      ? run.attempts + (finite ? ' / ' + run.goal : '')
       : run.opened +
         (isTide() ? ' ' : ' / 100 ') +
         (isTide()
@@ -179,24 +179,25 @@ export function createGameMarkup(state: () => Presentation) {
         `left:${x / 4.8}%;top:${y / 2.4}%;width:${w / 4.8}%;height:${h / 2.4}%`,
     );
     return run.choices
-      .map(
-        (t, index) =>
-          /* HTML */ `<button
-            style="${slots[index]}"
-            type="button"
-            class="tone-door ${toneDefinition(profile, t).markPath !== undefined ? 'has-mark' : ''} ${(phase === 'correct' || phase === 'landing') && t === run.word.tone ? 'is-correct' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
-            data-tone="${t}"
-            aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: ' : 'Choose '}${escape(toneLabel(profile, t))}"
-            ${!answering() ? 'disabled' : ''}
+      .map((t, index) => {
+        const tone = toneDefinition(profile, t);
+        const name = profile.toneNotation === 'marks' ? tone.label : tone.name;
+        return /* HTML */ `<button
+          style="${slots[index]}"
+          type="button"
+          class="tone-door ${tone.markPath !== undefined ? 'has-mark' : ''} ${(phase === 'correct' || phase === 'landing') && t === run.word.tone ? 'is-correct' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
+          data-tone="${t}"
+          aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: ' : 'Choose '}${escape(toneLabel(profile, t))}"
+          ${!answering() ? 'disabled' : ''}
+        >
+          ${phase === 'review' && t === run.word.tone ? '<span class="answer-mark" aria-hidden="true">✓</span>' : ''}${toneSymbolMarkup(profile, t)}<span
+            class="tone-name"
+            >${phase === 'review' && t === run.lastAnswer ? '✕ Your choice' : phase === 'review' && t === run.word.tone ? 'CORRECT' : escape(name)}</span
+          ><kbd class="door-key"
+            >${run.choices.length === 2 ? (run.choices.indexOf(t) === 0 ? '←' : '→') : run.choices.length === 3 ? ['←', '↑ ↓', '→'][run.choices.indexOf(t)] : run.choices.length === 4 ? ['↑', '←', '→', '↓'][run.choices.indexOf(t)] : t}</kbd
           >
-            ${phase === 'review' && t === run.word.tone ? '<span class="answer-mark" aria-hidden="true">✓</span>' : ''}${toneSymbolMarkup(profile, t)}${run.config.practice && profile.toneNotation === 'numbers' ? '<svg class="practice-tone-contour" viewBox="0 0 100 36" aria-hidden="true"><path d="' + toneDefinition(profile, t).path + '"/></svg>' : ''}<span
-              class="tone-name"
-              >${phase === 'review' && t === run.lastAnswer ? '✕ Your choice' : phase === 'review' && t === run.word.tone ? 'CORRECT' : escape(toneDefinition(profile, t).name)}</span
-            ><kbd class="door-key"
-              >${run.choices.length === 2 ? (run.choices.indexOf(t) === 0 ? '←' : '→') : run.choices.length === 3 ? ['←', '↑ ↓', '→'][run.choices.indexOf(t)] : run.choices.length === 4 ? ['↑', '←', '→', '↓'][run.choices.indexOf(t)] : t}</kbd
-            >
-          </button>`,
-      )
+        </button>`;
+      })
       .join('');
   }
   function typedForm() {
@@ -236,4 +237,55 @@ export function createGameMarkup(state: () => Presentation) {
   }
 
   return { progressMarkup, lifeMarkup, promptMarkup, toneButtons, typedForm };
+}
+
+export function runConclusionMarkup(run: Run, ready: boolean, reward: string) {
+  const won = run.status === 'won';
+  const rail = run.world === 'tide';
+  const title = won
+    ? rail
+      ? 'You reached the final station'
+      : 'The whole tower is alight.'
+    : rail
+      ? 'Skyrail run ended.'
+      : 'Tower run ended.';
+  const unit = rail
+    ? run.opened === 1
+      ? 'span crossed'
+      : 'spans crossed'
+    : run.opened === 1
+      ? 'floor lit'
+      : 'floors lit';
+  const disabled = ready ? '' : 'disabled';
+  return /* HTML */ `<section
+    class="run-conclusion ${ready ? '' : 'is-arriving'}"
+    aria-labelledby="run-end-title"
+  >
+    <h2 id="run-end-title" tabindex="-1">${title}</h2>
+    <p>${run.opened} ${unit} · ${run.mistakes} ${run.mistakes === 1 ? 'miss' : 'misses'}</p>
+    ${reward ? '<p class="homecoming-message" role="status">' + escape(reward) + '</p>' : ''}
+    ${
+      !won
+        ? /* HTML */ `<p class="ending-word">
+            ${escape(run.word.syllables.map((s) => (s.text === s.transcription ? s.text : s.text + ' ' + s.transcription)).join(' · '))}
+            <button class="text-button" id="ending-replay" type="button">
+              ▶ Listen again <kbd>Space</kbd>
+            </button>
+          </p>`
+        : ''
+    }
+    <div class="results-actions">
+      ${!(rail && won) ? `<button class="primary" id="retry-run" type="button" ${disabled}>${won ? 'A new adventure' : 'Try again'} →</button>` : ''}
+      ${!rail && !won ? `<button class="secondary" id="ending-practice" type="button" ${disabled}>Practice this tone combination</button>` : ''}
+      ${!rail && run.missedPrompts.length ? `<button class="secondary" id="practise-mistakes" type="button" ${disabled}>Practice your mistakes</button>` : ''}
+      <button
+        class="${rail && won ? 'primary' : 'text-button'}"
+        id="ending-home"
+        type="button"
+        ${disabled}
+      >
+        Back to Home
+      </button>
+    </div>
+  </section>`;
 }

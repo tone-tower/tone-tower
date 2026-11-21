@@ -87,6 +87,55 @@ async function loaded(page, url = '/mandarin/') {
 const noOverflow = async (page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
+test('Start is fully in view before scrolling on all language homes', async ({ page }) => {
+  const size = page.viewportSize();
+  if (size.width > 700) await page.setViewportSize({ width: 1280, height: 720 });
+  for (const language of ['cantonese', 'mandarin', 'vietnamese']) {
+    await page.goto('/' + language + '/');
+    const start = page.locator('#start-adventure');
+    await expect(start).toBeVisible();
+    await expect(start).toBeInViewport({ ratio: 1 });
+    await page.locator('#setup-practice').click();
+    await expect(start).toBeInViewport({ ratio: 1 });
+  }
+});
+
+test('guide playback works before the game library is requested, and Start can retry', async ({
+  page,
+}) => {
+  let requests = 0;
+  const firstResponse = Promise.withResolvers();
+  await page.route('**/catalogs/cmn.json', async (route) => {
+    if (++requests === 1) {
+      await firstResponse.promise;
+      await route.fulfill({ status: 503 });
+    } else await route.fulfill({ json: catalog });
+  });
+  await loaded(page);
+  await page.locator('#learn').click();
+  await page.locator('.guide-tone[data-guide-tone="3"]').click();
+  await page.clock.runFor(150);
+  await expect(page.locator('#guide-status')).toContainText('mǎ');
+  await page.locator('.brand').click();
+  expect(requests).toBe(0);
+
+  const start = page.locator('#start-adventure');
+  await page.locator('#setup-practice').click();
+  try {
+    await start.click();
+    await expect(start).toBeDisabled();
+    await expect(page.locator('#setup-status')).toContainText('Loading');
+    await expect(page.locator('#app')).toHaveAttribute('data-view', 'home');
+  } finally {
+    firstResponse.resolve();
+  }
+  await expect(page.locator('#setup-error')).toContainText('Couldn’t load the recording library');
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect(page.getByRole('heading', { name: 'Practice tones' })).toBeVisible();
+  expect(requests).toBe(2);
+});
+
 test('chooser loads no catalog and language navigation stays in Mandarin', async ({ page }) => {
   const requests = [];
   page.on('request', (r) => {
@@ -101,20 +150,27 @@ test('chooser loads no catalog and language navigation stays in Mandarin', async
     'Vietnamese',
   ]);
   await page.locator('.language-card--mandarin').click();
-  await expect(page.locator('h1')).toHaveText('Choose a game');
-  await page.locator('#credits').click();
-  await expect(page.locator('#dialog')).toContainText('CC-CEDICT');
-  await expect(page.locator('#dialog')).not.toContainText('CC-Canto');
+  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await page.locator('#about').click();
+  const credits = page.getByRole('region', { name: 'Recordings' });
+  await credits.getByText('Data and software credits').click();
+  await expect(credits.getByRole('link', { name: 'CC-CEDICT' })).toBeVisible();
+  await expect(credits).not.toContainText('CC-Canto');
+  expect(requests).toEqual([]);
+  const browse = credits.getByRole('button', { name: 'Browse recordings' });
+  await browse.click();
+  await expect(page.getByRole('heading', { name: 'Recording directory' })).toBeVisible();
+  const search = page.getByRole('searchbox', { name: 'Find a recording' });
+  await search.fill('hao');
+  await expect(page.locator('#credit-results [role="status"]')).toHaveText('1–1 of 1 recordings');
+  await expect(page.locator('#credit-results tbody')).toContainText('nǐ hǎo');
   await page.locator('#close-dialog').click();
+  await expect(browse).toBeFocused();
   expect(
     requests.filter((url) => url.includes('/catalogs/')).every((url) => url.endsWith('/cmn.json')),
   ).toBe(true);
   await page.locator('#learn').click();
   await expect(page.locator('.brand')).toHaveAttribute(
-    'href',
-    new URL('/mandarin/', page.url()).href,
-  );
-  await expect(page.locator('#home')).toHaveAttribute(
     'href',
     new URL('/mandarin/', page.url()).href,
   );
@@ -145,10 +201,18 @@ test('Mandarin practice renders five doors and accepts neutral-tone keyboard ans
   await page.locator('#setup-practice').click();
   await page.locator('[data-practice-setting="choices"]').selectOption('5');
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   await expect(page.locator('.tone-door')).toHaveCount(5);
   await expect(page.locator('.tone-door .tone-mark')).toHaveCount(5);
   await expect(page.locator('.tone-door .tone-mark.is-blank')).toHaveCount(1);
+  await expect(page.locator('.tone-door .tone-name')).toHaveText([
+    'Tone 1',
+    'Tone 2',
+    'Tone 3',
+    'Tone 4',
+    'Neutral tone',
+  ]);
   await expect(page.locator('.tone-door').first()).toBeEnabled();
   const clip = await page.evaluate(() => window.__audioPlays.at(-1));
   const recording = catalog.recordings.find((r) => new URL(clip).pathname.endsWith('/' + r.audio));
@@ -170,38 +234,23 @@ test('navigation separates language switching, learning, and project information
   page,
 }) => {
   await loaded(page);
-  await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Home', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Records', exact: true })).toHaveCount(0);
   await expect(page.locator('[data-nav-page="about"]')).toHaveCount(1);
   await expect(page.locator('.site-header [data-nav-page="about"]')).toHaveText('About');
-  await expect(page.locator('.site-footer a')).toHaveCount(0);
-  await expect(page.locator('.site-footer #script-display')).toHaveCount(0);
-  await expect(page.locator('.learning-toolbar')).toHaveCount(0);
-  await expect(page.locator('#script-display')).toBeHidden();
-  await page.locator('.language-switcher summary').click();
-  await expect(page.getByLabel('Characters', { exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
+  await expect(page.locator('.site-footer')).toHaveCount(0);
+  await expect(page.locator('.site-language')).toHaveText('Mandarin');
+  await expect(
+    page.locator('.site-header').getByRole('radio', { name: 'Simplified' }),
+  ).toBeChecked();
   await page.locator('#learn').click();
-  const switcher = page.locator('.language-switcher');
-  await switcher.locator('summary').click();
-  await expect(page.locator('[data-language-link="yue"]')).toHaveAttribute(
-    'href',
-    /\/cantonese\/guide\/$/,
-  );
-  await expect(page.locator('[data-language-link="cmn"]')).toHaveAttribute(
-    'href',
-    /\/mandarin\/guide\/$/,
-  );
-  await page.keyboard.press('Escape');
-  await expect(switcher).not.toHaveAttribute('open');
-  await expect(switcher.locator('summary')).toBeFocused();
-  await expect(page.getByRole('button', { name: 'Records', exact: true })).toHaveCount(0);
-  await page.locator('#home').click();
+  await expect(page.getByRole('heading', { name: 'Pinyin guide', exact: true })).toBeVisible();
+  await page.locator('.brand').click();
   await page.locator('#setup-practice').click();
   await page.locator('[data-mode-card][data-destination="rail"]').click();
   await expect(page.locator('#setup-practice')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#start-adventure')).toHaveText('Start spelling practice →');
-  await expect(page.locator('#home')).toHaveAttribute(
+  await expect(page.locator('.brand')).toHaveAttribute(
     'href',
     new URL('/mandarin/', page.url()).href,
   );
@@ -216,14 +265,13 @@ test('Pinyin typing supports composition, Space replay, tone buttons, and script
   await page.locator('#setup-practice').click();
   await page.locator('[data-practice-setting="variant"]').check();
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   const input = page.locator('#transcription-answer');
   await expect(page.locator('.typing-tools')).toBeVisible();
   await expect(page.locator('[data-insert="ü"]')).toHaveCount(0);
   await expect(page.locator('#typed-help, .typing-hint, .keyboard')).toHaveCount(0);
-  await page.locator('.language-switcher summary').click();
-  await page.locator('#script-display').selectOption('traditional');
-  await page.keyboard.press('Escape');
+  await page.getByRole('radio', { name: 'Traditional' }).check();
   await expect(input).toBeEnabled();
   const clip = await page.evaluate(() => window.__audioPlays.at(-1));
   const p = pronunciations.find((p) => new URL(clip).pathname.endsWith('/audio/' + p.id + '.mp3'));
@@ -253,7 +301,68 @@ test('Pinyin typing supports composition, Space replay, tone buttons, and script
     await input.focus();
     await expect(input).toBeInViewport();
   }
+  await page.locator('#finish-practice').click();
+  const results = page.getByRole('heading', { name: 'Practice complete' });
+  await expect(results).toBeVisible();
+  await page.getByRole('radio', { name: 'Simplified' }).check();
+  await expect(results).toBeVisible();
   await noOverflow(page);
+});
+
+test('rapid Skyrail keys cannot activate navigation or dismiss a finished run', async ({
+  page,
+}) => {
+  await loaded(page);
+  await page.locator('[data-mode-card][data-destination="rail"]').click();
+  await page.locator('[data-difficulty="extreme"]').click();
+  await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-world', 'tide');
+  await page.clock.runFor(150);
+  const input = page.locator('#transcription-answer');
+  await input.fill('zz');
+
+  await page.locator('#about').click();
+  await expect(page.getByRole('heading', { name: 'Go to About?' })).toBeVisible();
+  await expect(page.locator('#dialog')).toBeHidden();
+  await expect(page).toHaveURL(/mandarin\/$/);
+  await page.keyboard.press('Escape');
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue('zz');
+
+  await page.evaluate(() => history.pushState(null, '', '/mandarin/about/'));
+  await page.goBack();
+  await expect(page).toHaveURL(/mandarin\/$/);
+  await expect(page.locator('.pause-overlay')).toHaveCount(0);
+
+  await page.locator('.game-layout').focus();
+  await page.keyboard.down('Enter');
+  const about = page.locator('#about');
+  await about.focus();
+  await page.keyboard.down('Enter');
+  await page.keyboard.up('Enter');
+  await expect(page.locator('.pause-overlay')).toHaveCount(0);
+  await expect(page).toHaveURL(/mandarin\/$/);
+
+  await about.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Go to About?' })).toBeVisible();
+  await page.keyboard.down('Enter');
+  await page.keyboard.down('Enter');
+  await page.keyboard.up('Enter');
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue('zz');
+  await page.keyboard.press('Space');
+  await page.clock.fastForward(16000);
+  await expect(page.getByRole('heading', { name: 'Skyrail run ended.' })).toBeFocused();
+  await expect(
+    page.locator('.run-conclusion').getByRole('button', { name: /practice/i }),
+  ).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Space');
+  await expect(page.locator('.run-conclusion')).toBeVisible();
+  await expect(page).toHaveURL(/\/mandarin\/$/);
+  await page.locator('#about').click();
+  await expect(page).toHaveURL(/mandarin\/about\/$/);
+  await expect(page.locator('.pause-overlay')).toHaveCount(0);
 });
 
 test('unavailable collection keeps the guide usable and games closed', async ({ page }) => {
@@ -270,6 +379,8 @@ test('unavailable collection keeps the guide usable and games closed', async ({ 
     }),
   );
   await loaded(page);
+  await page.locator('#start-adventure').click();
+  await expect(page.locator('.content-preview')).toBeVisible();
   await expect(page.locator('.content-preview')).toContainText('gathering enough recordings');
   await expect(page.locator('#start-adventure')).toBeDisabled();
   await page.locator('#learn').click();
@@ -289,6 +400,7 @@ test('reduced motion and blocked local storage still allow a language game', asy
   await loaded(page);
   await page.locator('#setup-practice').click();
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   await expect(page.locator('.tone-door').first()).toBeEnabled();
   await noOverflow(page);
@@ -300,50 +412,84 @@ test('language homes have a brief introduction and guide link above the games', 
   for (const [language, subject] of [
     ['cantonese', 'Jyutping'],
     ['mandarin', 'Pinyin'],
-    ['vietnamese', 'Vietnamese tones'],
+    ['vietnamese', 'Vietnamese'],
   ]) {
     await page.goto('/' + language + '/');
-    const intro = page.locator('.home-intro');
-    await expect(intro.locator('.home-intro-title')).toHaveText('Practice ' + subject);
-    await expect(intro.getByRole('link')).toHaveText('New to ' + subject + '? →');
+    const intro = page.locator('.home-welcome');
+    const heading = intro.getByRole('heading', { level: 1 });
+    const guideLabel = language === 'vietnamese' ? 'Vietnamese tone guide' : `New to ${subject}?`;
+    const link = intro.getByRole('link', { name: guideLabel + ' Open the guide', exact: true });
+    await expect(heading).toHaveText('Practice ' + subject);
+    await expect(link).toHaveAttribute(
+      'href',
+      new URL('/' + language + '/guide/', page.url()).href,
+    );
     await expect(intro.locator('[data-info-action="practice"]')).toHaveCount(0);
     await expect(page.locator('.home-learning, .targets')).toHaveCount(0);
-    if (page.viewportSize().width > 700 || language !== 'vietnamese') {
-      const titleBox = await intro.locator('.home-intro-title').boundingBox();
-      const guideBox = await intro.getByRole('link').boundingBox();
+    if (page.viewportSize().width > 700) {
+      const titleBox = await heading.boundingBox();
+      const guideBox = await link.boundingBox();
       expect(guideBox.x).toBeGreaterThan(titleBox.x + titleBox.width);
       expect(guideBox.y).toBeLessThan(titleBox.y + titleBox.height);
     }
     const introBox = await intro.boundingBox();
-    const gamesBox = await page.locator('.mode-picker').boundingBox();
+    const gamesBox = await page.locator('.mode-picker, .home-world').first().boundingBox();
     expect(introBox.y + introBox.height).toBeLessThanOrEqual(gamesBox.y);
-    await intro.getByRole('link').click();
+    await link.click();
     await expect(page).toHaveURL(new RegExp('/' + language + '/guide/$'));
-    await page.locator('#home').click();
+    await page.locator('.brand').click();
     await noOverflow(page);
   }
 });
 
-test('About retains the original sections, game cards, privacy, and feedback links', async ({
-  page,
-}) => {
-  for (const language of ['cantonese', 'mandarin']) {
+test('About covers games, recordings, and ways to contribute', async ({ page }) => {
+  for (const [language, subject] of Object.entries({
+    cantonese: 'Jyutping',
+    mandarin: 'Pinyin',
+    vietnamese: 'Vietnamese',
+  })) {
     await page.goto('/' + language + '/about/');
     await expect(page.locator('.about-page h1')).toHaveText('About Tone Tower');
-    await expect(page.locator('.about-page .info-card')).toHaveCount(2);
-    for (const name of [
-      'What you can practise',
-      'Games and practice',
-      'Recordings and sources',
-      'Progress and privacy',
-      'An open-source side project',
-      'Help make it better',
-    ])
-      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Report a problem ↗' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Suggest an idea ↗' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'explore it on GitHub ↗' })).toBeVisible();
+    await expect(page.locator('.about-page .info-card')).toHaveCount(
+      language === 'vietnamese' ? 1 : 2,
+    );
+    await expect(page.locator('.about-heading .lead')).toContainText(
+      'Tone Tower is a browser game for practising ' + subject,
+    );
+    await expect(page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Practice Mode', exact: true })).toHaveAttribute(
+      'href',
+      new URL('/' + language + '/practice/', page.url()).href,
+    );
+    const recordings = page.getByRole('region', { name: 'Recordings' });
+    await expect(recordings.getByRole('button', { name: 'Browse recordings' })).toBeVisible();
+    const license = recordings.getByRole('link', {
+      name: 'MIT licensed code',
+      includeHidden: true,
+    });
+    await expect(license).toBeHidden();
+    await recordings.getByText('Data and software credits').click();
+    await expect(license).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reset saved progress…' })).toHaveCount(0);
+    const contributions = page.getByRole('region', { name: 'Project and feedback' });
+    for (const name of ['GitHub repository', 'Report a problem ↗', 'Suggest an idea ↗'])
+      await expect(contributions.getByRole('link', { name })).toBeVisible();
+    const others = page.getByRole('region', { name: 'Other languages' });
+    await expect(others.getByRole('link')).toHaveCount(2);
+    for (const other of ['cantonese', 'mandarin', 'vietnamese'].filter((item) => item !== language))
+      await expect(others.getByRole('link', { name: new RegExp(other, 'i') })).toHaveAttribute(
+        'href',
+        new URL('/' + other + '/', page.url()).href,
+      );
     await noOverflow(page);
+    const home = page.getByRole('link', { name: '← Home' });
+    await home.click();
+    await expect(page).toHaveURL(new URL('/' + language + '/', page.url()).href);
+    await page.goBack();
+    await page.getByRole('link', { name: 'New to ' + subject + '? Open the guide' }).click();
+    await expect(page).toHaveURL(new URL('/' + language + '/guide/', page.url()).href);
+    await page.locator('.page-heading .back-link').click();
+    await expect(page).toHaveURL(new URL('/' + language + '/', page.url()).href);
   }
 });
 
@@ -355,6 +501,7 @@ test('Pinyin helpers insert once across answers, pause, script changes and audio
   await page.locator('#setup-practice').click();
   await page.locator('[data-practice-setting="variant"]').check();
   await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
   await page.clock.runFor(150);
   const input = page.locator('#transcription-answer');
   const check = async () => {
@@ -374,9 +521,7 @@ test('Pinyin helpers insert once across answers, pause, script changes and audio
   await page.locator('#pause-run').click();
   await page.locator('#resume-game').click();
   await check();
-  await page.locator('.language-switcher summary').click();
-  await page.locator('#script-display').selectOption('traditional');
-  await page.keyboard.press('Escape');
+  await page.getByRole('radio', { name: 'Traditional' }).check();
   await check();
   const clip = await page.evaluate(() => window.__audioPlays.at(-1));
   const recording = catalog.recordings.find((r) => new URL(clip).pathname.endsWith('/' + r.audio));

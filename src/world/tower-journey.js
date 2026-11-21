@@ -13,7 +13,8 @@ export function createTowerJourney(start = 0) {
     update(next) {
       // The model awards progress before clock.pause() emits its final answering tick.
       // Follow the prompt's room, so that tick cannot move us before the door animation.
-      const target = Math.max(floor, Math.min(99, next.floor ?? next.progress ?? floor));
+      const room = next.floor ?? next.progress ?? floor;
+      const target = Math.max(floor, next.practice ? room : Math.min(99, room));
       if (!['correct', 'landing', 'review'].includes(next.phase) && target > floor) {
         previous = state
           ? {

@@ -3,6 +3,25 @@ for (const base of [
   'http://127.0.0.1:4176/',
   'http://127.0.0.1:4177/release-check/renamed-project/',
 ]) {
+  test(
+    'static About links work with JavaScript disabled at ' + new URL(base).pathname,
+    async ({ browser }) => {
+      const context = await browser.newContext({ javaScriptEnabled: false });
+      try {
+        const page = await context.newPage();
+        await page.goto(base + 'cantonese/about/');
+        await expect(page.getByRole('region', { name: 'Recordings' })).toBeVisible();
+        await page
+          .getByRole('region', { name: 'Other languages' })
+          .getByRole('link', { name: 'Play Tone Tower in Vietnamese' })
+          .click();
+        await expect(page).toHaveURL(base + 'vietnamese/');
+      } finally {
+        await context.close();
+      }
+    },
+  );
+
   for (const language of ['cantonese', 'mandarin', 'vietnamese'])
     test(
       'built ' + language + ' routes, assets and playback resolve at ' + new URL(base).pathname,
@@ -60,7 +79,7 @@ for (const base of [
           expect((await page.request.get(guideAudio)).status()).toBe(200);
         }
         await page.locator('.brand').click();
-        await expect(page.locator('.mode-cards')).toBeVisible();
+        await expect(page.locator('#start-adventure')).toBeVisible();
         await expect(page.locator('.site-header [data-nav-page="about"]')).toHaveText('About');
         await expect(page.locator('#progress, #reward-hint')).toHaveCount(0);
         await expect(page.locator('.home-world')).not.toContainText('Tower windows remember');
@@ -83,10 +102,22 @@ for (const base of [
         await expect(page).toHaveURL(base + language + '/');
         await page.goto(base + language + '/about/');
         await expect(page.locator('.about-page h1')).toHaveText('About Tone Tower');
-        const license = page.getByRole('link', { name: 'MIT licensed' });
+        await page.getByText('Data and software credits').click();
+        const license = page.getByRole('link', { name: 'MIT licensed code' });
         await expect(license).toHaveAttribute('href', base + 'LICENSE');
+        await expect(page.getByRole('link', { name: 'DM Sans font licence' })).toHaveAttribute(
+          'href',
+          base + 'assets/fonts/DMSans-LICENSE.txt',
+        );
+        const otherLanguages = page.getByRole('region', { name: 'Other languages' });
+        for (const other of ['cantonese', 'mandarin', 'vietnamese'].filter(
+          (value) => value !== language,
+        ))
+          await expect(
+            otherLanguages.getByRole('link', { name: new RegExp(other, 'i') }),
+          ).toHaveAttribute('href', base + other + '/');
         await page.goto(base + language + '/practice/');
-        await expect(page.locator('.mode-cards')).toBeVisible();
+        await expect(page.locator('#start-adventure')).toBeVisible();
         if (language !== 'vietnamese')
           await page.locator('[data-mode-card][data-destination="rail"]').click();
         else await expect(page.locator('[data-destination="rail"]:visible')).toHaveCount(0);

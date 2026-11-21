@@ -3,8 +3,6 @@ import { languages } from './languages/profiles.ts';
 export const site = {
   siteUrl: 'https://tone-tower.github.io/tone-tower/',
   repository: 'https://github.com/tone-tower/tone-tower',
-  maintainer: 'john0107',
-  maintainerUrl: 'https://github.com/john0107',
 };
 export function languagePages(
   profile: LanguageProfile,
@@ -18,11 +16,11 @@ export function languagePages(
         copy.homeTitle ?? 'Tone Tower · ' + profile.label + ' ' + profile.romanization + ' games',
       description:
         copy.homeDescription ??
-        'Train your ear for ' +
+        'Practise ' +
           profile.label +
-          '. Play Tone Tower, Skyrail, and focused ' +
+          ' tones and ' +
           profile.romanization +
-          ' practice with human recordings.',
+          ' spelling with recordings in Tone Tower, Skyrail and focused exercises.',
     },
     sounds: {
       path: root + 'guide/',
@@ -54,9 +52,9 @@ export function languagePages(
       path: root + 'about/',
       title: 'About · ' + profile.label + ' Tone Tower',
       description:
-        'About the open-source ' +
-        profile.label +
-        ' pronunciation games. Find recording credits, source code, and feedback links.',
+        'Practise ' +
+        (profile.id === 'vi' ? profile.label : profile.romanization) +
+        ' with Tone Tower. Explore the games, recordings, and open-source project.',
     },
   };
 }

@@ -1,14 +1,14 @@
-import { filterCredits, creditsPage } from './credits.ts';
+import { filterCredits, creditsPage, orderCredits } from './credits.ts';
 import { recordingIssueUrl } from './recording-report.ts';
 import { query, required, escape } from './dom.ts';
 import type { LanguageProfile, ExerciseRow } from '../types.ts';
 interface Options {
   dialogBody: HTMLElement;
   profile: LanguageProfile;
-  getRows: () => ExerciseRow[];
-  openDialog: (html: string) => void;
+  loadRows: () => Promise<ExerciseRow[]>;
+  openDialog: (html: string, opener?: HTMLElement) => void;
 }
-export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }: Options) {
+export function createCreditsDialog({ dialogBody, profile, loadRows, openDialog }: Options) {
   const safeHref = (value: string | undefined) => {
     try {
       const u = new URL(value ?? '');
@@ -17,33 +17,10 @@ export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }
       return '#';
     }
   };
-  return function showCredits() {
-    const data = getRows();
+  return function showCredits(opener?: HTMLElement) {
     openDialog(
       /* HTML */ `<div class="eyebrow">Sources & licences</div>
-        <h2 id="dialog-title">Voices & credits</h2>
-        <p>
-          ${escape(profile.copy?.credits ?? 'Human recordings from Wikimedia Commons. Each recording keeps its source licence.')}
-        </p>
-        <details>
-          <summary>Dictionary, typography & application credits</summary>
-          ${
-            profile.dictionarySources.length
-              ? /* HTML */ `
-                  <p>
-                    Readings and glosses include adaptations from
-                    ${profile.dictionarySources.map((source) => '<a href="' + safeHref(source.url) + '" target="_blank" rel="noopener">' + escape(source.name) + '</a>' + (source.attribution ? ' · ' + escape(source.attribution) : '') + ' under <a href="' + safeHref(source.licenseUrl) + '">' + escape(source.license) + '</a>').join('; ')}.
-                    Individual entries identify their dictionary sources.
-                  </p>
-                `
-              : ''
-          }
-          <p>
-            DM Sans: <a href="assets/fonts/DMSans-LICENSE.txt">Font licence</a>. Application code:
-            <a href="LICENSE">MIT</a>. <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a>. No
-            accounts or analytics.
-          </p>
-        </details>
+        <h2 id="dialog-title">Recording directory</h2>
         <label class="credits-search"
           >Find a recording<input
             id="credit-search"
@@ -52,14 +29,23 @@ export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }
             autocomplete="off"
         /></label>
         <div id="credit-results"></div>`,
+      opener,
     );
     const results = required(dialogBody, '#credit-results'),
       search = required(dialogBody, '#credit-search');
-    let page = 0,
+    let data: ExerciseRow[] | null = null,
+      page = 0,
       query = '',
       debounce: ReturnType<typeof setTimeout>;
+    function focusPageButton(
+      preferred: '#credits-prev' | '#credits-next',
+      fallback: '#credits-prev' | '#credits-next',
+    ) {
+      const button = required(results, preferred);
+      (button.disabled ? required(results, fallback) : button).focus({ preventScroll: true });
+    }
     function draw() {
-      if (!results.isConnected) return;
+      if (!data || !results.isConnected) return;
       const matches = filterCredits(data, query),
         view = creditsPage(matches, page);
       page = view.page;
@@ -127,12 +113,12 @@ export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }
       required(results, '#credits-prev').onclick = () => {
         page--;
         draw();
-        required(results, '#credits-prev').focus({ preventScroll: true });
+        focusPageButton('#credits-prev', '#credits-next');
       };
       required(results, '#credits-next').onclick = () => {
         page++;
         draw();
-        required(results, '#credits-next').focus({ preventScroll: true });
+        focusPageButton('#credits-next', '#credits-prev');
       };
     }
     search.addEventListener('input', () => {
@@ -143,6 +129,21 @@ export function createCreditsDialog({ dialogBody, profile, getRows, openDialog }
         draw();
       }, 120);
     });
-    draw();
+    async function load() {
+      results.innerHTML = '<p role="status">Loading recording credits…</p>';
+      try {
+        data = orderCredits(await loadRows(), profile);
+        draw();
+      } catch {
+        if (!results.isConnected) return;
+        results.innerHTML =
+          '<p class="error" role="alert">Couldn’t load the recording credits.</p><button class="secondary" type="button">Try again</button>';
+        required(results, 'button').onclick = () => {
+          search.focus({ preventScroll: true });
+          void load();
+        };
+      }
+    }
+    void load();
   };
 }

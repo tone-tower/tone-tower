@@ -1,4 +1,4 @@
-import { cantoneseCatalog } from '../../tools/catalog/runtime.mjs';
+import { cantoneseCatalog, withSimplifiedCantonese } from '../../tools/catalog/runtime.mjs';
 import { test, expect } from '@playwright/test';
 
 // Keep smoke tests independent of downloads and speakers. Real recording playback
@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.clock.install();
   await page.route('**/catalogs/yue.json', (route) =>
-    route.fulfill({ json: cantoneseCatalog(catalog) }),
+    route.fulfill({ json: withSimplifiedCantonese(cantoneseCatalog(catalog)) }),
   );
   await page.addInitScript(() => {
     window.__audioPlays = [];
@@ -90,6 +90,108 @@ async function expectNoOverflow(page) {
   );
 }
 
+test('Cantonese character style updates the current prompt and carries over to the guide', async ({
+  page,
+}) => {
+  const traditional = page.getByRole('radio', { name: 'Traditional' });
+  const simplified = page.getByRole('radio', { name: 'Simplified' });
+  await expect(traditional).toBeChecked();
+  await page.locator('#setup-practice').click();
+  for (const tone of [1, 2, 5, 6]) await page.locator(`[data-practice-tone="${tone}"]`).click();
+  await page.locator('#start-adventure').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
+  await page.clock.runFor(150);
+
+  const character = page.locator('.word-prompt .prompt-character');
+  await expect(character).toHaveAttribute('lang', 'yue-Hant');
+  await expect(character).toHaveText(/^[試時]$/);
+  const written = await character.innerText();
+  const tone = await currentTone(page);
+  const plays = await page.evaluate(() => window.__audioPlays.length);
+  await simplified.check();
+  await expect(character).toHaveAttribute('lang', 'yue-Hans');
+  await expect(character).toHaveText(written === '試' ? '试' : '时');
+  expect(await page.evaluate(() => window.__audioPlays.length)).toBe(plays);
+  await expect(page.locator('.game-layout')).toBeFocused();
+  await page.keyboard.press(tone);
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+
+  await page.goto('/cantonese/guide/');
+  await expect(simplified).toBeChecked();
+  const reference = page.locator('.guide-tones [data-guide-tone="5"] span[lang]');
+  await expect(reference).toHaveText('妇');
+  await expect(reference).toHaveAttribute('lang', 'yue-Hans');
+  await traditional.check();
+  await expect(reference).toHaveText('婦');
+  await expect(reference).toHaveAttribute('lang', 'yue-Hant');
+});
+
+test('pause and resume buttons keep keyboard activation', async ({ page }) => {
+  await start(page, 'tone');
+  await page.clock.runFor(2200);
+  const plays = () => page.evaluate(() => window.__audioPlays.length);
+  const before = await plays();
+  await page.locator('#pause-run').press('Space');
+  await expect(page.locator('#resume-game')).toBeFocused();
+  expect(await plays()).toBe(before);
+  await page.locator('#resume-game').press('Enter');
+
+  await expect(page.locator('.game-layout')).toBeFocused();
+});
+
+test('header navigation pauses an unfinished run and confirms the full destination', async ({
+  page,
+}) => {
+  await start(page, 'tide');
+  await page.clock.runFor(150);
+  const input = page.locator('#transcription-answer');
+  await input.fill('zz');
+  const clock = page.locator('#countdown');
+  const remaining = await clock.textContent();
+  const resume = page.getByRole('button', { name: 'Resume' });
+
+  await page.locator('#replay-word').focus();
+  await page.keyboard.down('Space');
+  await page.locator('.brand').click();
+  await page.keyboard.up('Space');
+  await expect(page.getByRole('heading', { name: 'Go to Home?' })).toBeVisible();
+  await expect(resume).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: 'End run & go to Home' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(resume).toBeFocused();
+  await page.clock.runFor(5000);
+  await expect(clock).toHaveText(remaining);
+  await expect(page).toHaveURL(/cantonese\/$/);
+  await resume.click();
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue('zz');
+
+  await page.locator('#learn').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Go to Jyutping guide?' })).toBeVisible();
+  await page.getByRole('button', { name: 'End run & go to Jyutping guide' }).press('Enter');
+  await expect(page).toHaveURL(/cantonese\/guide\/$/);
+  await expect(page.getByRole('heading', { name: 'Jyutping guide', exact: true })).toBeFocused();
+});
+
+test('Tower returns pointer replay focus to gameplay and keeps arrow shortcuts off buttons', async ({
+  page,
+}) => {
+  await start(page, 'tone');
+  await page.clock.runFor(2200);
+  const game = page.locator('.game-layout');
+  const replay = page.locator('#replay-word');
+  await expect(game).toBeFocused();
+  await replay.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.tone-door:enabled')).not.toHaveCount(0);
+  await expect(replay).toBeFocused();
+  await replay.click();
+  await expect(game).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.tone-door:enabled')).toHaveCount(0);
+});
+
 test('Tower intro, crossing, mistake review and failed-run practice', async ({ page }) => {
   await start(page, 'tone');
   await page.clock.runFor(1900);
@@ -104,20 +206,56 @@ test('Tower intro, crossing, mistake review and failed-run practice', async ({ p
   await page.clock.runFor(2700);
   expect(await page.evaluate(() => window.__audioPlays.length)).toBe(2);
   await expect(page.locator('[data-tone]').first()).toBeEnabled();
+  let finalTones;
   for (let miss = 1; miss <= 4; miss++) {
+    finalTones = await page
+      .locator('[data-tone]')
+      .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort());
     const correct = await currentTone(page);
     await page.locator(`[data-tone]:not([data-tone="${correct}"])`).first().click();
-    await expect(page.locator('#practise-mistakes')).toHaveCount(0);
     if (miss < 4) {
+      await expect(page.locator('#practise-mistakes')).toHaveCount(0);
       await expect(page.locator('#ending-practice')).toHaveCount(0);
       await page.locator('#continue-game').click();
       await page.clock.runFor(150);
     }
   }
   await page.clock.runFor(2900);
-  await expect(page.locator('#ending-practice')).toBeEnabled();
-  await page.locator('#ending-practice').click();
+  await expect(page.getByRole('button', { name: 'Practice your mistakes' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Practice this tone combination' }).click();
   await expect(page.getByRole('heading', { name: 'Practice tones' })).toBeVisible();
+  await expect(page.locator('.game-progress-label')).toHaveText('0 / 20');
+  expect(
+    await page
+      .locator('[data-tone]')
+      .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort()),
+  ).toEqual(finalTones);
+  await expectNoOverflow(page);
+});
+
+test('Cantonese practice labels all six tones and uses the selected pair', async ({ page }) => {
+  await page.locator('#setup-practice').click();
+  const tones = page.getByRole('group', { name: 'Tones to practise' });
+  await expect(tones.locator('.practice-tone-description')).toHaveText([
+    'High and level',
+    'Rises high',
+    'Middle and level',
+    'Low and falling',
+    'Rises from low',
+    'Low and level',
+  ]);
+  for (const tone of [1, 4, 5, 6]) {
+    const choice = tones.getByRole('button', { name: 'Tone ' + tone, exact: true });
+    await expect(choice).toHaveAttribute('aria-pressed', 'true');
+    await choice.click();
+    await expect(choice).toHaveAttribute('aria-pressed', 'false');
+  }
+  await page.locator('#start-adventure').click();
+  await page.clock.runFor(150);
+  const choices = await page
+    .locator('[data-tone]')
+    .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort());
+  expect(choices).toEqual(['2', '3']);
   await expectNoOverflow(page);
 });
 
@@ -162,6 +300,7 @@ test('phone keyboard keeps the rail journey visible above the typing field', asy
   const scene = page.locator('.world-scene');
   await expect(scene).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('textbox')).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('.site-header')).toBeVisible();
   const rail = await scene.boundingBox();
   const field = await page.getByRole('textbox').boundingBox();
   expect(rail.height).toBeGreaterThanOrEqual(88);
@@ -239,7 +378,17 @@ test('missed-sound practice retains multi-syllable recordings from the tower', a
   await page.reload();
   await start(page, 'tone');
   await page.clock.runFor(2200);
+  const missed = [];
+  const prompt = () =>
+    page.evaluate(() => ({
+      audio: window.__audioPlays.at(-1),
+      target: [...document.querySelectorAll('.prompt-syllable')].findIndex((item) =>
+        item.classList.contains('is-target'),
+      ),
+      tones: [...document.querySelectorAll('[data-tone]')].map((door) => door.dataset.tone),
+    }));
   for (let miss = 0; miss < 4; miss++) {
+    missed.push(await prompt());
     const correct = await currentTone(page);
     await page
       .locator('[data-tone]:not([data-tone="' + correct + '"])')
@@ -251,7 +400,29 @@ test('missed-sound practice retains multi-syllable recordings from the tower', a
     }
   }
   await page.clock.runFor(2900);
-  await page.locator('#ending-practice').click();
+  await page.getByRole('button', { name: 'Practice your mistakes' }).click();
   await expect(page.getByRole('heading', { name: 'Practice tones' })).toBeVisible();
+  await expect(page.locator('.game-progress-label')).toHaveText('0 / 4');
+  for (let i = 0; i < missed.length; i++) {
+    await page.clock.runFor(800);
+    expect(await prompt()).toEqual(missed[i]);
+    await page
+      .locator('[data-tone]')
+      .nth(i % 2)
+      .click();
+    if (i < missed.length - 1) {
+      if ((await page.locator('#app').getAttribute('data-outcome')) === 'wrong')
+        await page.locator('#continue-game').click();
+      else await page.clock.runFor(1700);
+    }
+  }
+  await page.clock.runFor(100);
+  await page.getByRole('button', { name: 'See practice results' }).click();
+  await expect(page.getByRole('heading', { name: 'Practice complete' })).toBeVisible();
+  await expect(page.locator('.results-actions button')).toHaveCount(2);
+  await expect(page.getByText('One to listen to again')).toHaveCount(0);
+  await expect(page.getByText('Copy session summary')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Practice again' }).click();
+  await expect(page.locator('.game-progress-label')).toHaveText('0 / 4');
   await expectNoOverflow(page);
 });

@@ -1,5 +1,5 @@
 import { cantonese } from '../../src/languages/profiles.ts';
-import { cantoneseCatalog } from '../../tools/catalog/runtime.mjs';
+import { cantoneseCatalog, withSimplifiedCantonese } from '../../tools/catalog/runtime.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { syncRegistry, assembleCatalog, emptyCorrections } from '../../tools/catalog/catalog.mjs';
@@ -20,6 +20,32 @@ const clip = (id, character = '你', jyutping = 'nei5', extra = {}) => ({
   licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
   conversion: 'MP3 conversion',
   ...extra,
+});
+
+test('Cantonese catalog keeps both scripts aligned to the original Jyutping and recording', () => {
+  const syllables = [
+    { character: '乾', jyutping: 'kin4', tone: 4 },
+    { character: '隆', jyutping: 'lung4', tone: 4 },
+    { character: '時', jyutping: 'si4', tone: 4 },
+    { character: '期', jyutping: 'kei4', tone: 4 },
+  ];
+  const input = [clip('a', '乾隆時期', 'kin4 lung4 si4 kei4', { syllables })];
+  const catalog = withSimplifiedCantonese(
+    cantoneseCatalog(assembleCatalog(input, syncRegistry(input))),
+  );
+  const [traditional] = runtimeRows(catalog, cantonese);
+  const [simplified] = runtimeRows(catalog, cantonese, 'simplified');
+
+  assert.equal(traditional.text, '乾隆時期');
+  assert.equal(simplified.text, '乾隆时期');
+  assert.deepEqual(
+    simplified.syllables.map((syllable) => syllable.text),
+    ['乾', '隆', '时', '期'],
+  );
+  assert.equal(simplified.transcription, traditional.transcription);
+  assert.deepEqual(simplified.realizedTones, traditional.realizedTones);
+  assert.equal(simplified.id, traditional.id);
+  assert.equal(simplified.audio, traditional.audio);
 });
 
 test('multiple speakers share a persistent word identity; different readings remain distinct', () => {

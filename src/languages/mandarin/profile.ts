@@ -10,9 +10,6 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
   slug: 'mandarin',
   label: 'Mandarin',
   toneSummary: 'four tones and neutral tone',
-  learningResources: [
-    ['https://web.mit.edu/~jinzhang/www/pinyin/tones/', 'MIT’s Mandarin tone guide'],
-  ],
   romanization: 'Pinyin',
   transcriptionSystem: 'pinyin',
   practiceToneContent: 'mixed',
@@ -86,7 +83,7 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
       value: 5,
       symbol: '',
       markPath: '',
-      label: 'Neutral',
+      label: 'Neutral tone',
       name: 'Unmarked',
       description: 'Short and unstressed; pitch depends on context',
       path: 'M35 20 L65 20',

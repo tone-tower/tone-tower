@@ -4,12 +4,7 @@ import { cantonese, mandarin, vietnamese } from '../../src/languages/profiles.ts
 import { parsePinyin, formatPinyin, pinyinSpelling } from '../../src/languages/pinyin.ts';
 import { createRun, defaultPractice, validatePractice } from '../../src/game/game-core.ts';
 import { catalogRows, referenceRows } from '../../src/content/catalog.ts';
-import {
-  emptyProgress,
-  loadProgress,
-  saveProgress,
-  resetProgress,
-} from '../../src/persistence/progress.ts';
+import { emptyProgress, loadProgress, saveProgress } from '../../src/persistence/progress.ts';
 import { doorSlots } from '../../src/world/pixel-world.js';
 import { arrowChoiceIndex } from '../../src/game/game-controller.ts';
 
@@ -150,7 +145,7 @@ test('common catalog separates dictionary spelling, heard tones, scripts and con
   );
 });
 
-test('language saves, reset, tone confusions, and script settings are isolated', () => {
+test('language saves, tone confusions, and script settings are isolated', () => {
   const data = new Map(),
     storage = { getItem: (key) => data.get(key), setItem: (key, value) => data.set(key, value) };
   const yue = emptyProgress(cantonese),
@@ -164,9 +159,8 @@ test('language saves, reset, tone confusions, and script settings are isolated',
   assert.equal(loadProgress(cantonese, storage).records.tone.normal.best, 35);
   assert.equal(loadProgress(mandarin, storage).settings.script, 'traditional');
   assert.deepEqual(loadProgress(mandarin, storage).confusions, { '2-5': 3 });
-  resetProgress(mandarin, storage);
-  assert.equal(loadProgress(cantonese, storage).records.tone.normal.best, 35);
-  assert.equal(loadProgress(mandarin, storage).records.tone.normal.best, 0);
+
+  assert.equal(loadProgress(mandarin, storage).records.tone.normal.best, 80);
 });
 
 test('five doors have distinct hit regions and spatial keyboard choices', () => {

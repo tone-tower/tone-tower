@@ -7,6 +7,7 @@ import type {
   Run,
   Tone,
   FailureReason,
+  PracticePrompt,
   RunResult,
 } from '../types.ts';
 import { shuffle, buildChoices } from './logic.ts';
@@ -72,6 +73,17 @@ export function defaultPractice(challenge: Challenge, profile: LanguageProfile):
   };
 }
 
+export function practiceForRun(run: Run, mode: 'combination' | 'mistakes'): ExerciseConfig {
+  const config = {
+    ...defaultPractice('tone', run.profile),
+    variant: run.config.variant,
+    content: 'mixed' as const,
+  };
+  return mode === 'combination'
+    ? { ...config, tones: [...run.choices], choices: run.choices.length }
+    : { ...config, reviewPrompts: run.missedPrompts };
+}
+
 function normalizeConfig(input: RunInput, profile: LanguageProfile): ExerciseConfig {
   requireProfile(profile);
   const challenge = input.challenge ?? 'tone';
@@ -83,6 +95,13 @@ function normalizeConfig(input: RunInput, profile: LanguageProfile): ExerciseCon
     practice: input.practice === true,
     tones: [...(input.tones ?? profile.tones)],
     focusIds: [...(input.focusIds ?? [])],
+    ...(input.reviewPrompts && {
+      reviewPrompts: input.reviewPrompts.map(({ id, targetIndex, choices }) => ({
+        id,
+        targetIndex,
+        choices: [...choices],
+      })),
+    }),
   };
 }
 
@@ -137,6 +156,11 @@ export function validatePractice(
   if (config.challenge === 'tide' && !Object.hasOwn(RAIL_DIFFICULTIES, config.difficulty))
     errors.push('Choose a valid Skyrail difficulty.');
   if (!['drill', 'rehearsal'].includes(config.format)) errors.push('Choose a practice format.');
+  if (
+    config.reviewPrompts &&
+    (config.challenge !== 'tone' || config.format !== 'drill' || !config.reviewPrompts.length)
+  )
+    errors.push('Choose missed Tower questions for review.');
   if (![10, 20, 50, 'endless'].includes(config.length))
     errors.push('Choose 10, 20, 50, or endless practice.');
   if (!Number.isInteger(config.start) || config.start < 1 || config.start > 100)
@@ -174,6 +198,23 @@ export function validatePractice(
     errors.push('Missed recording selection is invalid.');
   if (!errors.length && words) {
     const pool = compatibleWords(config, words, profile);
+    if (config.reviewPrompts) {
+      const byId = new Map(pool.map((word) => [word.id, word]));
+      const valid = config.reviewPrompts.every(({ id, targetIndex, choices }) => {
+        if (!Number.isInteger(targetIndex)) return false;
+        const syllable = byId.get(id)?.syllables[targetIndex];
+        return (
+          syllable &&
+          syllable.toneEligible !== false &&
+          choices.includes(syllable.tone) &&
+          profile.choiceCounts.includes(choices.length) &&
+          new Set(choices).size === choices.length &&
+          choices.every((tone) => profile.tones.includes(tone))
+        );
+      });
+      if (!valid) errors.push('A missed Tower question is unavailable.');
+      return { valid: !errors.length, errors, config };
+    }
     if (!pool.length)
       errors.push(
         'No recordings match these settings. Try another recording length or clear the missed-word filter.',
@@ -244,6 +285,7 @@ export function createRun(
       lives: 'standard',
       timer: config.challenge === 'tone' ? 'off' : 'stage',
       focusIds: [],
+      reviewPrompts: undefined,
     };
   }
   const pool = compatibleWords(config, words, profile);
@@ -258,6 +300,9 @@ export function createRun(
   let used = new Set<string>(),
     usedWords = new Set<string>(),
     toneBag: Tone[] = [];
+  const reviewPrompts = config.reviewPrompts;
+  const reviewRecordings = reviewPrompts && new Map(pool.map((word) => [word.id, word]));
+  let skippedReviews = 0;
   const start = config.practice && config.format === 'rehearsal' ? config.start - 1 : 0;
   const maxLives =
     config.practice && config.lives === 'unlimited'
@@ -281,6 +326,7 @@ export function createRun(
     targets: [],
     choices: [],
     missedIds: [],
+    missedPrompts: [],
     confusions: {},
     assisted: 0,
     promptState: 'ready',
@@ -289,6 +335,7 @@ export function createRun(
     lastResult: null,
     stages: Array.from({ length: 5 }, () => ({ attempts: 0, correct: 0, mistakes: 0 })),
     get goal() {
+      if (reviewPrompts) return reviewPrompts.length - skippedReviews;
       return !config.practice || config.format === 'rehearsal' ? 100 - start : config.length;
     },
     get stage() {
@@ -323,6 +370,26 @@ export function createRun(
     },
     next() {
       if (this.status !== 'playing') return false;
+      if (reviewPrompts && reviewRecordings) {
+        const prompt = reviewPrompts[this.attempts + skippedReviews];
+        if (!prompt) return false;
+        const recording = reviewRecordings.get(prompt.id);
+        if (!recording) throw Error('A missed recording is unavailable.');
+        const { targetIndex } = prompt;
+        this.word = {
+          ...recording,
+          syllables: recording.syllables.map((syllable) => ({ ...syllable })),
+          targetIndex,
+          tone: recording.syllables[targetIndex].tone,
+        };
+        this.targets = [targetIndex];
+        this.choices = [...prompt.choices];
+        this.promptState = 'ready';
+        this.lastAnswer = null;
+        this.lastFailure = null;
+        this.lastResult = null;
+        return this.word;
+      }
       let eligible = pool;
       if (config.challenge === 'tide' && config.target === 'stage' && config.content === 'mixed')
         eligible = eligible.filter((w) =>
@@ -392,6 +459,8 @@ export function createRun(
       return this.word;
     },
     replace() {
+      if (reviewPrompts && this.status === 'playing' && this.promptState === 'ready')
+        skippedReviews++;
       return this.next();
     },
     answer(value) {
@@ -484,6 +553,12 @@ export function createRun(
       stage.attempts++;
       stage.mistakes++;
       if (!this.missedIds.includes(this.word.id)) this.missedIds.push(this.word.id);
+      if (!config.practice && config.challenge === 'tone')
+        this.missedPrompts.push({
+          id: this.word.id,
+          targetIndex: this.targets[0],
+          choices: [...this.choices],
+        });
       if (reason === 'reveal' && !this.word.assisted) {
         this.word.assisted = true;
         this.assisted++;

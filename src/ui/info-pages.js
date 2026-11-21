@@ -1,105 +1,84 @@
-import {
-  soundPageMarkup as cantoneseGuide,
-  compactGuideMarkup as cantoneseCompact,
-} from '../languages/cantonese-guide.js';
+import { soundPageMarkup as cantoneseGuide } from '../languages/cantonese-guide.js';
 import { mandarinGuide } from '../languages/mandarin-guide.js';
 import { vietnameseGuide } from '../languages/vietnamese-guide.js';
-const guideName = (profile) => profile.guideName ?? profile.romanization + ' guide';
+import { textLanguage } from '../languages/text-language.ts';
 import { site } from '../site.ts';
+import { languages } from '../languages/profiles.ts';
+import { escape } from './dom.ts';
 const guides = {
-  yue: { full: cantoneseGuide, compact: cantoneseCompact },
-  cmn: {
-    full: (a, d, rows) => mandarinGuide(a, d, false, rows),
-    compact: (a, d) => mandarinGuide(a, d, true),
-  },
-  vi: { full: (a, d) => vietnameseGuide(a, d), compact: (a, d) => vietnameseGuide(a, d, true) },
+  yue: cantoneseGuide,
+  cmn: mandarinGuide,
+  vi: vietnameseGuide,
 };
-export function soundPageMarkup(anchors, definitions, rows, profile) {
-  return guides[profile.id].full(anchors, definitions, rows);
+export function soundPageMarkup(
+  anchors,
+  definitions,
+  rows,
+  profile,
+  script = profile.defaultScript,
+) {
+  return guides[profile.id](anchors, definitions, rows, textLanguage(profile, script));
 }
-export function compactGuideMarkup(anchors, definitions, profile) {
-  return guides[profile.id].compact(anchors, definitions);
-}
-export function aboutPageMarkup({ recordingCount, profile, availability } = {}) {
-  const learningResources = (profile.learningResources ?? [])
-    .map(([url, label]) => '<a href="' + url + '" target="_blank" rel="noopener">' + label + '</a>')
-    .join(' or ');
-  const toneDescription = profile.toneSummary ?? profile.tones.length + ' tones';
-  const count =
-    Number.isSafeInteger(recordingCount) && recordingCount > 0
-      ? recordingCount.toLocaleString('en') + ' '
-      : '';
-  // A language without Skyrail practises tones only.
-  const spelling = profile.challenges.includes('tide');
-  const guideLink = /* HTML */ `<button
-    class="text-button inline-link"
-    data-page="sounds"
-    type="button"
-  >
-    ${guideName(profile)}
-  </button>`;
+
+const aboutIntroductions = {
+  yue: 'Tone Tower is a browser game for practising Jyutping. Listen to Cantonese audio recordings and choose the correct tone or type the correct Jyutping spelling.',
+  cmn: 'Tone Tower is a browser game for practising Pinyin. Listen to Mandarin audio recordings and choose the correct tone or type the correct Pinyin spelling.',
+  vi: 'Tone Tower is a browser game for practising Vietnamese. Listen to a whole audio recordings and choose the correct tone.',
+};
+
+export function aboutPageMarkup(profile) {
+  const hasSpellingGame = profile.challenges.includes('tide');
+  const romanization = escape(profile.romanization);
+  const subject = profile.id === 'vi' ? escape(profile.label) : romanization;
+  const otherLanguages = Object.values(languages).filter((language) => language.id !== profile.id);
+  const dictionarySources = profile.dictionarySources.map(
+    (source) =>
+      /* HTML */ `<li>
+        <a href="${escape(source.url)}">${escape(source.name)}</a>
+        <span class="about-source-licence">
+          · <a href="${escape(source.licenseUrl)}">${escape(source.license)}</a>
+        </span>
+        ${source.attribution ? /* HTML */ `<span class="about-source-attribution">${escape(source.attribution)}</span>` : ''}
+      </li>`,
+  );
+
   return /* HTML */ `<article class="info-page about-page">
-    <header class="page-heading">
-      <button class="text-button back-link" data-page="home" type="button">← Home</button>
-      <h1 tabindex="-1">About Tone Tower</h1>
-      <p class="lead">
-        Tone Tower is a browser game for practising
-        ${spelling ? profile.romanization : profile.label + ' tones'}.
-      </p>
+    <header class="page-heading about-heading">
+      <a class="text-button back-link" href="./" data-page="home">← Home</a>
+      <div>
+        <h1 tabindex="-1">About Tone Tower</h1>
+        <p class="lead">${escape(aboutIntroductions[profile.id])}</p>
+      </div>
+      <a class="about-guide-card" href="guide/" data-page="sounds">
+        <span>
+          <strong>New to ${subject}?</strong>
+          Open the guide
+        </span>
+        <span class="about-guide-arrow" aria-hidden="true">→</span>
+      </a>
     </header>
-    <section class="info-section" aria-labelledby="purpose-heading">
-      <h2 id="purpose-heading">What you can practise</h2>
-      ${
-        spelling
-          ? /* HTML */ `<p>
-                The exercises connect ${profile.label} pronunciation with its written representation
-                in ${profile.romanization}. You listen to a recording, then identify a tone or type
-                the sounds you hear. Answers advance you through a tower or a railway, depending on
-                the game.
-              </p>
-              <p>
-                The games are suitable for learners of ${profile.label} and for ${profile.label}
-                speakers learning ${profile.romanization}. You can play using the pronunciation
-                spelling before you can read the written words. The ${guideLink} explains the
-                notation and includes examples of the ${toneDescription}.
-              </p>`
-          : /* HTML */ `<p>
-                The exercises train your ear for the ${toneDescription} of ${profile.label}. You
-                listen to a recording, then choose the tone you heard. Each correct answer takes you
-                one floor up the tower.
-              </p>
-              <p>
-                The game is suitable for learners of ${profile.label} at any level: you do not need
-                to know the words. The ${guideLink} explains how the tones are written and includes
-                an example of each.
-              </p>`
-      }
-      <p>
-        The exercises supplement pronunciation study. If you are learning the sounds for the first
-        time, start with ${learningResources}.
-      </p>
-    </section>
+
     <section class="info-section" aria-labelledby="games-heading">
-      <h2 id="games-heading">Games and practice</h2>
-      <div class="info-grid">
+      <h2 id="games-heading">Games</h2>
+      <p>There are two game modes available.</p>
+      <div class="info-grid about-games">
         <div class="info-card">
           <h3>Tone Tower</h3>
           <p>
-            Identify the highlighted syllable’s tone and choose the corresponding door. The number
-            of answer choices increases as you progress. There is no time limit.
+            Listen to a word and choose the correct tone. The difficulty increases as you climb more
+            floors.
           </p>
           <button class="text-button" data-start-world="tone" type="button">
             Choose Tower difficulty →
           </button>
         </div>
         ${
-          spelling
+          hasSpellingGame
             ? /* HTML */ `<div class="info-card">
                 <h3>Skyrail</h3>
                 <p>
-                  Type the recording’s ${profile.romanization} within the time limit to build the
-                  track. Spelling practises initials and finals; With tones also requires
-                  ${profile.usesToneMarks ? 'tone marks or tone numbers' : 'tone numbers'}.
+                  Type the ${romanization} spelling before time runs out. This game can be played
+                  with and without tones.
                 </p>
                 <button class="text-button" data-start-world="tide" type="button">
                   Choose Skyrail settings →
@@ -109,101 +88,72 @@ export function aboutPageMarkup({ recordingCount, profile, availability } = {}) 
         }
       </div>
       <p>
-        For focused exercises without a timer or lives, use
-        <button class="text-button inline-link" data-info-action="practice" type="button">
-          Practice</button
-        >. Choose a tone pair
-        ${spelling ? 'or work on initials, finals and spelling' : 'or a larger set of tones'}.
-        Complete game difficulties to earn permanent decorations for the home world; practice stays
-        free of unlock goals.
-      </p>
-      <p class="small">
-        Tone Tower trains listening
-        recognition${spelling ? ' and ' + profile.romanization + ' spelling' : ''}. It does not
-        assess your spoken pronunciation. Use it alongside conversation, vocabulary and a fuller
-        ${profile.label} course.
+        A <a href="practice/" data-page="practice">Practice Mode</a> is also available for both
+        games.
       </p>
     </section>
+
+    <section class="info-section" aria-labelledby="other-languages-heading">
+      <h2 id="other-languages-heading">Other languages</h2>
+      <p>Tone Tower is also available in other languages.</p>
+      <ul class="about-languages">
+        ${otherLanguages
+          .map(
+            (language) =>
+              /* HTML */ `<li>
+                <a href="${escape(language.slug)}/">
+                  Play Tone Tower in ${escape(language.label)} <span aria-hidden="true">→</span>
+                </a>
+              </li>`,
+          )
+          .join('')}
+      </ul>
+    </section>
+
     <section class="info-section" aria-labelledby="recordings-heading">
-      ${availability?.mode === 'beta' ? '<p class="beta-source-note">' + profile.label + ' is in beta. Source labels and dictionary readings provide the starting content; reported problems can be corrected without replacing the original recordings.</p>' : ''}
-      <h2 id="recordings-heading">Recordings and sources</h2>
+      <h2 id="recordings-heading">Recordings</h2>
       <p>
         ${
           profile.copy?.recordings
-            ? 'The ' + count + profile.copy.recordings
-            : 'The ' +
-              count +
-              'recordings are human speech from Wikimedia Commons, each with its own source, creator and licence. Readings and English meanings include credited dictionary sources such as ' +
-              profile.dictionarySources.map((source) => source.name).join(' and ') +
-              '.'
+            ? escape(profile.copy.recordings)
+            : 'The recordings come from contributors to Wikimedia Commons, so you’ll hear different voices and accents. The recording directory lists the creator, original source and licence for each clip.'
         }
       </p>
-      <p>
-        Pronunciation can vary between speakers and regions. Dictionary readings and the included
-        recordings should be understood in that context.
-      </p>
-      <button class="text-button section-link" data-info-action="credits" type="button">
-        Browse voices &amp; credits →
-      </button>
+      <button class="secondary" data-info-action="credits" type="button">Browse recordings</button>
+      <details class="guide-detail">
+        <summary>Data and software credits</summary>
+        ${
+          dictionarySources.length
+            ? /* HTML */ `<p>Readings and English meanings draw on these dictionaries.</p>
+                <ul class="about-sources">
+                  ${dictionarySources.join('')}
+                </ul>`
+            : ''
+        }
+        <ul class="about-licences">
+          <li><a href="LICENSE">MIT licensed code</a></li>
+          <li><a href="assets/fonts/DMSans-LICENSE.txt">DM Sans font licence</a></li>
+          <li><a href="THIRD_PARTY_NOTICES.md">Third-party notices</a></li>
+        </ul>
+      </details>
     </section>
-    <section class="info-section" aria-labelledby="progress-heading">
-      <h2 id="progress-heading">Progress and privacy</h2>
-      <p>
-        Tone Tower does not require an account and has no analytics. Progress and preferences are
-        saved separately for each language in this browser and do not sync between devices. Clearing
-        browser storage removes them; closing or reloading the page ends the current run.
-      </p>
-      <p>
-        Your best tower climb lights its windows at home. Each completed difficulty adds a butterfly
-        garden, a roaming cat, a banner, a moon heron or a dragon. Decorations
-        accumulate${spelling ? ', and either Skyrail answer style earns its difficulty’s reward' : ''}.
-      </p>
-      <button class="text-button section-link" data-info-action="reset" type="button">
-        Reset saved progress…
-      </button>
-    </section>
+
     <section class="info-section" aria-labelledby="project-heading">
-      <h2 id="project-heading">An open-source side project</h2>
+      <h2 id="project-heading">Project and feedback</h2>
       <p>
-        Tone Tower is made and maintained by
-        <a href="${site.maintainerUrl}" target="_blank" rel="noopener">${site.maintainer}</a>. The
-        code is <a href="LICENSE">MIT licensed</a>, and you can
-        <a href="${site.repository}" target="_blank" rel="noopener">explore it on GitHub ↗</a>,
-        suggest improvements, or contribute a fix. Recordings and fonts keep their own licences.
+        Tone Tower is open source. You can find the code in the
+        <a href="${site.repository}">GitHub repository</a>.
       </p>
-    </section>
-    <section class="info-section" aria-labelledby="feedback-heading">
-      <h2 id="feedback-heading">Help make it better</h2>
       <p>
-        Found a bug, heard a recording that seems wrong, or have an idea? Share it on GitHub. For a
-        recording issue, include the written word${spelling ? ' and ' + profile.romanization : ''}
-        so it is easy to find.
+        If a recording or answer seems wrong, use the report link in the game’s answer feedback or
+        in the recording directory. It includes the details needed to find the clip.
       </p>
-      <div class="feedback-links">
-        <a
-          class="secondary"
-          href="${site.repository}/issues/new?template=bug-report.yml"
-          target="_blank"
-          rel="noopener"
-          >Report a problem ↗</a
-        >
-        <a
-          class="secondary"
-          href="${site.repository}/issues/new?template=idea.yml"
-          target="_blank"
-          rel="noopener"
-          >Suggest an idea ↗</a
-        >
-        <a href="${site.repository}/issues" target="_blank" rel="noopener">Browse feedback ↗</a>
-      </div>
-      <p class="small">
-        A GitHub account is needed to post. Reports and replies are public; please leave out
-        personal information. Feedback is welcome, though responses may take a little time.
+      <p class="feedback-links">
+        <a href="${site.repository}/issues/new?template=bug-report.yml">Report a problem ↗</a>
+        <a href="${site.repository}/issues/new?template=idea.yml">Suggest an idea ↗</a>
+        <a href="${site.repository}/issues">Browse feedback ↗</a>
       </p>
+      <p class="small">GitHub issues and replies are public.</p>
     </section>
-    <div class="info-actions">
-      <button class="primary" data-page="home" type="button">Go to the games →</button
-      ><button class="text-button" data-page="sounds" type="button">${guideName(profile)}</button>
-    </div>
   </article>`;
 }

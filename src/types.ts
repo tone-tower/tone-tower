@@ -149,7 +149,6 @@ export interface LanguageProfile extends Transcription {
   allowWordSpaces: boolean;
   toneSummary: string;
   dictionarySources: readonly DictionarySource[];
-  learningResources: readonly (readonly [string, string])[];
   toneDefinitions: readonly ToneDefinition[];
   toneNotation: 'numbers' | 'marks';
   typingHelpers: readonly TypingHelper[];
@@ -164,7 +163,6 @@ export interface LanguageProfile extends Transcription {
     practiceDescription?: string;
     loading?: string;
     recordings?: string;
-    credits?: string;
   };
   example: {
     text: string;
@@ -196,8 +194,14 @@ export interface ExerciseConfig {
   timer: 'off' | 'stage' | 'custom';
   seconds: number;
   focusIds: string[];
+  reviewPrompts?: PracticePrompt[];
 }
 export type RunInput = Partial<ExerciseConfig>;
+export interface PracticePrompt {
+  id: string;
+  targetIndex: number;
+  choices: Tone[];
+}
 export type FailureReason = 'tone' | 'spelling' | 'timeout' | 'reveal';
 interface ResultDetails {
   correct: boolean;
@@ -228,6 +232,7 @@ export interface Run {
   targets: number[];
   choices: Tone[];
   missedIds: string[];
+  missedPrompts: PracticePrompt[];
   confusions: Record<string, number>;
   assisted: number;
   promptState: 'ready' | 'answered' | 'failed';
