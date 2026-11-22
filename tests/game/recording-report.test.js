@@ -14,14 +14,35 @@ test('recording reports prefill the exact language, recording, reading and sourc
         source: 'https://commons.wikimedia.org/?curid=123',
       },
       mandarin,
+      { challenge: 'tone', practice: false },
     ),
   );
   assert.equal(url.origin, 'https://github.com');
-  assert.equal(url.searchParams.get('template'), 'bug-report.yml');
-  assert.equal(url.searchParams.get('area'), 'Recording or answer');
-  assert.match(url.searchParams.get('problem'), /Language: Mandarin/);
-  assert.match(url.searchParams.get('problem'), /Recording ID: commons-123/);
-  assert.match(url.searchParams.get('problem'), /Dictionary spelling: ni3 hao3/);
-  assert.match(url.searchParams.get('problem'), /Tone answers: 2 3/);
-  assert.match(url.searchParams.get('problem'), /curid=123/);
+  assert.equal(url.searchParams.get('template'), 'recording-report.yml');
+  assert.equal(url.searchParams.get('title'), '[Recording] Mandarin: 你好 (commons-123)');
+  assert.equal(url.searchParams.get('problem'), null);
+  assert.equal(
+    url.searchParams.get('context'),
+    [
+      'Where: Tone Tower',
+      'Language: Mandarin',
+      'Recording ID: commons-123',
+      'Written form: 你好',
+      'Dictionary spelling: ni3 hao3',
+      'Listening tones: 2 3',
+      'Source: https://commons.wikimedia.org/?curid=123',
+    ].join('\n'),
+  );
+});
+
+test('recording reports identify the selected game and its Practice mode or the credits screen', () => {
+  for (const [context, location] of [
+    [{ challenge: 'tone', practice: true }, 'Tone Tower Practice'],
+    [{ challenge: 'tide', practice: false }, 'Skyrail'],
+    [{ challenge: 'tide', practice: true }, 'Skyrail Practice'],
+    ['credits', 'Voices & credits'],
+  ]) {
+    const url = new URL(recordingIssueUrl({ id: 'commons-123' }, mandarin, context));
+    assert.equal(url.searchParams.get('context').split('\n')[0], `Where: ${location}`);
+  }
 });

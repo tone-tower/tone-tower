@@ -9,7 +9,6 @@ import type {
   Run,
 } from './types.ts';
 import { siteRoot, siteURL, localizeAssets } from './site-root.ts';
-import { recordingIssueUrl } from './ui/recording-report.ts';
 import { languages } from './languages/profiles.ts';
 import { requireProfile } from './languages/profile.ts';
 import { site, languagePages, pageFromLocation } from './site.ts';

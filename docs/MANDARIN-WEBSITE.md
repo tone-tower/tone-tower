@@ -48,10 +48,10 @@ answers. Longer third-tone sequences need prosodic grouping, so their uncertain
 targets are omitted from tone questions while the words remain usable for
 spelling. A shortened third tone is still third tone.
 
-The game provides “Report this recording” links after an answer and in Voices &
-credits. They open a GitHub issue form with the language, recording ID, written
-form, reading, tone answers, and original source prefilled. The player decides
-whether to submit; the app sends no reports itself.
+The game provides recording report links after a missed answer and in Voices &
+credits. They open a GitHub form with the game and mode or screen, language,
+recording ID, written form, dictionary Pinyin, listening tones, and original
+source prefilled. The player adds a short note and decides whether to submit.
 
 Corrections live in `data/content/cmn/corrections.json`, separately from the
 download archive. Each patch requires a reason. Examples:

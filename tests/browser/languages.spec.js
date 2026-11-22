@@ -164,6 +164,11 @@ test('chooser loads no catalog and language navigation stays in Mandarin', async
   await search.fill('hao');
   await expect(page.locator('#credit-results [role="status"]')).toHaveText('1–1 of 1 recordings');
   await expect(page.locator('#credit-results tbody')).toContainText('nǐ hǎo');
+  const report = page.getByRole('link', { name: 'Report this recording' });
+  await expect(report).toBeVisible();
+  expect(new URL(await report.getAttribute('href')).searchParams.get('context')).toMatch(
+    /^Where: Voices & credits\nLanguage: Mandarin\n/,
+  );
   await page.locator('#close-dialog').click();
   await expect(browse).toBeFocused();
   expect(

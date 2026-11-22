@@ -39,7 +39,7 @@ export function languagePages(
     },
     practice: {
       path: root + 'practice/',
-      title: 'Practice Workshop · ' + profile.label + ' Tone Tower',
+      title: 'Practice · ' + profile.label + ' Tone Tower',
       description:
         copy.practiceDescription ??
         'Practise ' +
