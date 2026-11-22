@@ -130,8 +130,7 @@ test('Tide starts after audio, replay never resets time, and timeout costs one l
   const h = harness();
   h.controller.start({ challenge: 'tide', variant: 'spelling' });
   assert.strictEqual(h.controller.phase, 'listening');
-  assert.match(h.app.innerHTML, /To the gap/);
-  assert.notMatch(h.app.innerHTML, /Untimed practice/);
+  assert.match(h.app.querySelector('.rail-clock').textContent, /Time remaining/);
   assert.strictEqual(h.app.querySelector('#countdown').textContent, '15s');
   const mountedInput = h.app.querySelector('#transcription-answer');
   h.time.advance(30000);
@@ -477,7 +476,7 @@ test('retry feedback clears on editing and timeout stays full until next prompt'
     '100%',
   );
   assert.notMatch(h.app.innerHTML, /Not quite—try again/);
-  assert.match(h.app.innerHTML, /Connection missed — 1 life lost/);
+  assert.match(h.app.querySelector('#rail-message').textContent, /Time’s up. The answer is/);
   h.click('#continue-game');
   assert.strictEqual(h.app.dataset.outcome, 'listening');
   assert.strictEqual(
@@ -498,7 +497,8 @@ test('wrong door marks the correct answer without a success door', async () => {
   assert.ok(h.app.querySelector('.is-wrong'));
   assert.ok(h.app.querySelector('.is-answer'));
   assert.strictEqual(h.app.querySelector('.is-correct'), null);
-  assert.match(h.app.innerHTML, /bright door/);
+  assert.match(h.app.querySelector('#tower-message').textContent, /The correct tone is/);
+  assert.match(h.app.querySelector('.scene-review-action .recording-report').href, /issues\/new/);
   h.click('#continue-game');
   assert.strictEqual(h.app.querySelector('.is-wrong'), null);
   h.audio();
@@ -596,11 +596,11 @@ test('audio recovery clears unavailable and retry styling without resetting the 
   input.value = 'zzz';
   fire(input, 'input');
   fire(h.app.querySelector('#typed-form'), 'submit');
-  assert.match(h.app.querySelector('#rail-message').textContent, /No life lost/);
+  assert.match(h.app.querySelector('#input-status').textContent, /No life lost/);
+  assert.strictEqual(h.app.querySelector('#rail-message').textContent, '');
   input.value = 'zz';
   fire(input, 'input');
-  assert.strictEqual(h.app.querySelector('.rail-feedback').dataset.feedback, 'neutral');
-  assert.notMatch(h.app.querySelector('#rail-message').textContent, /Not quite/);
+  assert.strictEqual(h.app.querySelector('#input-status').textContent, '');
   h.click('#replay-word');
   h.requests.at(-1).reject(Error('offline'));
   await flush();
@@ -668,10 +668,7 @@ test('Tower audio failure uses the fixed notice and replacement never awards a f
   h.audio();
   await flush();
   assert.strictEqual(h.app.querySelector('#replace-recording'), null);
-  assert.strictEqual(
-    h.app.querySelector('#tower-message').textContent,
-    'Listen to the highlighted syllable and choose its tone.',
-  );
+  assert.strictEqual(h.app.querySelector('#tower-message').textContent, '');
   h.controller.dispose();
 });
 
@@ -1043,8 +1040,7 @@ test('Mandarin feedback explains heard tones without exposing tone marks before 
   fire(h.document, 'keydown', { key: '2', target: h.document.body });
   assert.match(h.app.innerHTML, /Written nǐ hǎo; listening answer ní hǎo/);
   assert.match(h.app.innerHTML, /A third tone changes before another third tone/);
-  assert.ok(h.app.querySelector('.recording-report'));
-  assert.match(h.app.querySelector('.recording-report').getAttribute('href'), /greeting/);
+  assert.strictEqual(h.app.querySelector('.recording-report'), null);
   h.controller.dispose();
 });
 test('Mandarin replays with Space while preserving Pinyin r and composition', async () => {
@@ -1248,7 +1244,10 @@ test('Vietnamese conceals every tone, uses named keyboard choices, and reveals o
   assert.equal(h.controller.phase, 'answering');
   fire(document, 'keydown', { key: '3', target: document.body });
   assert.equal(h.controller.phase, 'review');
-  assert.match(h.app.querySelector('#tower-message').textContent, /dấu hỏi → dấu nặng/i);
+  assert.match(
+    h.app.querySelector('#tower-message').textContent,
+    /dấu hỏi\. The correct tone is dấu nặng/i,
+  );
   assert.equal(
     [...h.app.querySelectorAll('.prompt-character')].map((node) => node.textContent).join(' '),
     'được phép',

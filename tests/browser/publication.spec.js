@@ -95,7 +95,6 @@ for (const base of [
         }, language);
         await page.reload();
         await expect(page.getByRole('button', { name: 'Pet the rooftop cat' })).toBeVisible();
-        await expect(page.locator('[data-variant="normal"] .earned-reward')).toHaveCount(1);
         await page.goBack();
         await expect(page).toHaveURL(base + language + '/guide/');
         await page.goForward();
@@ -144,10 +143,7 @@ for (const base of [
             .locator('.tone-door[data-tone="' + recording.realizedTones[target] + '"]')
             .click();
           await expect(page.locator('.game-progress-label')).toContainText('1 / 20');
-          await expect(page.locator('.recording-report')).toHaveAttribute(
-            'href',
-            /github\.com.*issues\/new/,
-          );
+          await expect(page.locator('.recording-report')).toHaveCount(0);
         }
         expect(errors).toEqual([]);
         expect(failed).toEqual([]);

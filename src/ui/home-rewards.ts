@@ -33,10 +33,18 @@ export function homeRewards(progress: Progress): HomeRewards {
 }
 
 export const friendDialogue: Record<string, readonly string[]> = {
+  'tone-easy': [
+    'A butterfly lands on a flower. “We followed the light from all the doors you opened.”',
+    '“Which floor is spring on? We keep taking the stairs and finding more stairs.”',
+  ],
   'tone-normal': [
     'The rooftop cat stretches and purrs. “I moved in after you cleared Normal Tower. The roof was included, yes?”',
     '“There is a tiny moon inside every locked door. I checked exactly one.”',
     '“I patrol both ends of this roof. Neither end has offered me dinner.”',
+  ],
+  'tide-easy': [
+    'A butterfly flutters over the station flowers. “We planted these when you reached the last station.”',
+    '“I asked the conductor for a window seat. He said I already had wings.”',
   ],
   'tide-normal': [
     'The station cat opens a sleepy eye. “After you cleared Normal Skyrail, I bought a ticket to a nap.”',

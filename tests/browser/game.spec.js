@@ -107,10 +107,12 @@ test('Cantonese character style updates the current prompt and carries over to t
   await expect(character).toHaveText(/^[試時]$/);
   const written = await character.innerText();
   const tone = await currentTone(page);
+  const door = await page.locator('.tone-door').first().elementHandle();
   const plays = await page.evaluate(() => window.__audioPlays.length);
   await simplified.check();
   await expect(character).toHaveAttribute('lang', 'yue-Hans');
   await expect(character).toHaveText(written === '試' ? '试' : '时');
+  expect(await door.evaluate((node) => node.isConnected)).toBe(true);
   expect(await page.evaluate(() => window.__audioPlays.length)).toBe(plays);
   await expect(page.locator('.game-layout')).toBeFocused();
   await page.keyboard.press(tone);
@@ -129,9 +131,15 @@ test('Cantonese character style updates the current prompt and carries over to t
 test('pause and resume buttons keep keyboard activation', async ({ page }) => {
   await start(page, 'tone');
   await page.clock.runFor(2200);
+  await expect(page.locator('.tower-feedback')).toBeHidden();
+  const pause = page.getByRole('button', { name: 'Pause game' });
+  await expect(pause).toBeInViewport({ ratio: 1 });
+  const { width, height } = await pause.boundingBox();
+  expect(Math.min(width, height)).toBeGreaterThanOrEqual(44);
+  await expect(page.locator('.game-readout')).toHaveCSS('clip-path', 'inset(50%)');
   const plays = () => page.evaluate(() => window.__audioPlays.length);
   const before = await plays();
-  await page.locator('#pause-run').press('Space');
+  await pause.press('Space');
   await expect(page.locator('#resume-game')).toBeFocused();
   expect(await plays()).toBe(before);
   await page.locator('#resume-game').press('Enter');
@@ -203,6 +211,7 @@ test('Tower intro, crossing, mistake review and failed-run practice', async ({ p
   const tone = await currentTone(page);
   await page.locator(`[data-tone="${tone}"]`).click();
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+  await expect(page.getByRole('link', { name: 'Report recording' })).toHaveCount(0);
   await page.clock.runFor(2700);
   expect(await page.evaluate(() => window.__audioPlays.length)).toBe(2);
   await expect(page.locator('[data-tone]').first()).toBeEnabled();
@@ -212,15 +221,20 @@ test('Tower intro, crossing, mistake review and failed-run practice', async ({ p
       .locator('[data-tone]')
       .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort());
     const correct = await currentTone(page);
+    const pause = page.getByRole('button', { name: 'Pause game' });
+    const pausePosition = await pause.boundingBox();
     await page.locator(`[data-tone]:not([data-tone="${correct}"])`).first().click();
     if (miss < 4) {
       await expect(page.locator('#practise-mistakes')).toHaveCount(0);
       await expect(page.locator('#ending-practice')).toHaveCount(0);
+      await expect(page.locator('.scene-review-action .recording-report')).toBeVisible();
+      expect(await pause.boundingBox()).toEqual(pausePosition);
       await page.locator('#continue-game').click();
       await page.clock.runFor(150);
     }
   }
   await page.clock.runFor(2900);
+  await expect(page.getByRole('link', { name: 'Report recording' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Practice your mistakes' })).toBeEnabled();
   await page.getByRole('button', { name: 'Practice this tone combination' }).click();
   await expect(page.getByRole('heading', { name: 'Practice tones' })).toBeVisible();
@@ -262,7 +276,10 @@ test('Cantonese practice labels all six tones and uses the selected pair', async
 test('Skyrail retry, crossing, pause and timeout keep the input usable', async ({ page }) => {
   await start(page, 'tide');
   await page.clock.runFor(150);
+  await expect(page.locator('.rail-feedback')).toBeHidden();
   const input = page.getByRole('textbox');
+  const character = await page.locator('.is-target .prompt-character').innerText();
+  await expect(input).toHaveAccessibleName('Jyutping for the highlighted syllable, ' + character);
   const originalInput = await input.elementHandle();
   await input.fill('wrong');
   await page.locator('#check-answer').click();
@@ -270,6 +287,7 @@ test('Skyrail retry, crossing, pause and timeout keep the input usable', async (
   await expect(input).toBeEnabled();
   await input.fill('si');
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+  await expect(page.locator('.rail-feedback')).toBeHidden();
   await page.clock.runFor(1050);
   await expect(input).toHaveValue('');
   expect(await input.evaluate((node, original) => node === original, originalInput)).toBe(true);
@@ -280,6 +298,8 @@ test('Skyrail retry, crossing, pause and timeout keep the input usable', async (
   await page.getByRole('button', { name: 'Resume', exact: false }).click();
   await page.clock.runFor(16000);
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'timeout');
+  await expect(page.locator('.rail-feedback')).toHaveCSS('clip-path', 'inset(50%)');
+  await expect(page.locator('.scene-review-action .recording-report')).toBeVisible();
   await expect(input).toBeDisabled();
   await expect(page.locator('#continue-game')).toBeVisible();
   await page.locator('#continue-game').click();
@@ -300,6 +320,8 @@ test('phone keyboard keeps the rail journey visible above the typing field', asy
   const scene = page.locator('.world-scene');
   await expect(scene).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('textbox')).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Pause game' })).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('.game-readout')).toHaveCSS('clip-path', 'inset(50%)');
   await expect(page.locator('.site-header')).toBeVisible();
   const rail = await scene.boundingBox();
   const field = await page.getByRole('textbox').boundingBox();
@@ -357,8 +379,7 @@ test('first completion reveals a permanent friend at home', async ({ page }) => 
   await expect(page.locator('#home-reward-status')).toContainText('Welcome home.');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Pet the rooftop cat' })).toBeVisible();
-  await expect(page.locator('[data-variant="normal"] .earned-reward')).toHaveCount(1);
-  await expect(page.locator('[data-variant="easy"] .earned-reward')).toHaveCount(0);
+  await expect(page.locator('.home-friend')).toHaveCount(1);
 });
 
 test('missed-sound practice retains multi-syllable recordings from the tower', async ({ page }) => {

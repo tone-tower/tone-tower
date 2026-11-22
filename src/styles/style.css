@@ -464,6 +464,10 @@ p {
   box-shadow: none;
   pointer-events: auto;
 }
+.home-friend--tone-easy,
+.home-friend--tide-easy {
+  width: 14%;
+}
 button.home-friend:hover:not(:disabled),
 button.home-friend:active:not(:disabled) {
   background: transparent;
@@ -475,18 +479,24 @@ button.home-friend:active:not(:disabled) {
   outline: 2px solid var(--gold);
   outline-offset: 3px;
 }
-.earned-reward {
-  color: var(--gold);
-  margin-left: 4px;
-  font-size: 11px;
-}
 .home-reward-status {
-  border-top: 1px solid #647b7c;
-  padding: 12px 18px;
-  color: var(--gold);
-  font-size: 11px;
-  line-height: 1.6;
-  margin: 0;
+  position: absolute;
+  inset: auto 12px 12px;
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  margin: 0 auto;
+  padding: 7px 11px;
+  border: 1px solid #7b8987;
+  background: #172b38f2;
+  color: var(--cream);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+}
+.home-reward-status:empty {
+  opacity: 0;
 }
 .homecoming-message {
   color: var(--gold);

@@ -1,5 +1,11 @@
 import { toneLabel } from '../ui/tone-presentation.ts';
-import { createGameMarkup, runConclusionMarkup } from './game-markup.ts';
+import {
+  createGameMarkup,
+  endingWord,
+  pauseButtonMarkup,
+  runConclusionMarkup,
+} from './game-markup.ts';
+import { textLanguage } from '../languages/text-language.ts';
 import { query, queryAll, required, escape, errorMessage } from '../ui/dom.ts';
 import type {
   Run,
@@ -45,7 +51,7 @@ interface ControllerOptions {
 }
 import { recordingIssueUrl } from '../ui/recording-report.ts';
 import { requireProfile } from '../languages/profile.ts';
-import { createRun, challenges } from './game-core.ts';
+import { createRun } from './game-core.ts';
 import { worldScene, districts, doorSlots } from '../world/worlds.js';
 import { animateWorld } from '../world/world-runtime.js';
 import { RAIL_CARS } from '../world/skyrail-world.js';
@@ -234,13 +240,6 @@ export function createGameController({
     const floor = phase === 'correct' || phase === 'landing' ? answeredPosition : run.opened + 1;
     return run.config.practice && run.config.format === 'drill' ? floor : Math.min(100, floor);
   }
-  function district() {
-    return (
-      districts[run.config.challenge]?.[Math.min(4, Math.floor((position() - 1) / 20))] ?? {
-        name: 'The ascent',
-      }
-    );
-  }
   function presentation() {
     return paused
       ? 'paused'
@@ -258,38 +257,23 @@ export function createGameController({
               ? 'retry'
               : phase;
   }
-  function instruction() {
-    if (entryVisual) return 'Entering the tower… The first sound follows the opening.';
-    if (phase === 'review')
-      return run.lastFailure === 'timeout'
-        ? 'Time’s up. Compare the answer below.'
-        : run.lastFailure === 'reveal'
-          ? 'Answer revealed. Take a closer look.'
-          : 'Not quite. Compare the tones below.';
-    if (phase === 'correct' || phase === 'landing')
-      return run.config.practice ? '✓ Correct!' : '✓ Correct! The way is open.';
-    if (phase === 'listening') return 'Listen to the recording…';
-    return isTide() ? '' : 'Listen to the highlighted syllable and choose its tone.';
-  }
   let unveiling = false;
   const said = (value: unknown) => {
     const tone = profile.tones.find((tone) => tone === value);
     return tone === undefined ? String(value) : toneLabel(profile, tone);
   };
-  const { progressMarkup, lifeMarkup, promptMarkup, toneButtons, typedForm } = createGameMarkup(
-    () => ({
+  const { controlsMarkup, progressMarkup, promptMarkup, toneButtons, typedForm, answerLabel } =
+    createGameMarkup(() => ({
       run,
       phase,
       profile,
       paused,
       inputValue,
       message,
-      outcome,
       answering,
       script,
       unveiling,
-    }),
-  );
+    }));
   function railFeedback() {
     const review = phase === 'review',
       landing = phase === 'landing',
@@ -297,28 +281,20 @@ export function createGameController({
     const text = audioFailed
       ? 'Recording unavailable. Clock stopped. Replay to retry.'
       : review
-        ? (run.config.practice
-            ? 'Not quite. Answer: '
-            : 'Connection missed' + (run.lives === null ? '' : ' — 1 life lost') + '. Answer: ') +
+        ? (run.lastFailure === 'timeout' ? 'Time’s up. The answer is ' : 'The answer is ') +
           (run.config.variant === 'full'
             ? run.expected()
             : run.expectedParts().map(profile.withoutTones).join(' '))
         : landing
           ? 'Station reached · ' + districts.tide[run.stage].name
-          : correct
-            ? run.config.practice
-              ? '✓ Correct!'
-              : '✓ Correct. Bridge restored.'
-            : message || instruction();
+          : correct && run.config.practice
+            ? '✓ Correct!'
+            : '';
     return (
-      '<div class="rail-feedback" role="status" data-feedback="' +
-      (audioFailed || review
-        ? 'error'
-        : landing || correct
-          ? 'success'
-          : message
-            ? 'retry'
-            : 'neutral') +
+      '<div class="game-feedback rail-feedback' +
+      (review && !audioFailed ? ' sr-only' : '') +
+      '" role="status" data-feedback="' +
+      (audioFailed || review ? 'error' : landing || correct ? 'success' : 'neutral') +
       '"><span id="rail-message">' +
       escape(text) +
       '</span>' +
@@ -329,22 +305,30 @@ export function createGameController({
     );
   }
   const terminal = () => !run.config.practice && run.status !== 'playing';
+  function recordingReport() {
+    if (phase !== 'review') return '';
+    return /* HTML */ `<a
+      class="recording-report text-button"
+      href="${escape(recordingIssueUrl(run.word, profile))}"
+      target="_blank"
+      rel="noopener"
+      >Report recording <span aria-hidden="true">↗</span></a
+    >`;
+  }
   function sceneContinue() {
-    if (isTide() && run.config.practice && run.status !== 'playing')
-      return '<div class="scene-review-action"><button class="primary" id="continue-game" type="button">See results <kbd>Enter</kbd> →</button></div>';
-    return phase === 'review' && run.status === 'playing'
-      ? '<div class="scene-review-action"><span>' +
-          (isTide()
-            ? 'Replay and compare with the answer above.'
-            : 'Replay to hear the correct tone before continuing.') +
-          '</span><button class="primary" id="continue-game" type="button">' +
-          (run.config.practice
-            ? 'Next recording'
-            : isTide()
-              ? 'Catch the next car'
-              : 'Try the next sound') +
-          ' <kbd>Enter</kbd> →</button></div>'
-      : '';
+    const practiceComplete = isTide() && run.config.practice && run.status !== 'playing';
+    if (!practiceComplete && (phase !== 'review' || run.status !== 'playing')) return '';
+    const label = practiceComplete
+      ? 'See results'
+      : run.config.practice
+        ? 'Next recording'
+        : isTide()
+          ? 'Catch the next car'
+          : 'Try the next sound';
+    return /* HTML */ `<div class="scene-review-action">
+      ${recordingReport()}
+      <button class="primary" id="continue-game" type="button">${label} <kbd>Enter</kbd> →</button>
+    </div>`;
   }
   function railInterlude() {
     if (!isTide() || phase !== 'landing' || terminal()) return '';
@@ -365,12 +349,6 @@ export function createGameController({
       towerContinue('Depart when ready') +
       '</section>'
     );
-  }
-  function setRailNotice(text: string, kind = 'neutral') {
-    const notice = q('#rail-message')!;
-    if (notice) notice.textContent = text;
-    const panel = q('.rail-feedback')!;
-    if (panel) panel.dataset.feedback = kind;
   }
   const towerTerminal = () => !isTide() && run.status !== 'playing';
   const towerStop = () => !isTide() && (phase === 'landing' || terminal() || towerTerminal());
@@ -422,11 +400,12 @@ export function createGameController({
       (won
         ? 'Take one last step into the open sky.'
         : run.cleared + ' ' + (practice ? 'correct answers' : 'floors lit') + '.') +
-      '</p>' +
+      '</p><div class="results-actions">' +
+      recordingReport() +
       towerContinue(
         practice ? 'See practice results' : won ? 'Step onto the summit' : 'Finish this climb',
       ) +
-      '</section>'
+      '</div></section>'
     );
   }
   function unlockTowerStop() {
@@ -469,23 +448,23 @@ export function createGameController({
               ? 'Not quite. The correct tone is ' + said(run.word.tone) + '.'
               : '✓ Correct. Floor lit.'
         : review
-          ? 'Not quite' +
-            (run.lives === null ? '' : ' — 1 life lost') +
-            '. ' +
+          ? 'You chose ' +
             said(run.lastAnswer) +
-            ' → ' +
+            '. The correct tone is ' +
             said(run.word.tone) +
-            '. The bright door is the correct tone.'
+            '.'
           : landing
             ? run.opened + ' floors lit · A rest landing. ' + next.name + ' is next.' + restored
-            : correct
-              ? '✓ Correct. Floor lit.' + restored
-              : instruction();
+            : correct && run.config.practice
+              ? '✓ Correct.' + restored
+              : '';
     const action = audioFailed
       ? '<button class="primary tower-continue" id="replace-recording" type="button">Replace word →</button>'
-      : '<span class="tower-action-space" aria-hidden="true"></span>';
+      : '';
     return (
-      '<div class="tower-feedback" role="status" data-feedback="' +
+      '<div class="game-feedback tower-feedback' +
+      (review && !audioFailed ? ' sr-only' : '') +
+      '" role="status" data-feedback="' +
       (audioFailed || review ? 'error' : landing || correct ? 'success' : 'neutral') +
       '"><span id="tower-message">' +
       escape(text) +
@@ -521,24 +500,6 @@ export function createGameController({
         </div>
       </div>
     </section>`;
-  }
-  function clockMarkup() {
-    if (!isTide()) return '';
-    return (
-      '<div class="rail-clock"><strong id="countdown" aria-live="off">' +
-      (run.timeLimit()
-        ? Math.ceil((clock.total ? clock.remaining : run.timeLimit()) / 1000) + 's'
-        : '∞') +
-      '</strong><span>' +
-      (phase === 'review'
-        ? 'Stopped'
-        : phase === 'correct' || phase === 'landing'
-          ? 'Span repaired'
-          : run.timeLimit()
-            ? 'To the gap'
-            : 'Untimed practice') +
-      '</span></div>'
-    );
   }
   function syncScene() {
     const scene = q('.world-scene')!;
@@ -590,8 +551,7 @@ export function createGameController({
     if (!active) return;
     const previousFocus = doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
     const focusedInGame = previousFocus && app.contains(previousFocus);
-    const d = district(),
-      previousFrame = q('.scene-frame')!,
+    const previousFrame = q('.scene-frame')!,
       previousScene = q('.world-scene')!;
     const sceneKey = run.config.challenge;
     const keepScene =
@@ -603,6 +563,7 @@ export function createGameController({
     app.dataset.world = run.config.challenge;
     app.dataset.practice = String(run.config.practice);
     app.dataset.outcome = presentation();
+    const showScenePause = phase === 'landing' || terminal();
     const markup = /* HTML */ `<div
       class="game-layout"
       tabindex="-1"
@@ -610,30 +571,9 @@ export function createGameController({
       data-terminal="${terminal()}"
       data-landing="${phase === 'landing'}"
     >
-      <div class="game-hud">
-        <div class="run-title">
-          <span class="eyebrow"
-            >${run.config.practice ? 'Practice' : isTide() ? escape(run.config.difficulty + ' · ' + (run.config.variant === 'full' ? 'With tones' : 'Without tones')) : escape(run.config.variant + ' · ' + d.name)}</span
-          >
-          <h1>
-            ${run.config.practice ? (isTide() ? (run.config.variant === 'full' ? 'Practice spelling + tones' : 'Practice spelling') : 'Practice tones') : escape(challenges[run.config.challenge].title)}
-          </h1>
-        </div>
-        <div class="scene-status">
-          ${lifeMarkup()}
-          <div class="game-progress">${progressMarkup()}</div>
-        </div>
-        ${run.config.practice ? '' : clockMarkup()}<button
-          class="quiet"
-          id="pause-run"
-          type="button"
-          aria-label="Pause game"
-        >
-          Ⅱ
-        </button>
-      </div>
+      ${controlsMarkup(showScenePause)}
       <div class="scene-question" tabindex="-1">
-        ${isTide() ? railFeedback() : towerFeedback()}${promptMarkup(['review', 'correct', 'landing'].includes(phase))}
+        ${promptMarkup(['review', 'correct', 'landing'].includes(phase))}
         <div class="prompt-actions">
           <button
             class="secondary"
@@ -643,22 +583,23 @@ export function createGameController({
           >
             ▶ Replay <kbd>Space</kbd>${isTide() && profile.allowWordSpaces ? '' : ' <kbd>R</kbd>'}
           </button>
-          ${['review', 'correct', 'landing'].includes(phase) ? '<a class="recording-report text-button" href="' + escape(recordingIssueUrl(run.word, profile)) + '" target="_blank" rel="noopener">Report recording ↗</a>' : ''}
+          ${showScenePause ? '' : pauseButtonMarkup}
         </div>
-        ${towerEnding()}
+        ${isTide() ? railFeedback() : towerFeedback()} ${towerEnding()}
       </div>
       <div class="scene-frame">
         ${worldScene(run.config.challenge, { position: position(), phase: paused ? 'paused' : phase, content: (isTide() ? railInterlude() : toneButtons() + towerInterlude()) + sceneContinue(), count: run.choices.length })}
       </div>
       ${isTide() ? /* HTML */ `<div class="typing-slot">${typedForm()}</div>` : ''}
       <div class="game-panel">
-        ${terminal() ? runConclusionMarkup(run, towerReady, run.status === 'won' ? victoryMessage(run) : '') : ''}
+        ${terminal() ? runConclusionMarkup(run, towerReady, run.status === 'won' ? victoryMessage(run) : '', recordingReport()) : ''}
         <div class="feedback-zone"></div>
         <div class="game-actions">
+          ${run.config.practice ? progressMarkup() : ''}
           ${run.config.practice && run.status === 'playing' ? '<button class="quiet" id="finish-practice" type="button">Finish practice</button>' : ''}
         </div>
         <p id="audio-status" class="game-message sr-only" role="status">
-          ${entryVisual ? 'Entering the tower…' : phase === 'listening' ? 'Listening…' : audioFailed ? 'Replay to retry the recording.' : ''}
+          ${entryVisual ? 'Entering the tower…' : phase === 'listening' ? 'Listening…' : audioFailed ? 'Replay to retry the recording.' : phase === 'correct' && !run.config.practice ? 'Correct.' : ''}
         </p>
         <div id="audio-error" class="error" role="alert"></div>
         ${isTide() ? '' : '<p class="small keyboard">' + (run.choices.length <= 4 ? 'Arrow keys choose · ' : '') + profile.tones.map((_, index) => index + 1).join(' / ') + ' choose a tone · Space / R replays · Esc pauses' + (['review', 'landing'].includes(phase) ? ' · Enter continues' : '') + '</p>'}
@@ -670,7 +611,7 @@ export function createGameController({
     if (keepMounted) {
       const next = doc.createElement('div');
       next.innerHTML = markup;
-      for (const selector of ['.game-hud', '.scene-question', '.game-panel'])
+      for (const selector of ['.game-controls', '.scene-question', '.game-panel'])
         q(selector)!.replaceWith(required(next, selector));
       if (isTide()) {
         const input = q('#transcription-answer')!,
@@ -678,6 +619,7 @@ export function createGameController({
         input.value = inputValue;
         input.disabled = fresh.disabled;
         input.removeAttribute('aria-invalid');
+        input.placeholder = fresh.placeholder;
         q('#check-answer')!.disabled = required(next, '#check-answer').disabled;
         q('#typed-form > label')!.textContent = required(next, '#typed-form > label').textContent;
         q('#input-status')!.textContent = required(next, '#input-status').textContent;
@@ -772,7 +714,6 @@ export function createGameController({
         q('.game-layout')!.dataset.outcome = presentation();
         q('#input-status')!.textContent = '';
         q('#transcription-answer')?.removeAttribute('aria-invalid');
-        if (!audioFailed) setRailNotice(instruction());
         if (!input.composing) submit(true);
       });
       input.addEventListener('compositionstart', () => {
@@ -811,7 +752,8 @@ export function createGameController({
       replay();
       if (event.detail > 0) focusGameplay();
     });
-    q('#pause-run')?.addEventListener('click', () => pause());
+    const pauseButton = q('#pause-run');
+    if (pauseButton) pauseButton.onclick = pause;
     q('#continue-game')?.addEventListener('click', advance);
     q('#resume-game')?.addEventListener('click', resume);
     q('#end-run')?.addEventListener('click', () => {
@@ -843,7 +785,6 @@ export function createGameController({
             : 0;
     scene?.style.setProperty('--rail-progress', `${fraction * 100}%`);
     scene?.classList.toggle('is-danger', fraction >= 0.75);
-    count?.classList.toggle('danger', fraction >= 0.75);
     syncScene();
   }
   function enableAnswers() {
@@ -881,13 +822,6 @@ export function createGameController({
       if (error) error.textContent = '';
       if (status)
         status.textContent = isTide() ? 'Type your answer.' : 'Choose the tone you heard.';
-      const instructionNode = q('.game-instruction')!;
-      if (instructionNode) instructionNode.textContent = instruction();
-      if (isTide()) setRailNotice(message || instruction(), message ? 'retry' : 'neutral');
-      else {
-        const notice = q('#tower-message')!;
-        if (notice) notice.textContent = instruction();
-      }
       const scene = q('.world-scene')!;
       if (scene) scene.dataset.phase = phase;
       enableAnswers();
@@ -978,7 +912,6 @@ export function createGameController({
     const result = run.answer(inputValue);
     if (result?.kind === 'empty') {
       message = 'Type your answer first.';
-      setRailNotice(message, 'retry');
       const status = q('#input-status')!;
       if (status) status.textContent = message;
       return;
@@ -991,7 +924,6 @@ export function createGameController({
       message = run.config.practice
         ? 'Not quite — try again.'
         : 'Not quite—try again. No life lost.';
-      setRailNotice(message, 'retry');
       q('#transcription-answer')?.setAttribute('aria-invalid', 'true');
       const status = q('#input-status')!;
       if (status) status.textContent = message;
@@ -1231,6 +1163,7 @@ export function createGameController({
     resume,
     dispose,
     setScript(nextScript: string) {
+      if (nextScript === script || !profile.scripts.includes(nextScript)) return;
       script = nextScript;
       const update = (word: ExerciseRow) => {
         word.text = word.forms?.[script] ?? word.forms?.default ?? word.text;
@@ -1238,11 +1171,19 @@ export function createGameController({
           syllable.text = syllable.forms?.[script] ?? syllable.forms?.default ?? syllable.text;
       };
       words.forEach(update);
-      if (run) update(run.word);
-      if (active) {
-        captureInput();
-        render({ focus: false });
-      }
+      if (!active) return;
+      update(run.word);
+      // Patch the written forms in place so door and scene animations keep their current frame.
+      const language = textLanguage(profile, script);
+      qa('.word-prompt .prompt-character').forEach((character, i) => {
+        character.textContent = run.word.syllables[i].text ?? '';
+        character.lang = language;
+      });
+      const label = q('#typed-form > label');
+      if (label) label.textContent = answerLabel();
+      q('.recording-report')?.setAttribute('href', recordingIssueUrl(run.word, profile));
+      const ending = q('.ending-word-text');
+      if (ending) ending.textContent = endingWord(run);
     },
     get active() {
       return active;
