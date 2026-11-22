@@ -215,10 +215,7 @@ test('six doors show tone marks and names, and every cover leaves once a door is
   await expect(page.locator('.prompt-gloss')).toHaveText(gloss ?? '');
   // Revealing the answer does not move or resize the word.
   expect(await page.locator('.prompt-syllables').boundingBox()).toEqual(before);
-  await expect(page.locator('.recording-report')).toHaveAttribute(
-    'href',
-    /github\.com.*issues\/new/,
-  );
+  await expect(page.locator('.recording-report')).toHaveCount(0);
   await page.clock.runFor(1900);
   await expect(page.locator('.tone-cover.is-leaving')).toHaveCount(0);
   await expect(page.locator('.tone-cover')).toHaveCount((await current(page)).parts.length);
@@ -233,7 +230,11 @@ test('a wrong door names both tones, and number keys follow the door order', asy
   await page.keyboard.press(String(order.indexOf(wrong) + 1));
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'wrong');
   await expect(page.locator('#tower-message')).toContainText(
-    new RegExp(toneName(wrong) + ' → ' + toneName(tone), 'i'),
+    new RegExp(toneName(wrong) + '\\. The correct tone is ' + toneName(tone), 'i'),
+  );
+  await expect(page.locator('.scene-review-action .recording-report')).toHaveAttribute(
+    'href',
+    /github\.com.*issues\/new/,
   );
   expect(await shown(page)).toBe(text);
   await expect(page.locator('.tone-door.is-answer')).toHaveAttribute('data-tone', tone);

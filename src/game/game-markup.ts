@@ -1,9 +1,14 @@
 import { toneCoverMarkup } from '../ui/tone-cover.js';
-import type { Run, LanguageProfile, RunResult, ControllerPhase } from '../types.ts';
+import type { Run, LanguageProfile, ControllerPhase } from '../types.ts';
 import { escape } from '../ui/dom.ts';
 import { doorSlots } from '../world/worlds.js';
 import { textLanguage } from '../languages/text-language.ts';
 import { toneDefinition, toneLabel, toneSymbolMarkup } from '../ui/tone-presentation.ts';
+import { challenges } from './game-core.ts';
+
+export const pauseButtonMarkup =
+  '<button class="quiet" id="pause-run" type="button" aria-label="Pause game"></button>';
+
 interface Presentation {
   run: Run;
   phase: ControllerPhase;
@@ -11,7 +16,6 @@ interface Presentation {
   paused: boolean;
   inputValue: string;
   message: string;
-  outcome: RunResult | null;
   answering: () => boolean;
   script: string;
   unveiling: boolean;
@@ -35,31 +39,30 @@ export function createGameMarkup(state: () => Presentation) {
             : 'floors lit');
     return '<span class="game-progress-label" role="status">' + label + '</span>';
   }
-  function lifeMarkup() {
-    const { run, phase, outcome } = state();
-    const lives = run.lives;
-    const maxLives = run.maxLives ?? 0;
-    if (lives === null) return '<span class="life-meter is-unlimited">Unlimited attempts</span>';
-    return (
-      '<span class="life-meter" role="img" aria-label="' +
-      run.lives +
-      ' of ' +
-      run.maxLives +
-      ' lives remaining">' +
-      Array.from(
-        { length: maxLives },
-        (_, i) =>
-          '<svg class="pixel-life ' +
-          (i >= lives ? 'is-empty ' : '') +
-          (phase === 'review' && i === lives
-            ? 'heart-lost '
-            : outcome?.recovered && i >= lives - outcome.recovered && i < lives
-              ? 'is-restored '
-              : '') +
-          '" viewBox="0 0 20 22" aria-hidden="true"><path d="M1 5L5 1h4l1 3 1-3h4l4 4v7L10 21 1 12Z"/><path class="life-facet" d="M4 6h3v6H4m8-6h3v3h-3"/></svg>',
-      ).join('') +
-      '</span>'
-    );
+  function lifeLabel() {
+    const { lives, maxLives } = state().run;
+    return lives === null ? 'Unlimited attempts' : `${lives} of ${maxLives} lives remaining`;
+  }
+  function controlsMarkup(showPause: boolean) {
+    const { run } = state();
+    const title = run.config.practice
+      ? isTide()
+        ? run.config.variant === 'full'
+          ? 'Practice spelling + tones'
+          : 'Practice spelling'
+        : 'Practice tones'
+      : challenges[run.config.challenge].title;
+    return /* HTML */ `<div class="game-controls">
+      <div class="game-readout sr-only">
+        <h1>${escape(title)}</h1>
+        <div class="scene-status">
+          <span>${lifeLabel()}</span>
+          ${run.config.practice ? '' : progressMarkup()}
+        </div>
+        ${isTide() && !run.config.practice ? '<div class="rail-clock">Time remaining <strong id="countdown"></strong></div>' : ''}
+      </div>
+      ${showPause ? pauseButtonMarkup : ''}
+    </div>`;
   }
   function concealedMarkup(text: string, index: number, reveal: boolean) {
     const { profile, unveiling } = state();
@@ -200,26 +203,31 @@ export function createGameMarkup(state: () => Presentation) {
       })
       .join('');
   }
+  function answerLabel() {
+    const { run, profile } = state();
+    const focus = run.config.practice ? run.config.spellingFocus : 'full';
+    const spelling =
+      focus === 'initials' ? 'Initials' : focus === 'finals' ? 'Finals' : profile.romanization;
+    const target =
+      run.targets.length === 1
+        ? `the highlighted syllable, ${run.word.syllables[run.targets[0]].text}`
+        : 'the whole word';
+    return `${spelling} for ${target}`;
+  }
   function typedForm() {
     const { run, phase, profile, paused, inputValue, message, answering } = state();
     if (!isTide()) return '';
     const full = run.config.variant === 'full',
       focus = run.config.practice ? run.config.spellingFocus : 'full';
-    const target =
-      run.targets.length === 1
-        ? `the highlighted syllable, ${escape(run.word.syllables[run.targets[0]].text)}`
-        : 'the whole word';
     return /* HTML */ `<form id="typed-form" class="form-controls">
-      <label for="transcription-answer"
-        >${focus === 'initials' ? 'Initials' : focus === 'finals' ? 'Finals' : profile.romanization}
-        for ${target}</label
-      >
+      <label class="sr-only" for="transcription-answer">${escape(answerLabel())}</label>
       <div class="answer-input-row">
         <input
           id="transcription-answer"
           name="answer"
           type="text"
           value="${escape(inputValue)}"
+          ${focus === 'initials' ? 'placeholder="Initials"' : focus === 'finals' ? 'placeholder="Finals"' : ''}
           autocomplete="off"
           autocapitalize="off"
           autocorrect="off"
@@ -236,10 +244,16 @@ export function createGameMarkup(state: () => Presentation) {
     </form>`;
   }
 
-  return { progressMarkup, lifeMarkup, promptMarkup, toneButtons, typedForm };
+  return { controlsMarkup, progressMarkup, promptMarkup, toneButtons, typedForm, answerLabel };
 }
 
-export function runConclusionMarkup(run: Run, ready: boolean, reward: string) {
+export function endingWord(run: Run) {
+  return run.word.syllables
+    .map((s) => (s.text === s.transcription ? s.text : s.text + ' ' + s.transcription))
+    .join(' · ');
+}
+
+export function runConclusionMarkup(run: Run, ready: boolean, reward: string, report: string) {
   const won = run.status === 'won';
   const rail = run.world === 'tide';
   const title = won
@@ -267,10 +281,11 @@ export function runConclusionMarkup(run: Run, ready: boolean, reward: string) {
     ${
       !won
         ? /* HTML */ `<p class="ending-word">
-            ${escape(run.word.syllables.map((s) => (s.text === s.transcription ? s.text : s.text + ' ' + s.transcription)).join(' · '))}
+            <span class="ending-word-text">${escape(endingWord(run))}</span>
             <button class="text-button" id="ending-replay" type="button">
               ▶ Listen again <kbd>Space</kbd>
             </button>
+            ${report}
           </p>`
         : ''
     }

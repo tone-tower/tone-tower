@@ -259,8 +259,10 @@ function home(world?: Challenge, initialPractice = false) {
           <div class="home-reward-interactions" aria-label="Friends at home">
             ${(
               [
+                ['tone', 'easy', 'Visit the tower butterflies'],
                 ['tone', 'normal', 'Pet the rooftop cat'],
                 ['tone', 'extreme', 'Wake the spire dragon'],
+                ['tide', 'easy', 'Visit the station butterflies'],
                 ['tide', 'normal', 'Pet the station cat'],
                 ['tide', 'hard', 'Talk to the moon heron'],
                 ['tide', 'extreme', 'Wake the golden dragon'],
@@ -276,6 +278,7 @@ function home(world?: Challenge, initialPractice = false) {
               )
               .join('')}
           </div>
+          <p id="home-reward-status" class="home-reward-status" role="status"></p>
         </div>
         <div class="dock">
           <div>
@@ -293,14 +296,9 @@ function home(world?: Challenge, initialPractice = false) {
           </div>
         </div>
       </div>
-      <p
-        id="home-reward-status"
-        class="home-reward-status"
-        role="status"
-        ${homecoming.length ? '' : 'hidden'}
-      ></p>
     </section>`;
-  required(app, '#home-reward-status').textContent = homecoming
+  const rewardStatus = required(app, '#home-reward-status');
+  rewardStatus.textContent = homecoming
     .map((message) => message.replace(' Something new is waiting at home…', ' Welcome home.'))
     .join(' ');
   homecoming = [];
@@ -323,7 +321,8 @@ function home(world?: Challenge, initialPractice = false) {
         const cat = key.endsWith('-normal');
         button.style.left =
           ((position.x + (cat ? 9 * (position.direction ?? 1) : 0)) / 480) * 100 + '%';
-        button.style.top = ((position.y + 56 - (cat ? 9 : 7)) / 400) * 100 + '%';
+        const offset = cat ? 9 : key.endsWith('-easy') ? 0 : 7;
+        button.style.top = ((position.y + 56 - offset) / 400) * 100 + '%';
       });
     },
   });
@@ -341,11 +340,9 @@ function home(world?: Challenge, initialPractice = false) {
     button.onclick = () => {
       const friend = button.dataset.homeFriend ?? '';
       worldAnimation?.update({ rewardInteraction: friend });
-      const status = required(app, '#home-reward-status');
-      status.hidden = false;
       const lines = friendDialogue[friend];
       const turn = dialogueTurns.get(friend) ?? 0;
-      status.textContent = lines[turn % lines.length];
+      rewardStatus.textContent = lines[turn % lines.length];
       dialogueTurns.set(friend, turn + 1);
     };
   });
@@ -356,17 +353,6 @@ function home(world?: Challenge, initialPractice = false) {
       challenge = rail ? 'tide' : 'tone',
       key = rail ? 'tideVariant' : 'toneVariant',
       variant = progress.settings[key];
-    const rewardMark = (difficulty: string) => {
-      const d = homeDifficulties.find((entry) => entry === difficulty);
-      if (!d || !rewards[challenge][d]) return '';
-      return (
-        '<span class="earned-reward" role="img" title="' +
-        rewardNames[challenge][d] +
-        ' earned" aria-label="' +
-        rewardNames[challenge][d] +
-        ' earned">✦</span>'
-      );
-    };
     queryAll(app, '[data-destination]').forEach((b) =>
       b.setAttribute('aria-pressed', String(b.dataset.destination === value)),
     );
@@ -384,7 +370,6 @@ function home(world?: Challenge, initialPractice = false) {
                 (d === progress.settings.tideDifficulty) +
                 '">' +
                 difficultyName(d) +
-                rewardMark(d) +
                 heartPreview(l) +
                 '</button>',
             )
@@ -403,7 +388,6 @@ function home(world?: Challenge, initialPractice = false) {
             (v === variant) +
             '">' +
             variantName(challenge, v) +
-            (rail ? '' : rewardMark(v)) +
             (rail ? '' : heartPreview(TONE_VARIANTS[v])) +
             '</button>',
         )
@@ -857,7 +841,12 @@ for (const option of scriptOptions) {
     progress.settings.script = script;
     persist();
     applyScript(script);
-    if (screen === 'home' || screen === 'sounds') {
+    if (screen === 'home') {
+      const language = textLanguage(profile, script);
+      queryAll(app, '.skyrail-example span[lang], .practice-example span[lang]').forEach(
+        (example) => (example.lang = language),
+      );
+    } else if (screen === 'sounds') {
       navigate(pageFromLocation(new URL(location.href), appBase, profile), {
         replace: true,
         focus: false,

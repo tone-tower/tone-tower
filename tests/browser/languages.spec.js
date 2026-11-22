@@ -223,10 +223,7 @@ test('Mandarin practice renders five doors and accepts neutral-tone keyboard ans
     .evaluateAll((nodes) => nodes.findIndex((n) => n.classList.contains('is-target')));
   await page.keyboard.press(String(recording.realizedTones[index]));
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
-  await expect(page.locator('.recording-report')).toHaveAttribute(
-    'href',
-    /github\.com.*issues\/new/,
-  );
+  await expect(page.locator('.recording-report')).toHaveCount(0);
   await noOverflow(page);
 });
 

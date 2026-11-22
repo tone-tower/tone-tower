@@ -13,7 +13,9 @@ export function homeFriendPositions(s = {}) {
     };
   }
   return {
+    'tone-easy': { x: 145, y: 185 },
     'tone-normal': patrol(116, 168, 97),
+    'tide-easy': { x: 337, y: 178 },
     'tide-normal': patrol(302, 360, 140, 4),
     'tide-hard': { x: 414, y: 105 },
     'tone-extreme': { x: 144, y: 13 },
@@ -48,7 +50,9 @@ export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
       r(xx, yy - 6, 1, 1, P.gold);
     }
   }
-  function butterflies(x, y) {
+  function butterflies(key) {
+    const { x, y } = friends[key];
+    const flutter = reacting(key);
     for (let k = 0; k < 3; k++) {
       const phase = time * 0.8 + k * 2.1;
       const xx = x + Math.sin(phase) * 24;
@@ -57,6 +61,10 @@ export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
       r(xx - wing, yy - 2, wing, 5, k % 2 ? P.red : P.teal);
       r(xx + 1, yy - 2, wing, 5, k % 2 ? P.gold : P.glass);
       r(xx, yy - 1, 1, 4, P.deep);
+      if (flutter) {
+        const rise = s.reduced ? 0 : Math.floor((s.elapsed || 0) * 5);
+        r(xx + 3, yy - 6 - rise, 2, 2, P.gold);
+      }
     }
   }
   function cat(key, sleepy = false) {
@@ -129,12 +137,12 @@ export function drawHomeRewards(ctx, s, P, layer = 'ornaments') {
     if (rewards.tone.easy) {
       flowers(101, 205);
       flowers(164, 205);
-      butterflies(145, 185);
+      butterflies('tone-easy');
     }
     if (rewards.tide.easy) {
       flowers(297, 196, true);
       flowers(357, 196, true);
-      butterflies(337, 178);
+      butterflies('tide-easy');
     }
     return;
   }
