@@ -17,6 +17,8 @@ export function animateWorld(canvas, initial = {}) {
     return { update() {}, dispose() {}, canvas };
   const ctx = canvas.getContext('2d');
   if (!ctx) return { update() {}, dispose() {}, canvas };
+  const scene = canvas.parentElement;
+  const sceneContent = canvas.nextElementSibling;
   const { width: logicalWidth, height: logicalHeight } = canvasSizes.get(canvas) ?? {
     width: canvas.width,
     height: canvas.height,
@@ -124,6 +126,15 @@ export function animateWorld(canvas, initial = {}) {
       state.scene === 'tone'
         ? tower?.tick(dt, { paused: state.paused, reduced: reduced.matches })
         : null;
+    if (climb && scene) {
+      const moving = climb.offset !== 0;
+      if (moving !== (scene.dataset.moving !== undefined)) {
+        if (moving) scene.dataset.moving = '';
+        else delete scene.dataset.moving;
+        // Native activation stays unavailable while the artwork and its hit targets travel.
+        sceneContent?.toggleAttribute('inert', moving);
+      }
+    }
     const snapshot = {
       ...state,
       scene: entering ? 'tower-entry' : state.scene,
@@ -144,7 +155,6 @@ export function animateWorld(canvas, initial = {}) {
     if (state.scene === 'hub') state.onHomeFriends?.(homeFriendPositions(snapshot));
     const resting =
       state.scene === 'tone' && state.phase === 'landing' && (reduced.matches || effect >= 1.25);
-    if (canvas.parentElement) canvas.parentElement.dataset.resting = String(resting);
     if (state.ending === 'won' && (effect > 1.2 || reduced.matches)) {
       canvas.parentElement?.style.setProperty('--tower-offset', '0%');
       drawFinale(ctx, { ...snapshot, scene: state.scene, elapsed: Math.max(0, effect - 1.2) }, P);

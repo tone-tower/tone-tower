@@ -49,7 +49,17 @@
           <span class="site-language">{{language}}</span>
         </span></a
       >
-      <nav aria-label="Main navigation">
+      <button
+        class="site-menu-toggle"
+        id="site-menu"
+        type="button"
+        aria-controls="main-navigation"
+        aria-expanded="false"
+        hidden
+      >
+        Menu
+      </button>
+      <nav id="main-navigation" aria-label="Main navigation">
         <a id="learn" class="nav-link" href="guide/" data-nav-page="sounds">{{guideName}}</a
         ><a id="about" class="nav-link" href="about/" data-nav-page="about">About</a>
       </nav>

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openHeaderMenu } from '../helpers/header-menu.js';
 
 const marks = { '́': 'sắc', '̀': 'huyền', '̉': 'hỏi', '̃': 'ngã', '̣': 'nặng' };
 const toneOf = (syllable) =>
@@ -125,6 +126,7 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await expect(page.locator('.site-language')).toContainText('Vietnamese');
   await expect(page.locator('#setup-practice')).toBeVisible();
   await expect(page.locator('#script-display')).toHaveCount(0);
+  await openHeaderMenu(page);
   await page.locator('#about').click();
   const credits = page.getByRole('region', { name: 'Recordings' });
   await expect(credits).toContainText('ElevenLabs voice “Tuan Anh”');
@@ -133,6 +135,7 @@ test('the chooser opens a Vietnamese site with the tower only and synthetic voic
   await expect(page.locator('#dialog')).not.toContainText(/undefined|Wikimedia|Original/);
   await page.locator('#close-dialog').click();
   await expect(page.locator('#progress')).toHaveCount(0);
+  await openHeaderMenu(page);
   await page.locator('#learn').click();
   await expect(page).toHaveURL(/\/vietnamese\/guide\/$/);
   await expect(page.getByRole('heading', { name: 'Six tones, five marks' })).toBeVisible();
@@ -326,6 +329,7 @@ test('Vietnamese saves stay separate and About links to each language home', asy
   expect(saves.vi).toBeTruthy();
   expect(saves.yue).toBe('cantonese-sentinel');
   expect(saves.cmn).toBe('mandarin-sentinel');
+  await openHeaderMenu(page);
   await page.locator('#about').click();
   const otherLanguages = page.getByRole('region', { name: 'Other languages' });
   await expect(

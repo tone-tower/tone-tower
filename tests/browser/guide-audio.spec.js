@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openHeaderMenu } from '../helpers/header-menu.js';
 
 test('the four ma buttons play real audio through to completion', async ({ page }) => {
   // Observe the native elements; do not replace play(), loading or media events.
@@ -33,6 +34,7 @@ test('the four ma buttons play real audio through to completion', async ({ page 
   });
   await page.goto('/mandarin/');
   await expect(page.locator('.mode-cards')).toBeVisible();
+  await openHeaderMenu(page);
   await page.locator('#learn').click();
   for (const tone of [1, 2, 3, 4]) {
     await page.locator('.guide-tones [data-guide-tone="' + tone + '"]').click();

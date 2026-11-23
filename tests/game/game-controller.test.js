@@ -388,11 +388,10 @@ test('Tower removes in-game references and Space replays without scoring or choo
   assert.strictEqual(h.app.querySelector('#show-reference'), null);
   assert.strictEqual(h.app.querySelector('[data-reference-tone]'), null);
   const requests = h.requests.length;
-  const pauseKey = fire(h.document, 'keydown', {
-    key: ' ',
-    target: h.app.querySelector('#pause-run'),
-  });
-  assert.strictEqual(pauseKey.defaultPrevented, false);
+  assert.strictEqual(h.app.querySelector('#pause-run'), null);
+  const escapeKey = fire(h.document, 'keydown', { key: 'Escape' });
+  assert.strictEqual(escapeKey.defaultPrevented, false);
+  assert.strictEqual(h.app.querySelector('.pause-overlay'), null);
   assert.strictEqual(h.requests.length, requests);
   const event = fire(h.document, 'keydown', { key: ' ' });
   assert.strictEqual(event.defaultPrevented, true);
@@ -403,7 +402,7 @@ test('Tower removes in-game references and Space replays without scoring or choo
   const wrong = h.controller.state.choices.find((t) => t !== h.controller.state.word.tone);
   fire(h.document, 'keydown', { key: String(wrong), target: h.document.body });
   assert.strictEqual(h.app.querySelector('.reference-grid'), null);
-  assert.ok(h.app.querySelector('.answer-mark'));
+  assert.strictEqual(h.app.querySelector('.is-answer .tone-name').textContent.trim(), '✓ Correct');
   h.controller.dispose();
 });
 
@@ -577,7 +576,7 @@ test('Skyrail gives each crossing 900ms, keeps typing enabled, and leaves checkp
   h.app.querySelector('#transcription-answer').value = h.controller.state.expected();
   fire(h.app.querySelector('#typed-form'), 'submit');
   assert.strictEqual(h.controller.phase, 'landing');
-  assert.match(h.app.innerHTML, /Station reached/);
+  assert.match(h.app.innerHTML, /Checkpoint reached/);
   assert.match(h.app.innerHTML, /Climber car/);
   h.time.advance(10000);
   assert.strictEqual(h.controller.phase, 'landing');
@@ -637,13 +636,15 @@ test('Tower checkpoints name the next district, restore lives and wait for Conti
   });
   assert.strictEqual(h.controller.phase, 'landing');
   assert.strictEqual(h.controller.state.lives, h.controller.state.maxLives);
-  assert.ok(h.app.innerHTML.includes('20 floors lit · A rest landing'));
-  assert.match(h.app.innerHTML, /Next: Rain Gallery · 3 doors/);
-  assert.match(h.app.innerHTML, /Lives refilled/);
+  const landing = h.app.querySelector('.scene-question .tower-interlude');
+  assert.match(landing.textContent, /Landing 20/i);
+  assert.match(landing.textContent, /Next: Rain Gallery · 3 doors/);
+  assert.match(landing.textContent, /Lives refilled/);
+  assert.strictEqual(h.app.querySelector('.world-scene .tower-interlude'), null);
   assert.strictEqual(h.app.querySelector('#continue-game').disabled, true);
   h.click('#continue-game');
   assert.strictEqual(h.controller.phase, 'landing');
-  assert.match(h.app.innerHTML, /lives restored/);
+  assert.match(landing.textContent, /4 of 4 lives/);
   assert.strictEqual(h.app.querySelectorAll('#continue-game').length, 1);
   h.time.advance(10000);
   assert.strictEqual(h.controller.phase, 'landing');
@@ -1024,7 +1025,7 @@ const greeting = [
     ],
   },
 ];
-test('Mandarin feedback explains heard tones without exposing tone marks before answering', async () => {
+test('Mandarin Tower grades heard tones and reveals dictionary spelling without generic hints', async () => {
   const h = harness({}, greeting, mandarin);
   h.controller.start({
     challenge: 'tone',
@@ -1038,8 +1039,12 @@ test('Mandarin feedback explains heard tones without exposing tone marks before 
   assert.notMatch(h.app.innerHTML, /nǐ|hǎo|Dictionary spelling/);
   assert.strictEqual(h.app.querySelector('.recording-report'), null);
   fire(h.document, 'keydown', { key: '2', target: h.document.body });
-  assert.match(h.app.innerHTML, /Written nǐ hǎo; listening answer ní hǎo/);
-  assert.match(h.app.innerHTML, /A third tone changes before another third tone/);
+  assert.strictEqual(h.controller.state.cleared, 1);
+  assert.strictEqual(h.app.querySelector('.tone-explanation'), null);
+  assert.deepEqual(
+    [...h.app.querySelectorAll('.prompt-romanization')].map((node) => node.textContent.trim()),
+    ['nǐ', 'hǎo'],
+  );
   assert.strictEqual(h.app.querySelector('.recording-report'), null);
   h.controller.dispose();
 });
@@ -1166,14 +1171,15 @@ for (const profile of [cantonese, mandarin]) {
         profile === mandarin && variant === 'full' ? 5 : 0,
       );
       const input = h.app.querySelector('#transcription-answer');
-      input.value = h.controller.state.expected();
+      input.value =
+        variant === 'full'
+          ? h.controller.state.expected()
+          : profile.withoutTones(h.controller.state.expected());
       fire(input, 'input');
       assert.strictEqual(h.controller.state.cleared, 1);
       assert.strictEqual(h.app.querySelector('.tone-explanation'), null);
       const spelling = h.controller.state.word.syllables.map((s) =>
-        variant === 'full'
-          ? profile.format(s.transcription)
-          : profile.withoutTones(s.transcription),
+        profile.format(s.transcription),
       );
       assert.deepEqual(
         [...h.app.querySelectorAll('.prompt-romanization')].map((node) => node.textContent.trim()),

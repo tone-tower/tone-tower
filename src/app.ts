@@ -24,6 +24,7 @@ import { animateWorld } from './world/world-runtime.js';
 import { destinations } from './world/pixel-world.js';
 import { soundPageMarkup, aboutPageMarkup } from './ui/info-pages.js';
 import { bindMapNavigation } from './ui/map-navigation.js';
+import { bindHeaderMenu } from './ui/site-controls.ts';
 import { textLanguage } from './languages/text-language.ts';
 import { homeRewards, homeDifficulties, rewardNames, friendDialogue } from './ui/home-rewards.ts';
 
@@ -33,6 +34,7 @@ const appBase = siteRoot();
 
 const app = required(document, '#app');
 const siteHeader = required(document, '.site-header');
+const closeHeaderMenu = bindHeaderMenu(siteHeader);
 const dialog = required(document, '#dialog');
 const dialogBody = required(document, '#dialog-body');
 const guideSource = query(document, '#guide-catalog');
@@ -784,6 +786,7 @@ function navigate(
   { replace = false, focus = true }: { replace?: boolean; focus?: boolean } = {},
 ) {
   if (!['home', 'sounds', 'about', 'practice'].includes(page)) return;
+  closeHeaderMenu();
   if (
     screen === 'game' &&
     controller?.active &&
@@ -892,7 +895,7 @@ function updateKeyboardViewport() {
   const input = query(app, '#transcription-answer');
   const keyboardOpen =
     screen === 'game' &&
-    input === document.activeElement &&
+    app.dataset.world === 'tide' &&
     viewport.width <= 700 &&
     (Math.max(window.innerHeight, document.documentElement.clientHeight) - viewport.height > 110 ||
       viewport.height < 540);
@@ -900,7 +903,7 @@ function updateKeyboardViewport() {
   document.documentElement.style.setProperty('--visual-height', viewport.height + 'px');
 
   const scene = keyboardOpen && query(app, '.scene-frame');
-  if (!scene || !input) return;
+  if (!scene || !input || input !== document.activeElement) return;
   const top = viewport.offsetTop + 8;
   const bottom = viewport.offsetTop + viewport.height - 8;
   const sceneTop = scene.getBoundingClientRect().top;

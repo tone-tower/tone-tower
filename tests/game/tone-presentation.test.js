@@ -46,17 +46,6 @@ test('character styles follow the profile and select the default writing system'
   assert.doesNotMatch(markup, /simplified|traditional/);
 });
 
-test('Mandarin feedback separates dictionary spelling from tone changes and neutral context', () => {
-  const greeting = [
-    { transcription: 'ni3', dictionaryTone: 3, tone: 2 },
-    { transcription: 'hao3', dictionaryTone: 3, tone: 3 },
-  ];
-  assert.match(mandarin.toneFeedback(greeting), /Written nǐ hǎo; listening answer ní hǎo/);
-  assert.match(mandarin.toneFeedback(greeting), /third tone changes before another third tone/);
-  assert.match(mandarin.toneFeedback([{ transcription: 'ma5', tone: 5 }]), /short and unstressed/);
-  assert.equal(mandarin.toneFeedback([{ transcription: 'ma1', tone: 1 }]), '');
-});
-
 test('tone helpers edit the current syllable, replace old tones, preserve umlauts, and support neutral', () => {
   for (const [value, start, end, tone, expected, caret] of [
     ['ni3 hao', 7, 7, 3, 'ni3 hǎo', 7],

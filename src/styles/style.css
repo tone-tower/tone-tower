@@ -2160,18 +2160,44 @@ input[type='number'] {
 }
 @media (max-width: 900px) {
   .language-header {
-    gap: 8px 16px;
-    padding-block: 16px 0;
-  }
-  .language-header > nav {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    gap: 4px;
+    gap: 8px 12px;
+    padding-block: 12px;
   }
   .language-header > nav .nav-link {
-    padding: 10px 12px;
-    margin-bottom: 8px;
+    padding: 8px 10px;
     font-size: 12px;
+  }
+}
+@media (max-width: 700px) {
+  .language-header:not([data-menu]) > nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .language-header[data-menu] {
+    position: relative;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .language-header .site-menu-toggle {
+    grid-row: 1;
+    grid-column: 3;
+    justify-self: end;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid #647b7c;
+    border-radius: 7px;
+    box-shadow: none;
+  }
+  .language-header[data-menu] > nav {
+    grid-area: auto;
+    position: absolute;
+    inset: 100% 0 auto auto;
+    z-index: 12;
+    display: grid;
+    padding: 4px;
+    background: var(--ink);
+    border: 1px solid #647b7c;
+    border-radius: 7px;
+    box-shadow: 0 5px 16px #101f2b80;
   }
 }
 @media (max-width: 560px) {

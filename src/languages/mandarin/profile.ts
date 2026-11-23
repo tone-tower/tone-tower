@@ -1,7 +1,6 @@
 import type { LanguageProfile } from '../../types.ts';
 import { pinyin, applyPinyinTone } from '../pinyin.ts';
 import { cedictSource } from '../sources.ts';
-import { mandarinToneFeedback } from './tone-feedback.ts';
 
 export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
   ...pinyin,
@@ -36,7 +35,6 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
         applyPinyinTone(value, start, end, index + 1),
     })),
   ],
-  toneFeedback: mandarinToneFeedback,
   tones: [1, 2, 3, 4, 5],
   choiceCounts: [2, 3, 4, 5],
   stageChoices: [2, 3, 4, 5, 5],
