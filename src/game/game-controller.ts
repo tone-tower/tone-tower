@@ -309,7 +309,7 @@ export function createGameController({
     if (phase !== 'review') return '';
     return /* HTML */ `<a
       class="recording-report text-button"
-      href="${escape(recordingIssueUrl(run.word, profile))}"
+      href="${escape(recordingIssueUrl(run.word, profile, run.config))}"
       target="_blank"
       rel="noopener"
       >Report recording <span aria-hidden="true">↗</span></a
@@ -1181,7 +1181,10 @@ export function createGameController({
       });
       const label = q('#typed-form > label');
       if (label) label.textContent = answerLabel();
-      q('.recording-report')?.setAttribute('href', recordingIssueUrl(run.word, profile));
+      q('.recording-report')?.setAttribute(
+        'href',
+        recordingIssueUrl(run.word, profile, run.config),
+      );
       const ending = q('.ending-word-text');
       if (ending) ending.textContent = endingWord(run);
     },

@@ -1,0 +1,20 @@
+name: Report a recording
+description: A recording sounds unclear, or its word, spelling, or expected tones seem wrong.
+title: '[Recording] '
+body:
+  - type: markdown
+    attributes:
+      value: This report is public. Please leave out personal information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What sounds wrong?
+      description: A short note about what you heard is enough.
+      placeholder: The start of the recording sounds cut off.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Recording details
+      description: The game fills this in. If you opened the form on GitHub, add the language, word, and recording ID if you know it.

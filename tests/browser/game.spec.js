@@ -234,7 +234,11 @@ test('Tower intro, crossing, mistake review and failed-run practice', async ({ p
     }
   }
   await page.clock.runFor(2900);
-  await expect(page.getByRole('link', { name: 'Report recording' })).toBeVisible();
+  const report = page.getByRole('link', { name: 'Report recording' });
+  await expect(report).toBeVisible();
+  expect(new URL(await report.getAttribute('href')).searchParams.get('context')).toMatch(
+    /^Where: Tone Tower\n/,
+  );
   await expect(page.getByRole('button', { name: 'Practice your mistakes' })).toBeEnabled();
   await page.getByRole('button', { name: 'Practice this tone combination' }).click();
   await expect(page.getByRole('heading', { name: 'Practice tones' })).toBeVisible();
@@ -270,6 +274,13 @@ test('Cantonese practice labels all six tones and uses the selected pair', async
     .locator('[data-tone]')
     .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort());
   expect(choices).toEqual(['2', '3']);
+  const correct = await currentTone(page);
+  await page.locator(`[data-tone]:not([data-tone="${correct}"])`).first().click();
+  const report = page.locator('.scene-review-action .recording-report');
+  await expect(report).toBeVisible();
+  expect(new URL(await report.getAttribute('href')).searchParams.get('context')).toMatch(
+    /^Where: Tone Tower Practice\n/,
+  );
   await expectNoOverflow(page);
 });
 
@@ -299,7 +310,11 @@ test('Skyrail retry, crossing, pause and timeout keep the input usable', async (
   await page.clock.runFor(16000);
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'timeout');
   await expect(page.locator('.rail-feedback')).toHaveCSS('clip-path', 'inset(50%)');
-  await expect(page.locator('.scene-review-action .recording-report')).toBeVisible();
+  const report = page.locator('.scene-review-action .recording-report');
+  await expect(report).toBeVisible();
+  expect(new URL(await report.getAttribute('href')).searchParams.get('context')).toMatch(
+    /^Where: Skyrail\n/,
+  );
   await expect(input).toBeDisabled();
   await expect(page.locator('#continue-game')).toBeVisible();
   await page.locator('#continue-game').click();

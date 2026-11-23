@@ -97,7 +97,7 @@ export function createCreditsDialog({ dialogBody, profile, loadRows, openDialog 
                       <td>
                         ${w.source ? '<a href="' + safeHref(w.source) + '" target="_blank" rel="noopener">Original ↗</a>' : ''}${w.source && w.license ? ' · ' : ''}${w.license ? '<a href="' + safeHref(w.licenseUrl) + '" target="_blank" rel="noopener">' + escape(w.license) + '</a>' : ''}${w.conversion ? /* HTML */ `<small>${escape(w.conversion)}</small>` : ''}<small
                           ><a
-                            href="${escape(recordingIssueUrl(w, profile))}"
+                            href="${escape(recordingIssueUrl(w, profile, 'credits'))}"
                             target="_blank"
                             rel="noopener"
                             >Report this recording ↗</a
