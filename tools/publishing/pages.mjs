@@ -45,7 +45,8 @@ export function renderPage(template, key, catalog) {
           profile.romanization +
           ' spelling.',
     ),
-    shareAlt: 'Tone Tower illustrated with a tower and a railway.',
+    shareAlt:
+      'Tone Tower for Cantonese, Mandarin and Vietnamese, showing a Mandarin round with 你好 (hello).',
     scriptSetting: scriptSettingMarkup(profile),
   };
   let html = localizeLinks(template, profile).replace(/\{\{(\w+)\}\}/g, (_, token) => {

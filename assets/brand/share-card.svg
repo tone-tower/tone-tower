@@ -1,31 +1,42 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
+    <linearGradient id="background" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#121d2b"/>
+      <stop offset="1" stop-color="#203449"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop stop-color="#80b79a" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#80b79a" stop-opacity="0"/>
+    </radialGradient>
     <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
-      <path d="M32 0H0V32" fill="none" stroke="#80b79a" stroke-opacity=".06"/>
+      <path d="M0 32V0H32" fill="none" stroke="#abc8bd" stroke-opacity=".08"/>
     </pattern>
+    <clipPath id="gameplay-frame">
+      <rect x="547" y="104" width="580" height="423" rx="16"/>
+    </clipPath>
+    <filter id="shadow" x="-10%" y="-15%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#080e18" flood-opacity=".65"/>
+    </filter>
   </defs>
-  <rect width="1200" height="630" fill="#19293d"/>
+
+  <rect width="1200" height="630" fill="url(#background)"/>
   <rect width="1200" height="630" fill="url(#grid)"/>
-  <path d="M0 540H1200V630H0Z" fill="#233d4c"/>
-  <path d="M0 564H1200" stroke="#80b79a" stroke-opacity=".3"/>
-  <g transform="translate(71 68) scale(3)" shape-rendering="crispEdges">
+  <ellipse cx="920" cy="330" rx="440" ry="315" fill="url(#glow)"/>
+
+  <rect x="63" y="87" width="60" height="60" rx="14" fill="#23384a" stroke="#486660"/>
+  <g transform="translate(73 95) scale(2)" shape-rendering="crispEdges">
     <path d="M9 7V3H5V0h5v3h5V0h4v4h-6v4" fill="#80b79a"/>
     <path d="M4 8h12v3h3v9h-3v3H4v-3H1v-9h3Z" fill="#edbd76"/>
     <path d="M5 13h2v3H5m8-3h2v3h-2m-5 5h4v1H8" fill="#19293d"/>
   </g>
-  <text x="68" y="226" font-family="Georgia,serif" font-size="94" font-weight="700" fill="#f1e5ca" letter-spacing="-4">Tone Tower</text>
-  <text x="74" y="300" font-family="sans-serif" font-size="33" fill="#edbd76">Listening games for tones and spelling</text>
-  <text x="74" y="359" font-family="sans-serif" font-size="23" fill="#bac7c5">Cantonese · Mandarin · Vietnamese</text>
-  <text x="74" y="595" font-family="sans-serif" font-size="18" fill="#bac7c5">Free to play · Open source · No account needed</text>
-  <g shape-rendering="crispEdges">
-    <path d="M776 494h160v26H750v-26h26V237h160v257" fill="#d8ae71"/>
-    <path d="M754 237h205l-103-80Z" fill="#80b79a"/>
-    <path d="M840 156V98h58v28h-43v30" fill="#edbd76"/>
-    <path d="M783 241h146v12H783Z" fill="#efd3a0"/>
-    <path d="M800 276h25v34h-25m58-34h25v34h-25m-58 36h25v34h-25m58-34h25v34h-25m-58 36h25v34h-25m58-34h25v34h-25M837 494v-49h39v49" fill="#19293d"/>
-    <path d="M934 420h266v13H934m60 13v74h14v-74m126 0v74h14v-74" fill="#80b79a"/>
-    <path d="M1003 363h105v49h-105v-49m9-12h86v12h-86" fill="#edbd76"/>
-    <path d="M1017 371h25v22h-25m38-22h36v22h-36" fill="#19293d"/>
-    <path d="M722 528h330v15H722m-29 15h390v15H693m-47 24h496v13H646" fill="#42606a"/>
-  </g>
+
+  <text x="61" y="264" fill="#f5e7ca" font-family="Georgia, serif" font-size="78" font-weight="700" letter-spacing="-4">Tone Tower</text>
+  <text x="64" y="325" fill="#f0c583" font-family="sans-serif" font-size="34" font-weight="600">Cantonese, Mandarin</text>
+  <text x="64" y="369" fill="#f0c583" font-family="sans-serif" font-size="34" font-weight="600">and Vietnamese</text>
+  <path d="M64 425H470" stroke="#587675" stroke-opacity=".65"/>
+  <text x="64" y="467" fill="#c6d2d9" font-family="sans-serif" font-size="25">Practise tones and spelling.</text>
+
+  <rect x="539" y="96" width="596" height="439" rx="24" fill="#111d2b" filter="url(#shadow)"/>
+  <image href="../../docs/images/tone-tower-gameplay.jpg" x="471" y="61" width="740" height="524.17" clip-path="url(#gameplay-frame)"/>
+  <rect x="539" y="96" width="596" height="439" rx="24" fill="none" stroke="#648579" stroke-width="2"/>
 </svg>

@@ -1,12 +1,12 @@
 # Tone Tower
 
-Free browser games for practising tones and spelling. No account needed.
+Listening games for Cantonese, Mandarin and Vietnamese. No account needed.
 
 **[Play in your browser](https://tone-tower.github.io/tone-tower/)**
 
 [Cantonese](https://tone-tower.github.io/tone-tower/cantonese/) · [Mandarin](https://tone-tower.github.io/tone-tower/mandarin/) · [Vietnamese](https://tone-tower.github.io/tone-tower/vietnamese/)
 
-[![A Cantonese Tone Tower round showing a word prompt and numbered tone doors](docs/images/tone-tower-gameplay.jpg)](https://tone-tower.github.io/tone-tower/)
+[![A Mandarin Tone Tower round with 你好 and two Pinyin tone doors](docs/images/tone-tower-gameplay.jpg)](https://tone-tower.github.io/tone-tower/)
 
 In **Tone Tower**, listen to a word and choose its tone to climb the tower. In **Skyrail**, type what you hear in Cantonese Jyutping or Mandarin Pinyin. Vietnamese has its own Tone Tower adventure.
 
