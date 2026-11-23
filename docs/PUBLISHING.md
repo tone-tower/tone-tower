@@ -147,7 +147,7 @@ Social services may cache old previews after deployment.
 ```markdown
 # Tone Tower
 
-Free browser games for practising tones and spelling.
+Listening games for Cantonese, Mandarin and Vietnamese.
 
 **[Play in your browser](https://tone-tower.github.io/tone-tower/)**
 
