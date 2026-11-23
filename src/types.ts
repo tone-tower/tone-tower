@@ -152,7 +152,6 @@ export interface LanguageProfile extends Transcription {
   toneDefinitions: readonly ToneDefinition[];
   toneNotation: 'numbers' | 'marks';
   typingHelpers: readonly TypingHelper[];
-  toneFeedback?: (syllables: readonly Syllable[]) => string;
   concealTone?: (text: string) => { base: string; index: number } | null;
   concealMeaning?: (text: string) => string;
   guideName?: string;

@@ -1,5 +1,6 @@
 import { cantoneseCatalog, withSimplifiedCantonese } from '../../tools/catalog/runtime.mjs';
 import { test, expect } from '@playwright/test';
+import { openHeaderMenu } from '../helpers/header-menu.js';
 
 // Keep smoke tests independent of downloads and speakers. Real recording playback
 // still needs a quick check on a phone, particularly for browser audio permissions.
@@ -90,6 +91,58 @@ async function expectNoOverflow(page) {
   );
 }
 
+function layoutBoxes(page, selectors) {
+  return page.evaluate(
+    (items) =>
+      items.map((selector) => {
+        const { x, y, width, height } = document.querySelector(selector).getBoundingClientRect();
+        return { x: x + scrollX, y: y + scrollY, width, height };
+      }),
+    selectors,
+  );
+}
+
+const skyrailLayout = [
+  '.prompt-character',
+  '.prompt-romanization',
+  '.prompt-gloss',
+  '#replay-word',
+  '.rail-answer-controls',
+  '.scene-frame',
+];
+
+for (const world of ['tone', 'tide']) {
+  test(`${world} meanings stay directly below the characters in a two-line slot`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await start(page, world);
+    const selectors = ['.prompt-syllables', '.prompt-gloss', '#replay-word', '.scene-frame'];
+    const boxes = await layoutBoxes(page, selectors);
+    const [syllables, meaningBox] = boxes;
+    const gloss = page.locator('.word-prompt .prompt-gloss');
+    await expect(gloss).toHaveCSS('-webkit-line-clamp', '2');
+    const lineHeight = parseFloat(
+      await gloss.evaluate((node) => getComputedStyle(node).lineHeight),
+    );
+    expect(meaningBox.height).toBeCloseTo(lineHeight * 2, 1);
+    expect(meaningBox.x + meaningBox.width / 2).toBeCloseTo(syllables.x + syllables.width / 2);
+    expect(meaningBox.y - (syllables.y + syllables.height)).toBe(4);
+    for (const meaning of [
+      '',
+      'short meaning',
+      'An expression with two common uses, with both meanings in view',
+      'An example of an unusually long dictionary definition. '.repeat(6).trim(),
+    ]) {
+      await gloss.evaluate((node, text) => (node.textContent = text), meaning);
+      await expect(gloss).toHaveText(meaning);
+      expect(await layoutBoxes(page, selectors)).toEqual(boxes);
+    }
+    expect(await gloss.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+    await expectNoOverflow(page);
+  });
+}
+
 test('Cantonese character style updates the current prompt and carries over to the guide', async ({
   page,
 }) => {
@@ -129,9 +182,9 @@ test('Cantonese character style updates the current prompt and carries over to t
 });
 
 test('pause and resume buttons keep keyboard activation', async ({ page }) => {
-  await start(page, 'tone');
-  await page.clock.runFor(2200);
-  await expect(page.locator('.tower-feedback')).toBeHidden();
+  await start(page, 'tide');
+  await page.clock.runFor(150);
+  await expect(page.locator('.rail-feedback')).toBeHidden();
   const pause = page.getByRole('button', { name: 'Pause game' });
   await expect(pause).toBeInViewport({ ratio: 1 });
   const { width, height } = await pause.boundingBox();
@@ -144,7 +197,7 @@ test('pause and resume buttons keep keyboard activation', async ({ page }) => {
   expect(await plays()).toBe(before);
   await page.locator('#resume-game').press('Enter');
 
-  await expect(page.locator('.game-layout')).toBeFocused();
+  await expect(page.locator('#transcription-answer')).toBeFocused();
 });
 
 test('header navigation pauses an unfinished run and confirms the full destination', async ({
@@ -175,6 +228,7 @@ test('header navigation pauses an unfinished run and confirms the full destinati
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('zz');
 
+  await openHeaderMenu(page);
   await page.locator('#learn').press('Enter');
   await expect(page.getByRole('heading', { name: 'Go to Jyutping guide?' })).toBeVisible();
   await page.getByRole('button', { name: 'End run & go to Jyutping guide' }).press('Enter');
@@ -190,6 +244,9 @@ test('Tower returns pointer replay focus to gameplay and keeps arrow shortcuts o
   const game = page.locator('.game-layout');
   const replay = page.locator('#replay-word');
   await expect(game).toBeFocused();
+  await expect(page.locator('#pause-run')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pause-overlay')).toHaveCount(0);
   await replay.focus();
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('.tone-door:enabled')).not.toHaveCount(0);
@@ -198,6 +255,31 @@ test('Tower returns pointer replay focus to gameplay and keeps arrow shortcuts o
   await expect(game).toBeFocused();
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('.tone-door:enabled')).toHaveCount(0);
+});
+
+test('a ready Tower door scores on one tap after the room stops moving', async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, 'Requires touch input.');
+  await start(page, 'tone');
+  const doors = page.locator('.tone-door');
+  await expect(doors.first()).toBeDisabled();
+  await page.clock.runFor(2200);
+  await page.locator(`[data-tone="${await currentTone(page)}"]`).tap();
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+  await page.clock.runFor(1850);
+  await expect(page.locator('.world-scene')).toHaveAttribute('data-moving', '');
+  await expect(page.locator('.scene-content')).toHaveAttribute('inert', '');
+  await page.keyboard.press(await currentTone(page));
+  await expect(page.locator('.is-correct')).toHaveCount(0);
+  await page.clock.runFor(600);
+  await expect(page.locator('.scene-content')).not.toHaveAttribute('inert', '');
+  const correct = await currentTone(page);
+  await page.locator(`[data-tone]:not([data-tone="${correct}"])`).first().tap();
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'wrong');
+  await expect(page.locator('.tone-door.is-answer')).toHaveAttribute('data-tone', correct);
+  await expect(page.locator('.game-readout')).toContainText('3 of 4 lives remaining');
 });
 
 test('Tower intro, crossing, mistake review and failed-run practice', async ({ page }) => {
@@ -221,14 +303,18 @@ test('Tower intro, crossing, mistake review and failed-run practice', async ({ p
       .locator('[data-tone]')
       .evaluateAll((doors) => doors.map((door) => door.dataset.tone).sort());
     const correct = await currentTone(page);
-    const pause = page.getByRole('button', { name: 'Pause game' });
-    const pausePosition = await pause.boundingBox();
     await page.locator(`[data-tone]:not([data-tone="${correct}"])`).first().click();
     if (miss < 4) {
       await expect(page.locator('#practise-mistakes')).toHaveCount(0);
       await expect(page.locator('#ending-practice')).toHaveCount(0);
       await expect(page.locator('.scene-review-action .recording-report')).toBeVisible();
-      expect(await pause.boundingBox()).toEqual(pausePosition);
+      const solution = page.locator('.tone-door.is-answer');
+      await expect(solution.locator('.tone-name')).toHaveText('✓ Correct');
+      const symbol = await solution.locator('.tone-symbol').boundingBox();
+      const label = await solution.locator('.tone-name').boundingBox();
+      const door = await solution.boundingBox();
+      expect(symbol.y + symbol.height).toBeLessThanOrEqual(label.y);
+      expect(label.y + label.height).toBeLessThanOrEqual(door.y + door.height);
       await page.locator('#continue-game').click();
       await page.clock.runFor(150);
     }
@@ -292,13 +378,18 @@ test('Skyrail retry, crossing, pause and timeout keep the input usable', async (
   const character = await page.locator('.is-target .prompt-character').innerText();
   await expect(input).toHaveAccessibleName('Jyutping for the highlighted syllable, ' + character);
   const originalInput = await input.elementHandle();
+  const before = await layoutBoxes(page, skyrailLayout);
+  await expect(page.locator('.prompt-romanization').first()).toBeHidden();
   await input.fill('wrong');
   await page.locator('#check-answer').click();
   await expect(page.locator('#input-status')).toContainText('No life lost');
   await expect(input).toBeEnabled();
+  expect(await layoutBoxes(page, skyrailLayout)).toEqual(before);
   await input.fill('si');
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
   await expect(page.locator('.rail-feedback')).toBeHidden();
+  await expect(page.locator('.prompt-romanization')).toHaveText('si' + (await currentTone(page)));
+  expect(await layoutBoxes(page, skyrailLayout)).toEqual(before);
   await page.clock.runFor(1050);
   await expect(input).toHaveValue('');
   expect(await input.evaluate((node, original) => node === original, originalInput)).toBe(true);
@@ -307,15 +398,36 @@ test('Skyrail retry, crossing, pause and timeout keep the input usable', async (
   await page.clock.runFor(20000);
   await expect(input).toHaveValue('unfinished');
   await page.getByRole('button', { name: 'Resume', exact: false }).click();
+  const reviewLayout = await layoutBoxes(page, skyrailLayout);
   await page.clock.runFor(16000);
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'timeout');
   await expect(page.locator('.rail-feedback')).toHaveCSS('clip-path', 'inset(50%)');
-  const report = page.locator('.scene-review-action .recording-report');
+  const report = page.locator('.rail-review-actions .recording-report');
   await expect(report).toBeVisible();
+  expect(await layoutBoxes(page, skyrailLayout)).toEqual(reviewLayout);
+  const [actions, scenery] = await layoutBoxes(page, ['.rail-review-actions', '.scene-frame']);
+  expect(actions.y + actions.height).toBeLessThanOrEqual(scenery.y);
+  const nextCar = page.getByRole('button', { name: /Catch the next car/ });
+  const [reportBox, nextBox] = await Promise.all([report.boundingBox(), nextCar.boundingBox()]);
+  expect(reportBox.y + reportBox.height / 2).toBeCloseTo(nextBox.y + nextBox.height / 2, 1);
+  expect((reportBox.x + nextBox.x + nextBox.width) / 2).toBeCloseTo(
+    actions.x + actions.width / 2,
+    1,
+  );
+  const toolbar = await page.locator('.rail-review-actions').boundingBox();
+  expect(nextBox.y + nextBox.height / 2).toBeCloseTo(toolbar.y + toolbar.height / 2, 1);
+  const shortcut = nextCar.locator('kbd');
+  if (page.viewportSize().width > 700) {
+    await expect(shortcut).toBeVisible();
+    await expect(shortcut).toHaveCSS(
+      'color',
+      await nextCar.evaluate((node) => getComputedStyle(node).color),
+    );
+  } else await expect(shortcut).toBeHidden();
   expect(new URL(await report.getAttribute('href')).searchParams.get('context')).toMatch(
     /^Where: Skyrail\n/,
   );
-  await expect(input).toBeDisabled();
+  await expect(page.locator('#transcription-answer')).toBeDisabled();
   await expect(page.locator('#continue-game')).toBeVisible();
   await page.locator('#continue-game').click();
   await page.clock.runFor(150);
@@ -340,16 +452,59 @@ test('phone keyboard keeps the rail journey visible above the typing field', asy
   await expect(page.locator('.site-header')).toBeVisible();
   const rail = await scene.boundingBox();
   const field = await page.getByRole('textbox').boundingBox();
+  const before = await layoutBoxes(page, skyrailLayout);
   expect(rail.height).toBeGreaterThanOrEqual(88);
   expect(rail.y + rail.height).toBeLessThanOrEqual(field.y);
   await page.getByRole('textbox').fill('si');
   await expect(scene).toBeInViewport({ ratio: 1 });
+  expect(await layoutBoxes(page, skyrailLayout)).toEqual(before);
   await page.clock.runFor(1050);
   await expect(scene).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('textbox')).toBeFocused();
+  const beforeReview = await layoutBoxes(page, skyrailLayout);
+  await page.clock.runFor(16000);
+  await expect(page.locator('.rail-review-actions .recording-report')).toBeVisible();
+  expect(await layoutBoxes(page, skyrailLayout)).toEqual(beforeReview);
   await expectNoOverflow(page);
   await page.setViewportSize(size);
   await expect(page.locator('body')).not.toHaveClass(/keyboard-open/);
+});
+
+test('a long Skyrail answer reveals its tones in the reserved space', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 430 });
+  const parts = ['gwong2', 'dung1', 'waa2', 'jap6', 'mun4', 'fo3'];
+  const phrase = {
+    id: 'long',
+    gloss: 'introductory Cantonese class',
+    syllables: [...'廣東話入門課'].map((character, i) => ({
+      character,
+      jyutping: parts[i],
+      tone: Number(parts[i].at(-1)),
+    })),
+  };
+  await page.route('**/catalogs/yue.json', (route) =>
+    route.fulfill({
+      json: cantoneseCatalog({
+        ...catalog,
+        words: [...singles, phrase],
+        recordings: [
+          ...catalog.recordings.filter((recording) => recording.anchor),
+          { id: phrase.id, wordId: phrase.id, audio: 'audio/long.mp3' },
+        ],
+      }),
+    }),
+  );
+  await page.reload();
+  await page.locator('.mode-card[data-destination="rail"]').click();
+  await page.locator('#setup-practice').click();
+  await page.locator('#start-adventure').click();
+  await page.clock.runFor(150);
+  const before = await layoutBoxes(page, skyrailLayout);
+  await page.locator('#transcription-answer').fill('gwong dung waa jap mun fo');
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+  await expect(page.locator('.prompt-romanization')).toHaveText(parts);
+  expect(await layoutBoxes(page, skyrailLayout)).toEqual(before);
+  await expectNoOverflow(page);
 });
 
 test('first completion reveals a permanent friend at home', async ({ page }) => {
@@ -384,6 +539,10 @@ test('first completion reveals a permanent friend at home', async ({ page }) => 
     await page.clock.fastForward(1800);
     await page.clock.runFor(150);
     if (floor < 100 && floor % 20 === 0) {
+      await expect(page.locator('.scene-question .tower-interlude')).toContainText(
+        'Lives refilled',
+      );
+      await expect(page.locator('.world-scene .tower-interlude')).toHaveCount(0);
       await page.locator('#continue-game').click();
       await page.clock.runFor(150);
     }

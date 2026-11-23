@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openHeaderMenu } from '../helpers/header-menu.js';
 
 const entries = [1, 2, 3, 4].map((t) => ({
   id: 'ma' + t,
@@ -112,6 +113,7 @@ test('guide playback works before the game library is requested, and Start can r
     } else await route.fulfill({ json: catalog });
   });
   await loaded(page);
+  await openHeaderMenu(page);
   await page.locator('#learn').click();
   await page.locator('.guide-tone[data-guide-tone="3"]').click();
   await page.clock.runFor(150);
@@ -151,6 +153,7 @@ test('chooser loads no catalog and language navigation stays in Mandarin', async
   ]);
   await page.locator('.language-card--mandarin').click();
   await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await openHeaderMenu(page);
   await page.locator('#about').click();
   const credits = page.getByRole('region', { name: 'Recordings' });
   await credits.getByText('Data and software credits').click();
@@ -174,6 +177,7 @@ test('chooser loads no catalog and language navigation stays in Mandarin', async
   expect(
     requests.filter((url) => url.includes('/catalogs/')).every((url) => url.endsWith('/cmn.json')),
   ).toBe(true);
+  await openHeaderMenu(page);
   await page.locator('#learn').click();
   await expect(page.locator('.brand')).toHaveAttribute(
     'href',
@@ -245,6 +249,7 @@ test('navigation separates language switching, learning, and project information
   await expect(
     page.locator('.site-header').getByRole('radio', { name: 'Simplified' }),
   ).toBeChecked();
+  await openHeaderMenu(page);
   await page.locator('#learn').click();
   await expect(page.getByRole('heading', { name: 'Pinyin guide', exact: true })).toBeVisible();
   await page.locator('.brand').click();
@@ -323,6 +328,7 @@ test('rapid Skyrail keys cannot activate navigation or dismiss a finished run', 
   const input = page.locator('#transcription-answer');
   await input.fill('zz');
 
+  await openHeaderMenu(page);
   await page.locator('#about').click();
   await expect(page.getByRole('heading', { name: 'Go to About?' })).toBeVisible();
   await expect(page.locator('#dialog')).toBeHidden();
@@ -336,6 +342,7 @@ test('rapid Skyrail keys cannot activate navigation or dismiss a finished run', 
   await expect(page).toHaveURL(/mandarin\/$/);
   await expect(page.locator('.pause-overlay')).toHaveCount(0);
 
+  await openHeaderMenu(page);
   await page.locator('.game-layout').focus();
   await page.keyboard.down('Enter');
   const about = page.locator('#about');
@@ -362,6 +369,7 @@ test('rapid Skyrail keys cannot activate navigation or dismiss a finished run', 
   await page.keyboard.press('Space');
   await expect(page.locator('.run-conclusion')).toBeVisible();
   await expect(page).toHaveURL(/\/mandarin\/$/);
+  await openHeaderMenu(page);
   await page.locator('#about').click();
   await expect(page).toHaveURL(/mandarin\/about\/$/);
   await expect(page.locator('.pause-overlay')).toHaveCount(0);
@@ -385,6 +393,7 @@ test('unavailable collection keeps the guide usable and games closed', async ({ 
   await expect(page.locator('.content-preview')).toBeVisible();
   await expect(page.locator('.content-preview')).toContainText('gathering enough recordings');
   await expect(page.locator('#start-adventure')).toBeDisabled();
+  await openHeaderMenu(page);
   await page.locator('#learn').click();
   await expect(page.getByRole('heading', { name: 'Pinyin guide', exact: true })).toBeVisible();
   await noOverflow(page);

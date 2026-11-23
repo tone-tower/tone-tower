@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openHeaderMenu } from '../helpers/header-menu.js';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -104,6 +105,51 @@ test('Pinyin lessons use marked spelling, contextual audio and accessible detail
   await expect(page.locator('#credit-results')).toContainText('Pitch and speed unchanged');
 });
 
+test('the mobile header keeps its height when the menu opens and closes', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('/mandarin/guide/');
+  const header = page.locator('.site-header');
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  const guide = navigation.getByRole('link', { name: 'Pinyin guide' });
+  const about = navigation.getByRole('link', { name: 'About' });
+  const heading = page.getByRole('heading', { name: 'Pinyin guide', exact: true });
+  await expect(heading).toBeVisible();
+  for (const width of [320, 360, 390]) {
+    await page.setViewportSize({ width, height: 640 });
+    await expect(menu).toBeVisible();
+    await expect(navigation).toBeHidden();
+    const height = (await header.boundingBox()).height;
+    const [script, brand, toggle] = await Promise.all(
+      ['#script-display', '.brand', '#site-menu'].map((selector) =>
+        page.locator(selector).boundingBox(),
+      ),
+    );
+    expect(script.x + script.width).toBeLessThanOrEqual(brand.x);
+    expect(brand.x + brand.width).toBeLessThanOrEqual(toggle.x);
+    await menu.press('Enter');
+    await expect(navigation).toBeVisible();
+    expect((await header.boundingBox()).height).toBe(height);
+    await page.keyboard.press('Tab');
+    await expect(guide).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeFocused();
+    await expect(navigation).toBeHidden();
+    await menu.click();
+    await heading.click();
+    await expect(navigation).toBeHidden();
+  }
+  await menu.click();
+  await about.click();
+  await expect(page).toHaveURL(/mandarin\/about\/$/);
+  await expect(navigation).toBeHidden();
+  await page.setViewportSize({ width: 701, height: 640 });
+  await expect(menu).toBeHidden();
+  await expect(navigation).toBeVisible();
+  await guide.click();
+  await expect(heading).toBeVisible();
+});
+
 test('Pinyin examples follow script settings when a run exits to the full guide', async ({
   page,
 }) => {
@@ -124,6 +170,7 @@ test('Pinyin examples follow script settings when a run exits to the full guide'
   await expect(traditional).toBeInViewport();
   await page.reload();
   await expect(traditional).toBeChecked();
+  await openHeaderMenu(page);
   await page.locator('#learn').click();
   await expect(page.locator('.guide-tones [data-guide-tone="3"]')).toContainText('馬');
   await expect(page.locator('.guide-tones [data-guide-tone="5"]')).toContainText('媽媽');
@@ -131,6 +178,7 @@ test('Pinyin examples follow script settings when a run exits to the full guide'
   await page.getByRole('button', { name: 'Choose Tower difficulty →' }).click();
   await page.locator('#start-adventure').click();
   await expect(page.locator('.tone-door').first()).toBeEnabled();
+  await openHeaderMenu(page);
   await page.locator('#learn').click();
   await expect(page.getByRole('heading', { name: 'Go to Pinyin guide?' })).toBeVisible();
   await expect(page.locator('#dialog')).toBeHidden();

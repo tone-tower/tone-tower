@@ -133,15 +133,19 @@ export function createGameMarkup(state: () => Presentation) {
           })
           .join('')}
       </div>
+      ${glossMarkup(meaning)}
       ${reveal && run.word.syllables.some((s) => s.dictionaryTone !== undefined && s.dictionaryTone !== s.tone) ? '<p class="tone-explanation">Heard tones: ' + escape(run.word.syllables.map((s) => profile.toneDefinitions.find((d) => d.value === s.tone)?.label).join(' · ')) + '. Dictionary spelling: ' + escape(profile.format(run.word.transcription || run.word.syllables.map((s) => s.transcription).join(' '))) + '. Tone Tower follows this recording; Skyrail uses dictionary spelling.</p>' : ''}
-      <p class="prompt-gloss">${meaning ? escape(meaning) : '&nbsp;'}</p>
     </div>`;
+  }
+
+  function glossMarkup(meaning: string | undefined) {
+    return `<p class="prompt-gloss" lang="en">${escape(meaning)}</p>`;
   }
 
   function promptMarkup(reveal = false) {
     const { run, profile, script } = state();
     if (profile.concealTone && !isTide()) return coveredPromptMarkup(reveal);
-    const feedback = reveal && !isTide() ? (profile.toneFeedback?.(run.word.syllables) ?? '') : '';
+    const rail = isTide();
     return /* HTML */ `<div
       class="word-prompt"
       data-length="${run.word.syllables.length}"
@@ -152,27 +156,27 @@ export function createGameMarkup(state: () => Presentation) {
         ${run.word.syllables
           .map((s, i) => {
             const target = run.targets.includes(i),
-              spelling = reveal
-                ? isTide() && run.config.variant !== 'full'
-                  ? profile.withoutTones(s.transcription)
-                  : profile.format(s.transcription)
-                : !isTide()
-                  ? profile.withoutTones(s.transcription)
-                  : '';
+              spelling =
+                rail || reveal
+                  ? profile.format(s.transcription)
+                  : profile.withoutTones(s.transcription),
+              reserved = rail && !reveal;
             return /* HTML */ `<span class="prompt-syllable ${target ? 'is-target' : ''}"
               >${!isTide() && target && run.targets.length === 1 ? '<span class="target-label">Listen here</span>' : ''}<span
                 class="prompt-character"
                 lang="${escape(textLanguage(profile, script))}"
                 >${escape(s.text)}</span
-              ><span class="prompt-romanization" lang="${escape(profile.id + '-Latn')}"
+              ><span
+                class="prompt-romanization${reserved ? ' is-reserved' : ''}"
+                lang="${escape(profile.id + '-Latn')}"
+                ${reserved ? 'aria-hidden="true"' : ''}
                 >${spelling ? escape(spelling) : '&nbsp;'}</span
               ></span
             >`;
           })
           .join('')}
       </div>
-      ${feedback ? '<p class="tone-explanation">' + escape(feedback) + '</p>' : ''}
-      <p class="prompt-gloss">${escape(run.word.gloss)}</p>
+      ${glossMarkup(run.word.gloss)}
     </div>`;
   }
   function toneButtons() {
@@ -193,9 +197,8 @@ export function createGameMarkup(state: () => Presentation) {
           aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: ' : 'Choose '}${escape(toneLabel(profile, t))}"
           ${!answering() ? 'disabled' : ''}
         >
-          ${phase === 'review' && t === run.word.tone ? '<span class="answer-mark" aria-hidden="true">✓</span>' : ''}${toneSymbolMarkup(profile, t)}<span
-            class="tone-name"
-            >${phase === 'review' && t === run.lastAnswer ? '✕ Your choice' : phase === 'review' && t === run.word.tone ? 'CORRECT' : escape(name)}</span
+          ${toneSymbolMarkup(profile, t)}<span class="tone-name"
+            >${phase === 'review' && t === run.lastAnswer ? '✕ Your choice' : phase === 'review' && t === run.word.tone ? '✓ Correct' : escape(name)}</span
           ><kbd class="door-key"
             >${run.choices.length === 2 ? (run.choices.indexOf(t) === 0 ? '←' : '→') : run.choices.length === 3 ? ['←', '↑ ↓', '→'][run.choices.indexOf(t)] : run.choices.length === 4 ? ['↑', '←', '→', '↓'][run.choices.indexOf(t)] : t}</kbd
           >
@@ -214,33 +217,44 @@ export function createGameMarkup(state: () => Presentation) {
         : 'the whole word';
     return `${spelling} for ${target}`;
   }
-  function typedForm() {
+  function typedForm(reviewActions: string) {
     const { run, phase, profile, paused, inputValue, message, answering } = state();
     if (!isTide()) return '';
     const full = run.config.variant === 'full',
       focus = run.config.practice ? run.config.spellingFocus : 'full';
     return /* HTML */ `<form id="typed-form" class="form-controls">
       <label class="sr-only" for="transcription-answer">${escape(answerLabel())}</label>
-      <div class="answer-input-row">
-        <input
-          id="transcription-answer"
-          name="answer"
-          type="text"
-          value="${escape(inputValue)}"
-          ${focus === 'initials' ? 'placeholder="Initials"' : focus === 'finals' ? 'placeholder="Finals"' : ''}
-          autocomplete="off"
-          autocapitalize="off"
-          autocorrect="off"
-          spellcheck="false"
-          enterkeyhint="go"
-          aria-describedby="input-status"
-          ${paused || !['listening', 'answering', 'correct'].includes(phase) ? 'disabled' : ''}
-        /><button class="primary" id="check-answer" type="submit" ${!answering() ? 'disabled' : ''}>
-          ${run.config.practice ? 'Check spelling' : 'Build span'} <span aria-hidden="true">→</span>
-        </button>
+      <div class="rail-answer-controls">
+        <div class="answer-input-row">
+          <input
+            id="transcription-answer"
+            name="answer"
+            type="text"
+            value="${escape(inputValue)}"
+            ${focus === 'initials' ? 'placeholder="Initials"' : focus === 'finals' ? 'placeholder="Finals"' : ''}
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            enterkeyhint="go"
+            aria-describedby="input-status"
+            ${paused || !['listening', 'answering', 'correct'].includes(phase) ? 'disabled' : ''}
+          /><button
+            class="primary"
+            id="check-answer"
+            type="submit"
+            ${!answering() ? 'disabled' : ''}
+          >
+            ${run.config.practice ? 'Check spelling' : 'Build span'}
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+        <div class="rail-review-actions">${reviewActions}</div>
       </div>
       ${full && profile.typingHelpers.length ? '<div class="typing-tools" role="group" aria-label="' + escape(profile.romanization) + ' typing helpers">' + profile.typingHelpers.map((helper) => '<button type="button" data-insert="' + escape(helper.value) + '" aria-label="' + escape(helper.description) + '">' + escape(helper.label) + '</button>').join('') + '</div>' : ''}
-      <p id="input-status" class="game-message" role="status">${escape(message)}</p>
+      <p id="input-status" class="game-message" role="status">
+        ${escape(message || (phase === 'correct' && run.config.practice ? '✓ Correct!' : ''))}
+      </p>
     </form>`;
   }
 
@@ -249,7 +263,10 @@ export function createGameMarkup(state: () => Presentation) {
 
 export function endingWord(run: Run) {
   return run.word.syllables
-    .map((s) => (s.text === s.transcription ? s.text : s.text + ' ' + s.transcription))
+    .map((s) => {
+      const spelling = run.world === 'tide' ? run.profile.format(s.transcription) : s.transcription;
+      return s.text === spelling ? s.text : s.text + ' ' + spelling;
+    })
     .join(' · ');
 }
 

@@ -52,7 +52,7 @@ interface ControllerOptions {
 import { recordingIssueUrl } from '../ui/recording-report.ts';
 import { requireProfile } from '../languages/profile.ts';
 import { createRun } from './game-core.ts';
-import { worldScene, districts, doorSlots } from '../world/worlds.js';
+import { worldScene, districts } from '../world/worlds.js';
 import { animateWorld } from '../world/world-runtime.js';
 import { RAIL_CARS } from '../world/skyrail-world.js';
 
@@ -173,6 +173,7 @@ export function createGameController({
   const q = <S extends string>(selector: S) => query(app, selector);
   const qa = <S extends string>(selector: S) => queryAll(app, selector);
   const isTide = () => run?.config.challenge === 'tide';
+  const manualPause = () => isTide() || run.timeLimit() > 0;
   const answering = () =>
     active && !paused && phase === 'answering' && audioReady && !audioFailed && !doc?.hidden;
   const clock = createCountdown({
@@ -275,26 +276,18 @@ export function createGameController({
       unveiling,
     }));
   function railFeedback() {
-    const review = phase === 'review',
-      landing = phase === 'landing',
-      correct = phase === 'correct';
+    const review = phase === 'review';
     const text = audioFailed
       ? 'Recording unavailable. Clock stopped. Replay to retry.'
       : review
         ? (run.lastFailure === 'timeout' ? 'Time’s up. The answer is ' : 'The answer is ') +
-          (run.config.variant === 'full'
-            ? run.expected()
-            : run.expectedParts().map(profile.withoutTones).join(' '))
-        : landing
-          ? 'Station reached · ' + districts.tide[run.stage].name
-          : correct && run.config.practice
-            ? '✓ Correct!'
-            : '';
+          run.targets.map((i) => profile.format(run.word.syllables[i].transcription)).join(' ')
+        : '';
     return (
       '<div class="game-feedback rail-feedback' +
       (review && !audioFailed ? ' sr-only' : '') +
       '" role="status" data-feedback="' +
-      (audioFailed || review ? 'error' : landing || correct ? 'success' : 'neutral') +
+      (audioFailed || review ? 'error' : 'neutral') +
       '"><span id="rail-message">' +
       escape(text) +
       '</span>' +
@@ -315,7 +308,7 @@ export function createGameController({
       >Report recording <span aria-hidden="true">↗</span></a
     >`;
   }
-  function sceneContinue() {
+  function reviewActions() {
     const practiceComplete = isTide() && run.config.practice && run.status !== 'playing';
     if (!practiceComplete && (phase !== 'review' || run.status !== 'playing')) return '';
     const label = practiceComplete
@@ -325,10 +318,9 @@ export function createGameController({
         : isTide()
           ? 'Catch the next car'
           : 'Try the next sound';
-    return /* HTML */ `<div class="scene-review-action">
-      ${recordingReport()}
-      <button class="primary" id="continue-game" type="button">${label} <kbd>Enter</kbd> →</button>
-    </div>`;
+    return /* HTML */ `${recordingReport()}<button class="primary" id="continue-game" type="button">
+        ${label} <kbd>Enter</kbd> →
+      </button>`;
   }
   function railInterlude() {
     if (!isTide() || phase !== 'landing' || terminal()) return '';
@@ -362,30 +354,24 @@ export function createGameController({
     );
   }
   function towerInterlude() {
-    if (isTide()) return '';
-    if (phase === 'landing') {
-      const available =
-          run.config.practice && run.config.format === 'drill'
-            ? run.config.choices
-            : Math.min(run.config.tones.length, profile.stageChoices[run.stage]),
-        nextChoices = profile.choiceCounts.filter((n) => n <= available).at(-1);
-      return (
-        '<section class="tower-interlude" aria-label="Rest landing"><div class="landing-copy"><span class="eyebrow">LANDING ' +
-        run.opened +
-        '</span><h2>' +
-        (run.lives === null ? 'Checkpoint reached.' : 'Lives refilled.') +
-        '</h2><p>' +
-        (run.lives === null ? 'Unlimited lives.' : run.lives + ' of ' + run.maxLives + ' lives.') +
-        ' Next: ' +
-        escape(districts.tone[run.stage].name) +
-        ' · ' +
-        nextChoices +
-        ' doors.</p>' +
-        towerContinue('Continue when ready') +
-        '</div></section>'
-      );
-    }
-    return '';
+    const available =
+        run.config.practice && run.config.format === 'drill'
+          ? run.config.choices
+          : Math.min(run.config.tones.length, profile.stageChoices[run.stage]),
+      nextChoices = profile.choiceCounts.filter((n) => n <= available).at(-1);
+    return /* HTML */ `<section class="tower-interlude" aria-labelledby="landing-title">
+      <div>
+        <span class="eyebrow">LANDING ${run.opened}</span>
+        <h2 id="landing-title" tabindex="-1">
+          ${run.lives === null ? 'Checkpoint reached.' : 'Lives refilled.'}
+        </h2>
+        <p>
+          ${run.lives === null ? 'Unlimited lives.' : run.lives + ' of ' + run.maxLives + ' lives.'}
+          Next: ${escape(districts.tone[run.stage].name)} · ${nextChoices} doors.
+        </p>
+      </div>
+      ${towerContinue('Continue when ready')}
+    </section>`;
   }
   function towerEnding() {
     if (!towerTerminal() || terminal()) return '';
@@ -427,16 +413,10 @@ export function createGameController({
   }
   function towerFeedback() {
     const review = phase === 'review',
-      landing = phase === 'landing',
       correct = phase === 'correct';
-    const next = districts.tone[run.stage],
-      restored = outcome?.recovered
-        ? ' · ' +
-          outcome.recovered +
-          ' ' +
-          (outcome.recovered === 1 ? 'life' : 'lives') +
-          ' restored'
-        : '';
+    const restored = outcome?.recovered
+      ? ' · ' + outcome.recovered + ' ' + (outcome.recovered === 1 ? 'life' : 'lives') + ' restored'
+      : '';
     const text = audioFailed
       ? 'Recording unavailable. Replay to retry, or replace this word.'
       : towerTerminal()
@@ -453,11 +433,9 @@ export function createGameController({
             '. The correct tone is ' +
             said(run.word.tone) +
             '.'
-          : landing
-            ? run.opened + ' floors lit · A rest landing. ' + next.name + ' is next.' + restored
-            : correct && run.config.practice
-              ? '✓ Correct.' + restored
-              : '';
+          : correct && run.config.practice
+            ? '✓ Correct.' + restored
+            : '';
     const action = audioFailed
       ? '<button class="primary tower-continue" id="replace-recording" type="button">Replace word →</button>'
       : '';
@@ -465,7 +443,7 @@ export function createGameController({
       '<div class="game-feedback tower-feedback' +
       (review && !audioFailed ? ' sr-only' : '') +
       '" role="status" data-feedback="' +
-      (audioFailed || review ? 'error' : landing || correct ? 'success' : 'neutral') +
+      (audioFailed || review ? 'error' : correct ? 'success' : 'neutral') +
       '"><span id="tower-message">' +
       escape(text) +
       '</span>' +
@@ -541,7 +519,7 @@ export function createGameController({
       : terminal()
         ? q('#run-end-title')
         : q('#continue-game')
-          ? q('.scene-question')
+          ? (q('#landing-title') ?? q('.scene-question'))
           : isTide() && !q('#transcription-answer')?.disabled
             ? q('#transcription-answer')
             : q('.game-layout');
@@ -563,7 +541,9 @@ export function createGameController({
     app.dataset.world = run.config.challenge;
     app.dataset.practice = String(run.config.practice);
     app.dataset.outcome = presentation();
-    const showScenePause = phase === 'landing' || terminal();
+    const showScenePause = manualPause() && (phase === 'landing' || terminal());
+    const inTowerLanding = !isTide() && phase === 'landing';
+    const actions = reviewActions();
     const markup = /* HTML */ `<div
       class="game-layout"
       tabindex="-1"
@@ -573,24 +553,29 @@ export function createGameController({
     >
       ${controlsMarkup(showScenePause)}
       <div class="scene-question" tabindex="-1">
-        ${promptMarkup(['review', 'correct', 'landing'].includes(phase))}
-        <div class="prompt-actions">
-          <button
-            class="secondary"
-            id="replay-word"
-            type="button"
-            aria-keyshortcuts="${isTide() && profile.allowWordSpaces ? 'Space' : 'Space R'}"
-          >
-            ▶ Replay <kbd>Space</kbd>${isTide() && profile.allowWordSpaces ? '' : ' <kbd>R</kbd>'}
-          </button>
-          ${showScenePause ? '' : pauseButtonMarkup}
-        </div>
-        ${isTide() ? railFeedback() : towerFeedback()} ${towerEnding()}
+        ${
+          inTowerLanding
+            ? towerInterlude()
+            : /* HTML */ ` ${promptMarkup(['review', 'correct', 'landing'].includes(phase))}
+                <div class="prompt-actions">
+                  <button
+                    class="secondary"
+                    id="replay-word"
+                    type="button"
+                    aria-keyshortcuts="${isTide() && profile.allowWordSpaces ? 'Space' : 'Space R'}"
+                  >
+                    ▶ Replay
+                    <kbd>Space</kbd>${isTide() && profile.allowWordSpaces ? '' : ' <kbd>R</kbd>'}
+                  </button>
+                  ${manualPause() && !showScenePause ? pauseButtonMarkup : ''}
+                </div>
+                ${isTide() ? railFeedback() : towerFeedback()} ${towerEnding()}`
+        }
       </div>
       <div class="scene-frame">
-        ${worldScene(run.config.challenge, { position: position(), phase: paused ? 'paused' : phase, content: (isTide() ? railInterlude() : toneButtons() + towerInterlude()) + sceneContinue(), count: run.choices.length })}
+        ${worldScene(run.config.challenge, { position: position(), phase: paused ? 'paused' : phase, content: isTide() ? railInterlude() : toneButtons() + (actions ? `<div class="scene-review-action">${actions}</div>` : ''), count: run.choices.length })}
       </div>
-      ${isTide() ? /* HTML */ `<div class="typing-slot">${typedForm()}</div>` : ''}
+      ${isTide() ? /* HTML */ `<div class="typing-slot">${typedForm(actions)}</div>` : ''}
       <div class="game-panel">
         ${terminal() ? runConclusionMarkup(run, towerReady, run.status === 'won' ? victoryMessage(run) : '', recordingReport()) : ''}
         <div class="feedback-zone"></div>
@@ -602,7 +587,7 @@ export function createGameController({
           ${entryVisual ? 'Entering the tower…' : phase === 'listening' ? 'Listening…' : audioFailed ? 'Replay to retry the recording.' : phase === 'correct' && !run.config.practice ? 'Correct.' : ''}
         </p>
         <div id="audio-error" class="error" role="alert"></div>
-        ${isTide() ? '' : '<p class="small keyboard">' + (run.choices.length <= 4 ? 'Arrow keys choose · ' : '') + profile.tones.map((_, index) => index + 1).join(' / ') + ' choose a tone · Space / R replays · Esc pauses' + (['review', 'landing'].includes(phase) ? ' · Enter continues' : '') + '</p>'}
+        ${isTide() ? '' : '<p class="small keyboard">' + (run.choices.length <= 4 ? 'Arrow keys choose · ' : '') + profile.tones.map((_, index) => index + 1).join(' / ') + ' choose a tone · Space / R replays' + (manualPause() ? ' · Esc pauses' : '') + (['review', 'landing'].includes(phase) ? ' · Enter continues' : '') + '</p>'}
       </div>
       ${pauseMarkup()}
     </div>`;
@@ -623,6 +608,7 @@ export function createGameController({
         q('#check-answer')!.disabled = required(next, '#check-answer').disabled;
         q('#typed-form > label')!.textContent = required(next, '#typed-form > label').textContent;
         q('#input-status')!.textContent = required(next, '#input-status').textContent;
+        q('.rail-review-actions')!.innerHTML = required(next, '.rail-review-actions').innerHTML;
       }
       previousScene.querySelector<HTMLElement>('.scene-content')!.innerHTML =
         next.querySelector<HTMLElement>('.scene-content')!.innerHTML;
@@ -886,7 +872,7 @@ export function createGameController({
     else playPrompt();
   }
   function choose(value: Tone | undefined) {
-    if (!answering()) return;
+    if (!answering() || q('.world-scene')?.hasAttribute('data-moving')) return;
     const result = run.answer(value);
     if (result?.kind === 'empty') return;
     settle(result);
@@ -1100,7 +1086,7 @@ export function createGameController({
       return;
     }
     if (event.repeat) return;
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && (paused || manualPause())) {
       event.preventDefault();
       paused ? resume() : pause();
       return;

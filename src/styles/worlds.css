@@ -50,6 +50,7 @@
   border-bottom: 3px solid var(--edge);
 }
 .word-prompt {
+  grid-area: 1 / 1;
   align-self: start;
   margin: 0;
   min-width: 0;
@@ -96,13 +97,20 @@
   min-height: 32px;
 }
 .prompt-gloss {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  block-size: 3em;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   text-align: center;
   font-size: 12px;
   color: var(--edge);
-  margin: 7px 0 0;
+  margin: 4px 0 0;
   line-height: 1.5;
 }
 .prompt-actions {
+  grid-area: 1 / 2;
   align-self: start;
   margin-top: 27px;
   display: flex;
@@ -148,6 +156,7 @@
   justify-content: center;
   flex-direction: column;
   gap: 9px;
+  min-height: 0;
   border: 0;
   padding: 0;
   background: transparent;
@@ -160,13 +169,23 @@
   position: absolute;
   inset: -3px;
 }
-.tone-door:hover:not(:disabled) {
+.tone-door:is(:hover, :active):not(:disabled) {
   border: 0;
-  box-shadow: inset 0 0 0 3px #a1b98a;
-  background: #a1b98a20;
+  box-shadow: none;
+  background: transparent;
+  translate: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .tone-door:hover:not(:disabled) {
+    box-shadow: inset 0 0 0 3px #a1b98a;
+    background: #a1b98a20;
+  }
 }
 .tone-door:disabled {
   opacity: 1;
+}
+.world-scene:is([data-phase='listening'], [data-moving]) .tone-door {
+  opacity: 0.55;
 }
 .tone-symbol {
   font: 700 42px/1 monospace;
@@ -239,6 +258,37 @@
 .form-controls {
   padding: 0;
 }
+.rail-review-actions {
+  position: absolute;
+  inset: 0 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.rail-review-actions:empty {
+  display: none;
+}
+.rail-answer-controls:has(.rail-review-actions:not(:empty)) .answer-input-row,
+#typed-form:has(.rail-review-actions:not(:empty)) .typing-tools {
+  visibility: hidden;
+}
+.rail-review-actions .primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  white-space: nowrap;
+}
+.rail-review-actions kbd {
+  margin: 0;
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+  font-size: 10px;
+}
 .answer-input-row {
   display: flex;
   gap: 9px;
@@ -271,6 +321,11 @@
 }
 .game-message:empty {
   display: none;
+}
+#input-status {
+  display: block;
+  min-height: 1.5em;
+  line-height: 1.5;
 }
 .feedback-zone {
   height: auto;
@@ -396,7 +451,6 @@
   }
   .prompt-gloss {
     font-size: 10px;
-    margin-top: 5px;
   }
   .target-label {
     font-size: 6px;
@@ -468,6 +522,13 @@
     padding: 7px;
     min-height: 44px;
   }
+  .rail-review-actions .primary {
+    padding-inline: 8px;
+    font-size: 11px;
+  }
+  .rail-review-actions kbd {
+    display: none;
+  }
   .form-controls .small {
     font-size: 9px;
     line-height: 1.4;
@@ -511,14 +572,6 @@
   #app[data-world='tide'] .scene-frame {
     grid-row: 4;
   }
-}
-body.keyboard-open #app[data-world='tide'] .scene-frame {
-  max-height: 74px;
-  overflow: hidden;
-}
-body.keyboard-open #app[data-world='tide'] .world-scene {
-  height: 74px;
-  aspect-ratio: auto;
 }
 body.keyboard-open .game-layout {
   margin-top: 5px;
@@ -581,6 +634,7 @@ body.keyboard-open .form-controls .small {
   visibility: hidden;
 }
 .typing-slot {
+  position: relative;
   grid-row: 3;
   padding: 13px 20px 8px;
   background: var(--ink);
@@ -872,23 +926,13 @@ html {
 .tone-door.is-answer {
   background: #f4d8a1ed;
   color: #172b38;
-  box-shadow:
-    inset 0 0 0 4px #fff0cb,
-    0 0 0 3px #d7a65c;
-  gap: 1px !important;
+  box-shadow: inset 0 0 0 2px #fff0cb;
 }
 .tone-door.is-answer .tone-symbol {
   color: #172b38;
+  max-block-size: 55%;
   text-shadow: none;
-}
-.tone-door.is-answer .tone-name {
-  color: #172b38;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-}
-.answer-mark {
-  font: bold 24px/1 monospace;
-  color: #315e46;
+  filter: none;
 }
 .world-scene[data-phase='review'] .door-key {
   display: none;
@@ -897,52 +941,34 @@ html {
   background: #422e3970;
   box-shadow: inset 0 0 0 3px var(--red);
 }
-.world-scene[data-count='4'] .answer-mark,
-.world-scene:is([data-count='5'], [data-count='6']) .answer-mark {
-  font-size: 18px;
-}
 .tower-interlude {
-  position: absolute;
-  inset: 0;
-  display: none;
-  align-items: flex-start;
-  pointer-events: none;
-}
-.world-scene[data-resting='true'] .tone-door {
-  display: none;
-}
-.world-scene[data-resting='true'] .tower-interlude {
+  grid-column: 1 / -1;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-block: 8px;
 }
-.landing-copy {
-  position: absolute;
-  left: 8%;
-  top: 18%;
-  width: 54%;
-  pointer-events: auto;
-  padding: 0 6px;
-}
-.landing-copy .eyebrow {
-  font-size: 10px;
+.tower-interlude .eyebrow {
   color: var(--gold);
 }
-.landing-copy h2 {
+.tower-interlude h2 {
   font:
-    700 26px/1.2 DM,
+    700 clamp(20px, 4vw, 26px)/1.2 DM,
     system-ui;
-  margin: 9px 0;
-  color: var(--cream);
+  margin: 5px 0;
 }
-.landing-copy p {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--edge);
-  margin: 8px 0 13px;
-}
-.landing-copy .primary {
+.tower-interlude p {
   font-size: 12px;
-  min-height: 40px;
+  line-height: 1.5;
+  color: var(--edge);
+  margin: 4px 0;
 }
+.tower-interlude .primary {
+  min-height: 44px;
+}
+
 .tower-run-end {
   grid-column: 1/-1;
   margin: 12px 0 3px;
@@ -1009,17 +1035,6 @@ html {
   }
   .tower-run-end .primary {
     font-size: 11px;
-  }
-  .answer-mark {
-    font-size: 20px;
-  }
-  .world-scene[data-count='4'] .answer-mark,
-  .world-scene:is([data-count='5'], [data-count='6']) .answer-mark {
-    font-size: 13px;
-  }
-  .tone-door.is-answer .tone-name {
-    font-size: 7px !important;
-    min-height: 9px;
   }
   .tone-door.is-wrong .tone-name {
     font-size: 6px !important;
@@ -1089,10 +1104,6 @@ html {
   align-items: center;
   gap: 8px;
 }
-.world-scene--tide .scene-review-action {
-  padding: 4px 6px;
-  background: #172b38ed;
-}
 .recording-report {
   display: inline-flex;
   align-items: center;
@@ -1102,6 +1113,11 @@ html {
   color: var(--teal);
   font-size: 11px;
   white-space: nowrap;
+}
+.rail-review-actions .recording-report {
+  padding-inline: 10px;
+  border: 1px solid #647b7c;
+  text-decoration: none;
 }
 .scene-review-action .primary {
   min-height: 44px;
@@ -1163,9 +1179,6 @@ html {
 }
 #app[data-world='tide'] .world-scene {
   max-height: 290px;
-}
-#app[data-world='tone'] .world-scene[data-resting='true'] .scene-content {
-  transform: none;
 }
 .run-conclusion {
   padding: 23px 26px 27px;
@@ -1336,16 +1349,6 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
     margin: 7px auto 0;
   }
 }
-/* Keep scene actions reachable even with a phone keyboard open. */
-body.keyboard-open #app[data-world='tide'] .world-scene:has(.scene-review-action),
-body.keyboard-open #app[data-world='tide'] .world-scene:has(.rail-interlude) {
-  min-height: 155px;
-  height: 155px;
-}
-body.keyboard-open #app[data-world='tide'] .scene-frame:has(.scene-review-action),
-body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
-  max-height: none;
-}
 @media (prefers-reduced-motion: reduce) {
   .scene-review-action,
   .rail-interlude,
@@ -1355,25 +1358,25 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
 }
 
 /* A district break gives the landscape the whole stage. The same canvas keeps running. */
-.game-layout[data-landing='true'] .scene-question,
+#app[data-world='tide'] .game-layout[data-landing='true'] .scene-question,
 .game-layout[data-landing='true'] .typing-slot,
 .game-layout[data-landing='true'] .tone-door {
   display: none !important;
 }
-#app[data-world] .game-layout[data-landing='true'] .scene-frame {
+#app[data-world='tide'] .game-layout[data-landing='true'] .scene-frame {
   grid-row: 2;
   max-height: none;
 }
-#app[data-world] .game-layout[data-landing='true'] .game-panel {
+#app[data-world='tide'] .game-layout[data-landing='true'] .game-panel {
   grid-row: 3;
   padding: 0;
   border: 0;
 }
-#app[data-world] .game-layout[data-landing='true'] .world-scene {
+#app[data-world='tide'] .game-layout[data-landing='true'] .world-scene {
   min-height: 300px;
   max-height: none;
 }
-#app[data-world] .game-layout[data-landing='true'] .world-canvas {
+#app[data-world='tide'] .game-layout[data-landing='true'] .world-canvas {
   position: absolute;
   bottom: 0;
   width: 100%;
@@ -1381,7 +1384,7 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
   aspect-ratio: 2/1;
 }
 @media (max-width: 700px) {
-  #app[data-world] .game-layout[data-landing='true'] .world-scene {
+  #app[data-world='tide'] .game-layout[data-landing='true'] .world-scene {
     height: 310px;
     aspect-ratio: auto;
   }
@@ -1417,42 +1420,6 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
     max-width: 115px;
     padding: 8px;
     line-height: 1.4;
-  }
-  .game-layout[data-landing='true'] .landing-copy {
-    left: 8%;
-    top: 6%;
-    width: 84%;
-    padding: 9px 12px;
-    background: #19293ded;
-    border: 1px solid #647b7c;
-  }
-  .game-layout[data-landing='true'] .landing-copy .eyebrow {
-    font-size: 8px;
-  }
-  .game-layout[data-landing='true'] .landing-copy h2 {
-    font-size: 21px;
-    margin: 6px 0;
-  }
-  .game-layout[data-landing='true'] .landing-copy p {
-    font-size: 11px;
-    line-height: 1.5;
-    margin: 7px 0 10px;
-  }
-  .game-layout[data-landing='true'] .landing-copy .primary {
-    font-size: 11px;
-    min-height: 40px;
-  }
-}
-
-.landing-copy {
-  padding: 15px 17px;
-  background: #19293deb;
-  border: 1px solid #647b7c;
-}
-@media (max-width: 700px) {
-  .game-layout[data-landing='true'] .landing-copy h2 {
-    letter-spacing: -1px;
-    font-size: 20px;
   }
 }
 
@@ -1554,29 +1521,15 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
   }
   body.keyboard-open
     #app[data-world='tide']
-    .world-scene:is([data-phase='listening'], [data-phase='answering'], [data-phase='correct']) {
+    .game-layout[data-landing='false'][data-terminal='false']
+    .world-scene {
     height: clamp(88px, calc(var(--visual-height, 450px) * 0.24), 120px);
     min-height: 88px;
     aspect-ratio: auto;
   }
-  body.keyboard-open
-    #app[data-world='tide']
-    .world-scene:is([data-phase='listening'], [data-phase='answering'], [data-phase='correct'])
-    .world-canvas {
+  body.keyboard-open #app[data-world='tide'] .world-canvas {
     object-fit: cover;
     object-position: center bottom;
-  }
-  body.keyboard-open
-    #app[data-world='tide']
-    .scene-question:has(
-      ~ .scene-frame .world-scene:is([data-phase='listening'], [data-phase='answering'])
-    )
-    .prompt-romanization {
-    display: none;
-  }
-  body.keyboard-open #app[data-world='tide'] .prompt-gloss {
-    margin-top: 3px;
-    font-size: 11px;
   }
   body.keyboard-open #app[data-world='tide'] .prompt-actions .secondary {
     min-height: 44px;
@@ -1586,7 +1539,10 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
     grid-row: 4;
     padding: 7px 10px;
   }
-  body.keyboard-open #app[data-world='tide'] .game-panel:has(.game-actions:empty) {
+  body.keyboard-open
+    #app[data-world='tide']
+    .game-layout[data-terminal='false']
+    .game-panel:has(.game-actions:empty) {
     display: none;
   }
 }
@@ -1647,6 +1603,19 @@ body.keyboard-open #app[data-world='tide'] .scene-frame:has(.rail-interlude) {
     width: 1.75em;
     height: 1.75em;
   }
+}
+.world-scene .tone-door.is-answer {
+  gap: 1px;
+}
+.world-scene .tone-door.is-answer .tone-name {
+  color: #172b38;
+  min-height: 0;
+  font-size: clamp(7px, 1.9vw, 11px);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: 0;
+  text-shadow: none;
+  white-space: nowrap;
 }
 .prompt-syllable.has-tone-cover {
   padding-top: 36px;
