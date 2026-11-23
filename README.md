@@ -1,12 +1,22 @@
 # Tone Tower
 
-Browser games for Cantonese Jyutping, Mandarin Pinyin and Vietnamese tones. Each language has its own site and progress. Tone Tower trains tone recognition; Skyrail trains spelling. Vietnamese offers Tone Tower only. Built with vanilla TypeScript, JavaScript canvas renderers, and Vite, with no accounts, analytics, or runtime services.
+Free browser games for practising tones and spelling. No account needed.
 
-[Play Tone Tower](https://tone-tower.github.io/tone-tower/) · [Report a problem](https://github.com/tone-tower/tone-tower/issues/new?template=bug-report.yml) · [Suggest an idea](https://github.com/tone-tower/tone-tower/issues/new?template=idea.yml)
+**[Play in your browser](https://tone-tower.github.io/tone-tower/)**
 
-Feedback and contributions are welcome on GitHub. Issues and replies are public.
+[Cantonese](https://tone-tower.github.io/tone-tower/cantonese/) · [Mandarin](https://tone-tower.github.io/tone-tower/mandarin/) · [Vietnamese](https://tone-tower.github.io/tone-tower/vietnamese/)
+
+[![A Cantonese Tone Tower round showing a word prompt and numbered tone doors](docs/images/tone-tower-gameplay.jpg)](https://tone-tower.github.io/tone-tower/)
+
+In **Tone Tower**, listen to a word and choose its tone to climb the tower. In **Skyrail**, type what you hear in Cantonese Jyutping or Mandarin Pinyin. Vietnamese has its own Tone Tower adventure.
+
+[Report a problem](https://github.com/tone-tower/tone-tower/issues/new?template=bug-report.yml) · [Suggest an idea](https://github.com/tone-tower/tone-tower/issues/new?template=idea.yml)
+
+Feedback and contributions are welcome. GitHub issues and replies are public.
 
 ## Development
+
+Built with vanilla TypeScript, JavaScript canvas renderers, and Vite. The game uses no analytics or runtime services. Progress is stored separately for each language in the browser.
 
 Use Node.js 22.12 or later.
 

@@ -137,6 +137,25 @@ Public identity and page descriptions live in `src/site.ts`. The root chooser is
 source. The sprout favicon is supplied as SVG and ICO, plus an Apple touch icon.
 Social services may cache old previews after deployment.
 
+### GitHub organization and repository
+
+1. In the [organization profile settings](https://github.com/organizations/tone-tower/settings/profile), upload the [sprout icon](../assets/brand/apple-touch-icon.png) and set the website to `https://tone-tower.github.io/tone-tower/`.
+2. Create a public repository named `.github` under `tone-tower` if one doesn't already exist. Add `profile/README.md` there using the text below. On the organization overview, edit the public pins and select `tone-tower/tone-tower`. [GitHub organization profile guide](https://docs.github.com/en/organizations/collaborating-with-groups-in-organizations/customizing-your-organizations-profile)
+3. On the [main repository](https://github.com/tone-tower/tone-tower), edit the **About** panel. Set the website to the same address and the description to “Free browser games for practising tones and spelling.”
+4. In the repository's **Settings → General → Social preview**, upload the [share card](../assets/brand/share-card.png). [GitHub social preview guide](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview)
+
+```markdown
+# Tone Tower
+
+Free browser games for practising tones and spelling.
+
+**[Play in your browser](https://tone-tower.github.io/tone-tower/)**
+
+[Cantonese](https://tone-tower.github.io/tone-tower/cantonese/) · [Mandarin](https://tone-tower.github.io/tone-tower/mandarin/) · [Vietnamese](https://tone-tower.github.io/tone-tower/vietnamese/)
+
+Listen and choose a tone in Tone Tower, or practise Jyutping and Pinyin spelling in Skyrail.
+```
+
 Feedback uses this repository's Issues tab. Keep **Settings → General → Features → Issues**
 enabled. Bug and idea forms live in `.github/ISSUE_TEMPLATE/`; posting requires a GitHub
 account. The About page explains that reports and replies are public, so no private
