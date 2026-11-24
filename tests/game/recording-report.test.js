@@ -17,7 +17,10 @@ test('recording reports prefill the exact language, recording, reading and sourc
       { challenge: 'tone', practice: false },
     ),
   );
-  assert.equal(url.origin, 'https://github.com');
+  assert.equal(
+    url.origin + url.pathname,
+    'https://github.com/tonetower/tonetower.github.io/issues/new',
+  );
   assert.equal(url.searchParams.get('template'), 'recording-report.yml');
   assert.equal(url.searchParams.get('title'), '[Recording] Mandarin: 你好 (commons-123)');
   assert.equal(url.searchParams.get('problem'), null);

@@ -483,8 +483,17 @@ test('About covers games, recordings, and ways to contribute', async ({ page }) 
     await expect(license).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reset saved progress…' })).toHaveCount(0);
     const contributions = page.getByRole('region', { name: 'Project and feedback' });
-    for (const name of ['GitHub repository', 'Report a problem ↗', 'Suggest an idea ↗'])
-      await expect(contributions.getByRole('link', { name })).toBeVisible();
+    const repository = 'https://github.com/tonetower/tonetower.github.io';
+    for (const [name, path] of [
+      ['GitHub repository', ''],
+      ['Report a problem ↗', '/issues/new?template=bug-report.yml'],
+      ['Share an idea or feedback ↗', '/discussions/new?category=ideas-feedback'],
+      ['Browse discussions ↗', '/discussions'],
+    ]) {
+      const link = contributions.getByRole('link', { name });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute('href', repository + path);
+    }
     const others = page.getByRole('region', { name: 'Other languages' });
     await expect(others.getByRole('link')).toHaveCount(2);
     for (const other of ['cantonese', 'mandarin', 'vietnamese'].filter((item) => item !== language))

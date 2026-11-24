@@ -90,7 +90,7 @@ Subject: Availability of Cantonese Wordnet pronunciation recordings
 Hello Luis and Joanna,
 
 I am building Tone Tower, an open-source Cantonese tone and Jyutping practice game:
-https://github.com/tone-tower/tone-tower
+https://github.com/tonetower/tonetower.github.io
 
 Your 2025 paper, "Can you hear me now? Towards talking Wordnets: A Cantonese Case
 Study", describes reviewed Commons recordings and 867 learner-focused recordings.
