@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Ideas, feedback and questions
+    url: https://github.com/tonetower/tonetower.github.io/discussions
+    about: Share feedback, suggest an improvement, or ask a question in GitHub Discussions.

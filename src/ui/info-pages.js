@@ -150,10 +150,12 @@ export function aboutPageMarkup(profile) {
       </p>
       <p class="feedback-links">
         <a href="${site.repository}/issues/new?template=bug-report.yml">Report a problem ↗</a>
-        <a href="${site.repository}/issues/new?template=idea.yml">Suggest an idea ↗</a>
-        <a href="${site.repository}/issues">Browse feedback ↗</a>
+        <a href="${site.repository}/discussions/new?category=ideas-feedback"
+          >Share an idea or feedback ↗</a
+        >
+        <a href="${site.repository}/discussions">Browse discussions ↗</a>
       </p>
-      <p class="small">GitHub issues and replies are public.</p>
+      <p class="small">GitHub issues and discussions are public.</p>
     </section>
   </article>`;
 }

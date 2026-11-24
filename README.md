@@ -2,17 +2,17 @@
 
 Listening games for Cantonese, Mandarin and Vietnamese. No account needed.
 
-**[Play in your browser](https://tone-tower.github.io/tone-tower/)**
+**[Play in your browser](https://tonetower.github.io/)**
 
-[Cantonese](https://tone-tower.github.io/tone-tower/cantonese/) · [Mandarin](https://tone-tower.github.io/tone-tower/mandarin/) · [Vietnamese](https://tone-tower.github.io/tone-tower/vietnamese/)
+[Cantonese](https://tonetower.github.io/cantonese/) · [Mandarin](https://tonetower.github.io/mandarin/) · [Vietnamese](https://tonetower.github.io/vietnamese/)
 
-[![A Mandarin Tone Tower round with 你好 and two Pinyin tone doors](docs/images/tone-tower-gameplay.jpg)](https://tone-tower.github.io/tone-tower/)
+[![A Mandarin Tone Tower round with 你好 and two Pinyin tone doors](docs/images/tone-tower-gameplay.jpg)](https://tonetower.github.io/)
 
 In **Tone Tower**, listen to a word and choose its tone to climb the tower. In **Skyrail**, type what you hear in Cantonese Jyutping or Mandarin Pinyin. Vietnamese has its own Tone Tower adventure.
 
-[Report a problem](https://github.com/tone-tower/tone-tower/issues/new?template=bug-report.yml) · [Suggest an idea](https://github.com/tone-tower/tone-tower/issues/new?template=idea.yml)
+[Report a problem](https://github.com/tonetower/tonetower.github.io/issues/new?template=bug-report.yml) · [Share an idea or feedback](https://github.com/tonetower/tonetower.github.io/discussions/new?category=ideas-feedback) · [Browse discussions](https://github.com/tonetower/tonetower.github.io/discussions)
 
-Feedback and contributions are welcome. GitHub issues and replies are public.
+Feedback and contributions are welcome. GitHub issues and discussions are public.
 
 ## Development
 
@@ -97,10 +97,10 @@ These checks cover the main flows and layout regressions. A quick real-phone che
 ```sh
 npm run build
 npm run check:dist
-npm run preview -- --base /tone-tower/
+npm run preview
 ```
 
-Open http://127.0.0.1:4173/tone-tower/. Publish only `dist/`. Vite bundles modules, CSS, fonts and artwork; content tooling adds only selected recordings and required credits. A publication manifest verifies output files and hashes, and unexpected files fail validation. Paths work under a renamed GitHub Pages repository as well as a domain root.
+Open http://127.0.0.1:4173/. To test a nested deployment, run `npm run preview -- --base /preview/nested/` and open http://127.0.0.1:4173/preview/nested/. Publish only `dist/`. Vite bundles modules, CSS, fonts and artwork. Content tooling adds only selected recordings and required credits. A publication manifest verifies output files and hashes, and unexpected files fail validation.
 
 See [publishing](docs/PUBLISHING.md) for setup and release checks. Stop audio downloads before preparing a release, run `npm run audio:sync`, and commit the matching metadata and MP3s. Ordinary builds validate the registry and leave versioned metadata unchanged.
 

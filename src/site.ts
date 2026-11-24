@@ -1,8 +1,8 @@
 import type { LanguageProfile, ExerciseConfig, ExerciseRow, Recording } from './types.ts';
 import { languages } from './languages/profiles.ts';
 export const site = {
-  siteUrl: 'https://tone-tower.github.io/tone-tower/',
-  repository: 'https://github.com/tone-tower/tone-tower',
+  siteUrl: 'https://tonetower.github.io/',
+  repository: 'https://github.com/tonetower/tonetower.github.io',
 };
 export function languagePages(
   profile: LanguageProfile,

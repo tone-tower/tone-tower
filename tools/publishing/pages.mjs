@@ -34,6 +34,7 @@ export function renderPage(template, key, catalog) {
     title: escape(metadata.title),
     description: escape(metadata.description),
     canonical: escape(url),
+    shareImage: escape(new URL('assets/brand/share-card.png', site.siteUrl).href),
     language: escape(profile.label),
     romanization: escape(profile.romanization),
     guideName: escape(profile.guideName ?? profile.romanization + ' guide'),
