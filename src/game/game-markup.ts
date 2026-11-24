@@ -7,7 +7,20 @@ import { toneDefinition, toneLabel, toneSymbolMarkup } from '../ui/tone-presenta
 import { challenges } from './game-core.ts';
 
 export const pauseButtonMarkup =
-  '<button class="quiet" id="pause-run" type="button" aria-label="Pause game"></button>';
+  '<button class="quiet" id="pause-run" type="button" aria-label="Pause game" aria-keyshortcuts="Escape" title="Pause game"></button>';
+
+export const doorArrowKeys: Partial<Record<number, readonly (readonly string[])[]>> = {
+  2: [['ArrowLeft'], ['ArrowRight']],
+  3: [['ArrowLeft'], ['ArrowUp', 'ArrowDown'], ['ArrowRight']],
+  4: [['ArrowUp'], ['ArrowLeft'], ['ArrowRight'], ['ArrowDown']],
+  5: [['ArrowUp'], ['ArrowLeft'], ['ArrowRight'], [], ['ArrowDown']],
+};
+const arrowSymbols: Partial<Record<string, string>> = {
+  ArrowLeft: '←',
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  ArrowRight: '→',
+};
 
 interface Presentation {
   run: Run;
@@ -81,102 +94,87 @@ export function createGameMarkup(state: () => Presentation) {
       escape(letters.slice(index + 1).join(''))
     );
   }
-  function coveredPromptMarkup(reveal = false) {
+  function promptMarkup(reveal: boolean, showPause: boolean) {
     const { run, profile, script } = state();
+    const rail = isTide();
     // Every syllable of a word hides its tone, so its neighbours give nothing away.
-    const concealed = (i: number) =>
-      isTide() ? null : (profile.concealTone?.(run.word.syllables[i].text ?? '') ?? null);
-    const covered = run.word.syllables.some((_, i) => concealed(i));
+    const concealed = run.word.syllables.map((s) =>
+      rail ? null : (profile.concealTone?.(s.text ?? '') ?? null),
+    );
+    const covered = concealed.some(Boolean);
     const meaning =
       covered && !reveal && run.word.gloss
         ? (profile.concealMeaning?.(run.word.gloss) ?? run.word.gloss)
         : run.word.gloss;
     // A written word is as wide as its letters; its size follows their count.
-    const letters = run.word.syllables.reduce((n, s) => n + [...(s.text ?? '')].length, 0);
+    const letters = covered
+      ? run.word.syllables.reduce((n, s) => n + [...(s.text ?? '')].length, 0)
+      : 0;
     // The longest tone name holds the answer's place, so revealing it moves nothing.
-    const reserved = profile.toneDefinitions
-      .map((def) => def.label)
-      .reduce((a, b) => (b.length > a.length ? b : a));
-    return /* HTML */ `<div
-      class="word-prompt"
-      lang="${escape(textLanguage(profile, script))}"
-      data-length="${run.word.syllables.length}"
-      ${run.word.syllables.length >= 4 ? 'data-long="true"' : ''}
-      ${covered ? 'data-letters="' + letters + '"' : ''}
-      style="--syllables:${run.word.syllables.length}${covered ? ';--letters:' + letters : ''}"
-    >
-      <div class="prompt-syllables">
-        ${run.word.syllables
-          .map((s, i) => {
-            const target = run.targets.includes(i),
-              hidden = concealed(i),
-              spelling = hidden
-                ? target && reveal
-                  ? toneDefinition(profile, s.tone).label
-                  : ''
-                : reveal
-                  ? profile.format(s.transcription)
-                  : !isTide()
-                    ? profile.withoutTones(s.transcription)
-                    : '';
-            return /* HTML */ `<span
-              class="prompt-syllable ${target ? 'is-target' : ''} ${hidden ? 'has-tone-cover' : ''}"
-              >${target && run.targets.length === 1 ? '<span class="target-label">Listen here</span>' : ''}<span
-                class="prompt-character"
-                >${hidden ? concealedMarkup(reveal ? (s.text ?? '') : hidden.base, hidden.index, reveal) : escape(s.text)}</span
-              ><span
-                class="prompt-romanization ${hidden && target && !reveal ? 'is-reserved' : ''}"
-                ${hidden && target && !reveal ? 'aria-hidden="true"' : ''}
-                >${spelling ? escape(spelling) : hidden && target ? escape(reserved) : '&nbsp;'}</span
-              ></span
-            >`;
-          })
-          .join('')}
+    const reservedTone = covered
+      ? profile.toneDefinitions.reduce(
+          (longest, { label }) => (label.length > longest.length ? label : longest),
+          '',
+        )
+      : '';
+    const spaceOnly = rail && profile.allowWordSpaces;
+    const wordLanguage = escape(textLanguage(profile, script));
+    const syllables = run.word.syllables.length;
+    const wide = covered ? syllables >= 3 || letters >= 12 : syllables > 4;
+    return /* HTML */ `<div class="round-prompt" ${wide ? 'data-wide' : ''}>
+      <div
+        class="word-prompt"
+        data-length="${syllables}"
+        ${syllables >= 3 ? 'data-long="true"' : ''}
+        ${covered ? 'data-letters="' + letters + '"' : ''}
+        style="--syllables:${syllables}${covered ? ';--letters:' + letters : ''}"
+      >
+        <div class="prompt-syllables">
+          ${run.word.syllables
+            .map((s, i) => {
+              const target = run.targets.includes(i),
+                hidden = concealed[i],
+                reserved = !reveal && (rail || (hidden && target)),
+                spelling = hidden
+                  ? target
+                    ? reveal
+                      ? toneDefinition(profile, s.tone).label
+                      : reservedTone
+                    : ''
+                  : rail || reveal
+                    ? profile.format(s.transcription)
+                    : profile.withoutTones(s.transcription);
+              return /* HTML */ `<span
+                class="prompt-syllable ${target ? 'is-target' : ''} ${hidden ? 'has-tone-cover' : ''}"
+                >${!rail && target && run.targets.length === 1 ? '<span class="target-label">Listen here</span>' : ''}<span
+                  class="prompt-character"
+                  lang="${wordLanguage}"
+                  >${hidden ? concealedMarkup(reveal ? (s.text ?? '') : hidden.base, hidden.index, reveal) : escape(s.text)}</span
+                ><span
+                  class="prompt-romanization${reserved ? ' is-reserved' : ''}"
+                  lang="${escape(profile.id + '-Latn')}"
+                  ${reserved ? 'aria-hidden="true"' : ''}
+                  >${spelling ? escape(spelling) : '&nbsp;'}</span
+                ></span
+              >`;
+            })
+            .join('')}
+        </div>
       </div>
-      ${glossMarkup(meaning)}
-      ${reveal && run.word.syllables.some((s) => s.dictionaryTone !== undefined && s.dictionaryTone !== s.tone) ? '<p class="tone-explanation">Heard tones: ' + escape(run.word.syllables.map((s) => profile.toneDefinitions.find((d) => d.value === s.tone)?.label).join(' · ')) + '. Dictionary spelling: ' + escape(profile.format(run.word.transcription || run.word.syllables.map((s) => s.transcription).join(' '))) + '. Tone Tower follows this recording; Skyrail uses dictionary spelling.</p>' : ''}
-    </div>`;
-  }
-
-  function glossMarkup(meaning: string | undefined) {
-    return `<p class="prompt-gloss" lang="en">${escape(meaning)}</p>`;
-  }
-
-  function promptMarkup(reveal = false) {
-    const { run, profile, script } = state();
-    if (profile.concealTone && !isTide()) return coveredPromptMarkup(reveal);
-    const rail = isTide();
-    return /* HTML */ `<div
-      class="word-prompt"
-      data-length="${run.word.syllables.length}"
-      ${run.word.syllables.length >= 4 ? 'data-long="true"' : ''}
-      style="--syllables:${run.word.syllables.length}"
-    >
-      <div class="prompt-syllables">
-        ${run.word.syllables
-          .map((s, i) => {
-            const target = run.targets.includes(i),
-              spelling =
-                rail || reveal
-                  ? profile.format(s.transcription)
-                  : profile.withoutTones(s.transcription),
-              reserved = rail && !reveal;
-            return /* HTML */ `<span class="prompt-syllable ${target ? 'is-target' : ''}"
-              >${!isTide() && target && run.targets.length === 1 ? '<span class="target-label">Listen here</span>' : ''}<span
-                class="prompt-character"
-                lang="${escape(textLanguage(profile, script))}"
-                >${escape(s.text)}</span
-              ><span
-                class="prompt-romanization${reserved ? ' is-reserved' : ''}"
-                lang="${escape(profile.id + '-Latn')}"
-                ${reserved ? 'aria-hidden="true"' : ''}
-                >${spelling ? escape(spelling) : '&nbsp;'}</span
-              ></span
-            >`;
-          })
-          .join('')}
+      <p class="prompt-gloss" lang="en"><span>${escape(meaning)}</span></p>
+      <div class="prompt-actions">
+        <button
+          class="secondary"
+          id="replay-word"
+          type="button"
+          aria-keyshortcuts="${spaceOnly ? 'Space' : 'Space R'}"
+          title="Replay (${spaceOnly ? 'Space' : 'Space or R'})"
+        >
+          <span class="replay-icon" aria-hidden="true">▶</span> Replay
+        </button>
+        ${showPause ? pauseButtonMarkup : ''}
       </div>
-      ${glossMarkup(run.word.gloss)}
+      ${!rail && profile.concealTone && reveal && run.word.syllables.some((s) => s.dictionaryTone !== undefined && s.dictionaryTone !== s.tone) ? '<p class="tone-explanation">Heard tones: ' + escape(run.word.syllables.map((s) => profile.toneDefinitions.find((d) => d.value === s.tone)?.label).join(' · ')) + '. Dictionary spelling: ' + escape(profile.format(run.word.transcription || run.word.syllables.map((s) => s.transcription).join(' '))) + '. Tone Tower follows this recording; Skyrail uses dictionary spelling.</p>' : ''}
     </div>`;
   }
   function toneButtons() {
@@ -189,19 +187,21 @@ export function createGameMarkup(state: () => Presentation) {
       .map((t, index) => {
         const tone = toneDefinition(profile, t);
         const name = profile.toneNotation === 'marks' ? tone.label : tone.name;
+        const arrows = doorArrowKeys[run.choices.length]?.[index] ?? [];
+        const symbols = arrows.map((key) => arrowSymbols[key]).join(' ');
+        const number = profile.tones.indexOf(t) + 1;
         return /* HTML */ `<button
           style="${slots[index]}"
           type="button"
           class="tone-door ${tone.markPath !== undefined ? 'has-mark' : ''} ${(phase === 'correct' || phase === 'landing') && t === run.word.tone ? 'is-correct' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
           data-tone="${t}"
           aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: ' : 'Choose '}${escape(toneLabel(profile, t))}"
+          aria-keyshortcuts="${[...arrows, number].join(' ')}"
           ${!answering() ? 'disabled' : ''}
         >
           ${toneSymbolMarkup(profile, t)}<span class="tone-name"
             >${phase === 'review' && t === run.lastAnswer ? '✕ Your choice' : phase === 'review' && t === run.word.tone ? '✓ Correct' : escape(name)}</span
-          ><kbd class="door-key"
-            >${run.choices.length === 2 ? (run.choices.indexOf(t) === 0 ? '←' : '→') : run.choices.length === 3 ? ['←', '↑ ↓', '→'][run.choices.indexOf(t)] : run.choices.length === 4 ? ['↑', '←', '→', '↓'][run.choices.indexOf(t)] : t}</kbd
-          >
+          ><kbd class="door-key" aria-hidden="true">${symbols ? `${symbols} · ` : ''}${number}</kbd>
         </button>`;
       })
       .join('');
@@ -252,9 +252,7 @@ export function createGameMarkup(state: () => Presentation) {
         <div class="rail-review-actions">${reviewActions}</div>
       </div>
       ${full && profile.typingHelpers.length ? '<div class="typing-tools" role="group" aria-label="' + escape(profile.romanization) + ' typing helpers">' + profile.typingHelpers.map((helper) => '<button type="button" data-insert="' + escape(helper.value) + '" aria-label="' + escape(helper.description) + '">' + escape(helper.label) + '</button>').join('') + '</div>' : ''}
-      <p id="input-status" class="game-message" role="status">
-        ${escape(message || (phase === 'correct' && run.config.practice ? '✓ Correct!' : ''))}
-      </p>
+      <p id="input-status" class="game-message" role="status">${escape(message)}</p>
     </form>`;
   }
 

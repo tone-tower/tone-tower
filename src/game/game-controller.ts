@@ -1,6 +1,7 @@
 import { toneLabel } from '../ui/tone-presentation.ts';
 import {
   createGameMarkup,
+  doorArrowKeys,
   endingWord,
   pauseButtonMarkup,
   runConclusionMarkup,
@@ -412,30 +413,15 @@ export function createGameController({
     }, delay);
   }
   function towerFeedback() {
-    const review = phase === 'review',
-      correct = phase === 'correct';
-    const restored = outcome?.recovered
-      ? ' · ' + outcome.recovered + ' ' + (outcome.recovered === 1 ? 'life' : 'lives') + ' restored'
-      : '';
+    const review = phase === 'review';
     const text = audioFailed
       ? 'Recording unavailable. Replay to retry, or replace this word.'
-      : towerTerminal()
-        ? run.status === 'won'
-          ? '✓ The last door opens. The summit is waiting.'
-          : run.status === 'lost'
-            ? 'No lives remain. The correct tone is ' + said(run.word.tone) + '.'
-            : review
-              ? 'Not quite. The correct tone is ' + said(run.word.tone) + '.'
-              : '✓ Correct. Floor lit.'
-        : review
-          ? 'You chose ' +
-            said(run.lastAnswer) +
-            '. The correct tone is ' +
-            said(run.word.tone) +
-            '.'
-          : correct && run.config.practice
-            ? '✓ Correct.' + restored
-            : '';
+      : review
+        ? (towerTerminal() ? 'Not quite' : 'You chose ' + said(run.lastAnswer)) +
+          '. The correct tone is ' +
+          said(run.word.tone) +
+          '.'
+        : '';
     const action = audioFailed
       ? '<button class="primary tower-continue" id="replace-recording" type="button">Replace word →</button>'
       : '';
@@ -443,7 +429,7 @@ export function createGameController({
       '<div class="game-feedback tower-feedback' +
       (review && !audioFailed ? ' sr-only' : '') +
       '" role="status" data-feedback="' +
-      (audioFailed || review ? 'error' : correct ? 'success' : 'neutral') +
+      (audioFailed || review ? 'error' : 'neutral') +
       '"><span id="tower-message">' +
       escape(text) +
       '</span>' +
@@ -544,6 +530,10 @@ export function createGameController({
     const showScenePause = manualPause() && (phase === 'landing' || terminal());
     const inTowerLanding = !isTide() && phase === 'landing';
     const actions = reviewActions();
+    const recovered = outcome?.recovered ?? 0;
+    const success = recovered
+      ? `Correct. ${recovered} ${recovered === 1 ? 'life' : 'lives'} restored.`
+      : 'Correct.';
     const markup = /* HTML */ `<div
       class="game-layout"
       tabindex="-1"
@@ -556,20 +546,8 @@ export function createGameController({
         ${
           inTowerLanding
             ? towerInterlude()
-            : /* HTML */ ` ${promptMarkup(['review', 'correct', 'landing'].includes(phase))}
-                <div class="prompt-actions">
-                  <button
-                    class="secondary"
-                    id="replay-word"
-                    type="button"
-                    aria-keyshortcuts="${isTide() && profile.allowWordSpaces ? 'Space' : 'Space R'}"
-                  >
-                    ▶ Replay
-                    <kbd>Space</kbd>${isTide() && profile.allowWordSpaces ? '' : ' <kbd>R</kbd>'}
-                  </button>
-                  ${manualPause() && !showScenePause ? pauseButtonMarkup : ''}
-                </div>
-                ${isTide() ? railFeedback() : towerFeedback()} ${towerEnding()}`
+            : /* HTML */ ` ${promptMarkup(['review', 'correct', 'landing'].includes(phase), manualPause() && !showScenePause)}
+              ${isTide() ? railFeedback() : towerFeedback()} ${towerEnding()}`
         }
       </div>
       <div class="scene-frame">
@@ -584,10 +562,10 @@ export function createGameController({
           ${run.config.practice && run.status === 'playing' ? '<button class="quiet" id="finish-practice" type="button">Finish practice</button>' : ''}
         </div>
         <p id="audio-status" class="game-message sr-only" role="status">
-          ${entryVisual ? 'Entering the tower…' : phase === 'listening' ? 'Listening…' : audioFailed ? 'Replay to retry the recording.' : phase === 'correct' && !run.config.practice ? 'Correct.' : ''}
+          ${entryVisual ? 'Entering the tower…' : phase === 'listening' ? 'Listening…' : audioFailed ? 'Replay to retry the recording.' : phase === 'correct' || phase === 'landing' ? success : ''}
         </p>
         <div id="audio-error" class="error" role="alert"></div>
-        ${isTide() ? '' : '<p class="small keyboard">' + (run.choices.length <= 4 ? 'Arrow keys choose · ' : '') + profile.tones.map((_, index) => index + 1).join(' / ') + ' choose a tone · Space / R replays' + (manualPause() ? ' · Esc pauses' : '') + (['review', 'landing'].includes(phase) ? ' · Enter continues' : '') + '</p>'}
+        ${!isTide() && !inTowerLanding && !terminal() ? `<p class="small keyboard">${phase === 'listening' || phase === 'answering' ? 'Choose a tone with the keys shown on its door. ' : ''}Replay with <kbd>Space</kbd> or <kbd>R</kbd>.</p>` : ''}
       </div>
       ${pauseMarkup()}
     </div>`;
@@ -1188,11 +1166,6 @@ export function createGameController({
 
 // Four doors form a compass; three doors share the middle vertical key.
 export function arrowChoiceIndex(count: number, key: string) {
-  const layouts: Record<number, Record<string, number>> = {
-    2: { ArrowLeft: 0, ArrowRight: 1 },
-    3: { ArrowLeft: 0, ArrowUp: 1, ArrowDown: 1, ArrowRight: 2 },
-    4: { ArrowUp: 0, ArrowLeft: 1, ArrowRight: 2, ArrowDown: 3 },
-    5: { ArrowUp: 0, ArrowLeft: 1, ArrowRight: 2, ArrowDown: 4 },
-  };
-  return layouts[count]?.[key] ?? null;
+  const index = doorArrowKeys[count]?.findIndex((keys) => keys.includes(key)) ?? -1;
+  return index === -1 ? null : index;
 }

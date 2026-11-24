@@ -32,6 +32,12 @@ const profile = requireProfile(languages[document.documentElement.dataset.langua
 const pages = languagePages(profile);
 const appBase = siteRoot();
 
+// Keep Vite's page-relative icon URLs valid when client-side navigation changes the URL depth.
+for (const icon of document.querySelectorAll<HTMLLinkElement>(
+  'link[rel="icon"][href], link[rel="apple-touch-icon"][href]',
+))
+  icon.setAttribute('href', icon.href);
+
 const app = required(document, '#app');
 const siteHeader = required(document, '.site-header');
 const closeHeaderMenu = bindHeaderMenu(siteHeader);

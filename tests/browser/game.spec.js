@@ -112,22 +112,29 @@ const skyrailLayout = [
 ];
 
 for (const world of ['tone', 'tide']) {
-  test(`${world} meanings stay directly below the characters in a two-line slot`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 320, height: 640 });
+  test(`${world} centers the word and keeps the meaning in a stable slot`, async ({ page }) => {
+    const phone = page.viewportSize().width <= 600;
+    if (phone) await page.setViewportSize({ width: 320, height: 640 });
     await start(page, world);
-    const selectors = ['.prompt-syllables', '.prompt-gloss', '#replay-word', '.scene-frame'];
+    const selectors = ['.prompt-syllables', '.prompt-gloss', '#replay-word', '.round-prompt'];
     const boxes = await layoutBoxes(page, selectors);
-    const [syllables, meaningBox] = boxes;
-    const gloss = page.locator('.word-prompt .prompt-gloss');
-    await expect(gloss).toHaveCSS('-webkit-line-clamp', '2');
+    const [syllables, meaningBox, replay, prompt] = boxes;
+    const gloss = page.locator('.prompt-gloss > span');
+    const lineCount = phone ? 3 : 2;
+    await expect(gloss).toHaveCSS('-webkit-line-clamp', String(lineCount));
     const lineHeight = parseFloat(
       await gloss.evaluate((node) => getComputedStyle(node).lineHeight),
     );
-    expect(meaningBox.height).toBeCloseTo(lineHeight * 2, 1);
-    expect(meaningBox.x + meaningBox.width / 2).toBeCloseTo(syllables.x + syllables.width / 2);
-    expect(meaningBox.y - (syllables.y + syllables.height)).toBe(4);
+    expect(meaningBox.height).toBeCloseTo(lineHeight * lineCount, 1);
+    expect(syllables.x + syllables.width / 2).toBeCloseTo(prompt.x + prompt.width / 2, 1);
+    expect(meaningBox.x + meaningBox.width).toBeLessThan(syllables.x);
+    expect(syllables.x + syllables.width).toBeLessThan(replay.x);
+    if (world === 'tide') {
+      const pause = await page.locator('#pause-run').boundingBox();
+      expect(pause.height).toBe(replay.height);
+      if (phone) expect(pause.width).toBe(replay.width);
+      else expect(pause.y).toBe(replay.y);
+    }
     for (const meaning of [
       '',
       'short meaning',
@@ -136,6 +143,12 @@ for (const world of ['tone', 'tide']) {
     ]) {
       await gloss.evaluate((node, text) => (node.textContent = text), meaning);
       await expect(gloss).toHaveText(meaning);
+      await expect(gloss).toHaveCSS('text-align', 'center');
+      const [glossText] = await layoutBoxes(page, ['.prompt-gloss > span']);
+      expect(glossText.y + glossText.height / 2).toBeCloseTo(
+        meaningBox.y + meaningBox.height / 2,
+        1,
+      );
       expect(await layoutBoxes(page, selectors)).toEqual(boxes);
     }
     expect(await gloss.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
@@ -168,8 +181,16 @@ test('Cantonese character style updates the current prompt and carries over to t
   expect(await door.evaluate((node) => node.isConnected)).toBe(true);
   expect(await page.evaluate(() => window.__audioPlays.length)).toBe(plays);
   await expect(page.locator('.game-layout')).toBeFocused();
+  const shortcuts = page.locator('.keyboard, .door-key');
+  for (const shortcut of await shortcuts.all()) {
+    if (page.viewportSize().width <= 700) await expect(shortcut).toBeHidden();
+    else await expect(shortcut).toBeVisible();
+  }
   await page.keyboard.press(tone);
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+  await expect(page.locator('.tone-door.is-correct')).toHaveCount(1);
+  await expect(page.locator('#audio-status')).toHaveText('Correct.');
+  await expect(page.locator('.tower-feedback')).toBeHidden();
 
   await page.goto('/cantonese/guide/');
   await expect(simplified).toBeChecked();
@@ -470,42 +491,78 @@ test('phone keyboard keeps the rail journey visible above the typing field', asy
   await expect(page.locator('body')).not.toHaveClass(/keyboard-open/);
 });
 
-test('a long Skyrail answer reveals its tones in the reserved space', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 430 });
-  const parts = ['gwong2', 'dung1', 'waa2', 'jap6', 'mun4', 'fo3'];
-  const phrase = {
-    id: 'long',
+for (const { text, parts, gloss } of [
+  {
+    text: '廣東話班',
+    parts: ['gwong2', 'dung1', 'waa2', 'baan1'],
+    gloss: 'Cantonese language class',
+  },
+  {
+    text: '廣東話入門課',
+    parts: ['gwong2', 'dung1', 'waa2', 'jap6', 'mun4', 'fo3'],
     gloss: 'introductory Cantonese class',
-    syllables: [...'廣東話入門課'].map((character, i) => ({
-      character,
-      jyutping: parts[i],
-      tone: Number(parts[i].at(-1)),
-    })),
-  };
-  await page.route('**/catalogs/yue.json', (route) =>
-    route.fulfill({
-      json: cantoneseCatalog({
-        ...catalog,
-        words: [...singles, phrase],
-        recordings: [
-          ...catalog.recordings.filter((recording) => recording.anchor),
-          { id: phrase.id, wordId: phrase.id, audio: 'audio/long.mp3' },
-        ],
+  },
+]) {
+  test(`a ${parts.length}-character Skyrail answer reveals its tones in the reserved space`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 430 });
+    const phrase = {
+      id: 'long',
+      gloss,
+      syllables: [...text].map((character, i) => ({
+        character,
+        jyutping: parts[i],
+        tone: Number(parts[i].at(-1)),
+      })),
+    };
+    await page.route('**/catalogs/yue.json', (route) =>
+      route.fulfill({
+        json: cantoneseCatalog({
+          ...catalog,
+          words: [...singles, phrase],
+          recordings: [
+            ...catalog.recordings.filter((recording) => recording.anchor),
+            { id: phrase.id, wordId: phrase.id, audio: 'audio/long.mp3' },
+          ],
+        }),
       }),
-    }),
-  );
-  await page.reload();
-  await page.locator('.mode-card[data-destination="rail"]').click();
-  await page.locator('#setup-practice').click();
-  await page.locator('#start-adventure').click();
-  await page.clock.runFor(150);
-  const before = await layoutBoxes(page, skyrailLayout);
-  await page.locator('#transcription-answer').fill('gwong dung waa jap mun fo');
-  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
-  await expect(page.locator('.prompt-romanization')).toHaveText(parts);
-  expect(await layoutBoxes(page, skyrailLayout)).toEqual(before);
-  await expectNoOverflow(page);
-});
+    );
+    await page.reload();
+    await page.locator('.mode-card[data-destination="rail"]').click();
+    await page.locator('#setup-practice').click();
+    await page.locator('#start-adventure').click();
+    await page.clock.runFor(150);
+    const selectors = [...skyrailLayout, '.prompt-syllables', '.prompt-actions'];
+    const before = await layoutBoxes(page, selectors);
+    await page
+      .locator('#transcription-answer')
+      .fill(parts.map((part) => part.slice(0, -1)).join(' '));
+    await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+    await expect(page.locator('.prompt-romanization')).toHaveText(parts);
+    expect(await layoutBoxes(page, selectors)).toEqual(before);
+    const [meaning, word, controls] = await layoutBoxes(page, [
+      '.prompt-gloss',
+      '.prompt-syllables',
+      '.prompt-actions',
+    ]);
+    const characters = await page.locator('.prompt-character').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const { top, left, right } = node.getBoundingClientRect();
+        return { top, left: left + scrollX, right: right + scrollX };
+      }),
+    );
+    expect(new Set(characters.map(({ top }) => Math.round(top))).size).toBe(1);
+    expect(characters[0].left).toBeGreaterThanOrEqual(word.x);
+    expect(characters.at(-1).right).toBeLessThanOrEqual(word.x + word.width);
+    if (parts.length === 4) {
+      expect(meaning.x + meaning.width).toBeLessThan(word.x);
+      expect(word.x + word.width).toBeLessThan(controls.x);
+      expect(meaning.y + meaning.height / 2).toBeCloseTo(word.y + word.height / 2, 1);
+    } else expect(word.y + word.height).toBeLessThanOrEqual(controls.y);
+    await expectNoOverflow(page);
+  });
+}
 
 test('first completion reveals a permanent friend at home', async ({ page }) => {
   test.skip(page.viewportSize().width < 700, 'One complete journey covers the unlock lifecycle.');
