@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openHeaderMenu } from '../helpers/header-menu.js';
 for (const base of [
   'http://127.0.0.1:4176/',
   'http://127.0.0.1:4177/release-check/renamed-project/',
@@ -54,6 +55,11 @@ for (const base of [
         await expect(page.locator('.language-card--vietnamese')).toBeVisible();
         await page.goto(base + language + '/guide/');
         await expect(page.locator('.info-page h1')).toBeVisible();
+        const icons = page.locator('link[rel="icon"]');
+        const iconURLs = () => icons.evaluateAll((nodes) => nodes.map((icon) => icon.href));
+        const guideIcons = await iconURLs();
+        expect(guideIcons).toHaveLength(2);
+        for (const url of guideIcons) expect((await page.request.get(url)).ok()).toBe(true);
         if (language === 'mandarin') {
           await expect(page.locator('.info-page h1')).toHaveText('Pinyin guide');
           await page.locator('[data-guide-word="commons-124599289"]').click();
@@ -80,6 +86,7 @@ for (const base of [
         }
         await page.locator('.brand').click();
         await expect(page.locator('#start-adventure')).toBeVisible();
+        expect(await iconURLs()).toEqual(guideIcons);
         await expect(page.locator('.site-header [data-nav-page="about"]')).toHaveText('About');
         await expect(page.locator('#progress, #reward-hint')).toHaveCount(0);
         await expect(page.locator('.home-world')).not.toContainText('Tower windows remember');
@@ -99,7 +106,13 @@ for (const base of [
         await expect(page).toHaveURL(base + language + '/guide/');
         await page.goForward();
         await expect(page).toHaveURL(base + language + '/');
+        expect(await iconURLs()).toEqual(guideIcons);
+        await openHeaderMenu(page);
+        await page.locator('.site-header [data-nav-page="about"]').click();
+        await expect(page).toHaveURL(base + language + '/about/');
+        expect(await iconURLs()).toEqual(guideIcons);
         await page.goto(base + language + '/about/');
+        expect(await iconURLs()).toEqual(guideIcons);
         await expect(page.locator('.about-page h1')).toHaveText('About Tone Tower');
         await page.getByText('Data and software credits').click();
         const license = page.getByRole('link', { name: 'MIT licensed code' });

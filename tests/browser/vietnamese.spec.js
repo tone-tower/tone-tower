@@ -245,7 +245,7 @@ test('a wrong door names both tones, and number keys follow the door order', asy
 });
 
 for (const text of ['trung học chuyên nghiệp', 'nghiêng nghiêng', 'phòng thí nghiệm'])
-  test('a long word stays on one line beside Replay: ' + text, async ({ page }) => {
+  test('a long word stays on one line without overlapping Replay: ' + text, async ({ page }) => {
     await page.route('**/catalogs/vi.json', (route) =>
       route.fulfill({ json: catalogOf([...references, [text]], { examplesOnly: true }) }),
     );
@@ -263,7 +263,9 @@ for (const text of ['trung học chuyên nghiệp', 'nghiêng nghiêng', 'phòng
       question = await page.locator('.scene-question').boundingBox();
     expect(new Set(syllables.map((box) => Math.round(box.top))).size).toBe(1);
     expect(syllables[0].left).toBeGreaterThanOrEqual(question.x);
-    expect(syllables.at(-1).right).toBeLessThanOrEqual(replay.x);
+    expect(syllables.at(-1).right).toBeLessThanOrEqual(question.x + question.width);
+    if (page.viewportSize().width <= 600) expect(syllables[0].bottom).toBeLessThanOrEqual(replay.y);
+    else expect(syllables.at(-1).right).toBeLessThanOrEqual(replay.x);
     // No syllable is broken across lines around its covered letter.
     for (const character of await page.locator('.prompt-character').all()) {
       const box = await character.boundingBox(),

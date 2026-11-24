@@ -88,6 +88,19 @@ async function loaded(page, url = '/mandarin/') {
 const noOverflow = async (page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
+test('the selector centers the title and fits all three language cards in the viewport', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const brand = await page.locator('.brand').boundingBox();
+  const header = await page.locator('.site-header').boundingBox();
+  expect(brand.x + brand.width / 2).toBeCloseTo(header.x + header.width / 2, 1);
+  const cards = page.locator('.language-card');
+  await expect(cards).toHaveCount(3);
+  for (const card of await cards.all()) await expect(card).toBeInViewport({ ratio: 1 });
+  await noOverflow(page);
+});
+
 test('Start is fully in view before scrolling on all language homes', async ({ page }) => {
   const size = page.viewportSize();
   if (size.width > 700) await page.setViewportSize({ width: 1280, height: 720 });
