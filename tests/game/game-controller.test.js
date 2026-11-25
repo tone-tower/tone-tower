@@ -208,6 +208,22 @@ test('a prompt already expired when restored shows timeout feedback without a re
   assert.strictEqual(restored.mistakes, 1);
 });
 
+test('completed Skyrail practice goes to results after reload without pausing', () => {
+  const h = harness();
+  const run = h.controller.start({ challenge: 'tide', practice: true, length: 10 });
+  for (let i = 0; i < 10; i++) {
+    run.answer(run.expected());
+    if (run.status === 'playing') run.next();
+  }
+  assert.strictEqual(run.status, 'complete');
+  h.document.hidden = true;
+  h.controller.restore({ run: run.snapshot(), deadline: null }, { paused: true });
+  assert.strictEqual(h.app.querySelector('#resume-game'), null);
+  h.time.advance(900);
+  assert.strictEqual(h.finished.length, 1);
+  assert.strictEqual(h.finished[0].cleared, 10);
+});
+
 test.each(['click', 'keyboard'])(
   'Tone doors accept %s while the first clip is playing',
   async (method) => {

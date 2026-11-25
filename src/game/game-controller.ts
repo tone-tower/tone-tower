@@ -189,7 +189,8 @@ export function createGameController({
   const q = <S extends string>(selector: S) => query(app, selector);
   const qa = <S extends string>(selector: S) => queryAll(app, selector);
   const isTide = () => run?.config.challenge === 'tide';
-  const manualPause = () => isTide() || run.timeLimit() > 0;
+  const terminal = () => !run.config.practice && run.status !== 'playing';
+  const manualPause = () => !terminal() && (isTide() || run.timeLimit() > 0);
   const answering = () =>
     active && !paused && phase === 'answering' && audioReady && !audioFailed && !doc?.hidden;
   const choosingTone = () =>
@@ -336,7 +337,6 @@ export function createGameController({
       '</div>'
     );
   }
-  const terminal = () => !run.config.practice && run.status !== 'playing';
   function recordingReport() {
     if (phase !== 'review') return '';
     return /* HTML */ `<a
@@ -574,7 +574,7 @@ export function createGameController({
     app.dataset.world = run.config.challenge;
     app.dataset.practice = String(run.config.practice);
     app.dataset.outcome = presentation();
-    const showScenePause = manualPause() && (phase === 'landing' || terminal());
+    const showScenePause = manualPause() && phase === 'landing';
     const inTowerLanding = !isTide() && phase === 'landing';
     const actions = reviewActions();
     const recovered = outcome?.recovered ?? 0;
@@ -1015,7 +1015,10 @@ export function createGameController({
     message = '';
     phase = 'review';
     towerReady = !towerStop();
-    if (!terminal()) checkpoint();
+    if (terminal()) {
+      paused = false;
+      exitConfirmation = null;
+    } else checkpoint();
     unveiling = true;
     render();
     unveiling = false;
@@ -1091,6 +1094,7 @@ export function createGameController({
   function pause() {
     if (!active || paused) return;
     expirePrompt();
+    if (terminal()) return;
     captureInput();
     paused = true;
     cancelAuto();
@@ -1245,14 +1249,16 @@ export function createGameController({
               ? 'landing'
               : 'correct';
       paused = reloadPause =
-        pauseOnReload && (phase === 'answering' || (phase === 'correct' && !towerStop()));
+        pauseOnReload &&
+        run.status === 'playing' &&
+        (phase === 'answering' || (phase === 'correct' && !towerStop()));
       checkpoint(saved.deadline);
       if (saved.deadline !== null) {
         clock.start(limit, saved.deadline);
         if (run.promptState === 'failed') return run;
       }
       render();
-      if (doc.hidden) pause();
+      if (doc.hidden && run.status === 'playing') pause();
       else if (!paused && phase === 'correct' && !towerStop()) scheduleAdvance();
       return run;
     },

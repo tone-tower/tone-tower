@@ -353,12 +353,21 @@ test('a long Tower word fits beside Replay and leaves space for Listen here', as
   await start(page, 'tone');
   await page.clock.runFor(2200);
   await expect(page.locator('.prompt-character')).toHaveText(['廣', '東', '話', '班']);
-  const [label, character, word, replay] = await layoutBoxes(page, [
+  const [label, target, character, word, replay] = await layoutBoxes(page, [
     '.target-label',
+    '.prompt-syllable.is-target',
     '.is-target .prompt-character',
     '.prompt-syllables',
     '#replay-word',
   ]);
+  const text = await page.locator('.target-label').evaluate((node) => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const { left, right } = range.getBoundingClientRect();
+    return { left: left + scrollX, right: right + scrollX };
+  });
+  expect(text.left).toBeGreaterThanOrEqual(target.x);
+  expect(text.right).toBeLessThanOrEqual(target.x + target.width);
   expect(label.y + label.height).toBeLessThan(character.y);
   expect(word.x + word.width).toBeLessThan(replay.x);
   expect(replay.y + replay.height / 2).toBeGreaterThan(word.y);
@@ -542,6 +551,41 @@ test('reloading a Tower prompt restores the game and waits for Resume before pla
   await resume.click();
   expect(await page.evaluate(() => window.__audioPlays.length)).toBe(1);
   await expect(choices.first()).toBeEnabled();
+});
+
+test('a finished Skyrail run keeps its end screen when hidden and returns Home on reload', async ({
+  page,
+}) => {
+  await page.locator('.mode-card[data-destination="rail"]').click();
+  await page.locator('[data-difficulty="extreme"]').click();
+  await page.locator('#start-adventure').click();
+  await page.clock.runFor(16000);
+  await page.locator('#continue-game').click();
+  await page.clock.runFor(150);
+  await page.getByRole('button', { name: 'Pause game' }).click();
+  const pause = page.locator('.pause-overlay');
+  await expect(pause).toBeVisible();
+  await page.clock.runFor(16000);
+  const endTitle = page.locator('#run-end-title');
+  await expect(pause).toHaveCount(0);
+  await expect(endTitle).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    delete document.hidden;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(pause).toHaveCount(0);
+  await expect(endTitle).toBeFocused();
+  await expect(page.locator('#ending-home')).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Pause game' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(pause).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.locator('.mode-cards')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resume run' })).toHaveCount(0);
+  await expect(pause).toHaveCount(0);
 });
 
 test('an unfinished Tower run can be reopened, kept, or discarded from Home', async ({
