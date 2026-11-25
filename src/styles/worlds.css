@@ -50,32 +50,47 @@
 }
 .round-prompt {
   display: grid;
-  grid-template-columns: minmax(7.75rem, 1fr) minmax(0, 2.5fr) minmax(7.75rem, 1fr);
+  grid-template-columns: minmax(8.5rem, 1fr) minmax(0, 2fr) minmax(8.5rem, 1fr);
   grid-template-areas: 'meaning word controls';
   align-items: center;
   gap: 4px 12px;
 }
 .word-prompt {
+  --max-character-size: 50px;
+  --syllable-gap: 8px;
+  --syllable-padding: 10px;
+  --syllable-space: calc(var(--syllable-gap) + 2 * var(--syllable-padding));
   grid-area: word;
   container-type: inline-size;
+  display: grid;
+  align-content: center;
+  min-height: 120px;
+}
+.word-prompt[data-letters] {
+  --long-syllable-padding: 6px;
+}
+.word-prompt[data-long] {
+  --syllable-padding: var(--long-syllable-padding, 3px);
+}
+.word-prompt:has(.target-label) {
+  --target-label-space: 16px;
 }
 .round-prompt .tone-explanation {
   grid-column: 1 / -1;
 }
 .prompt-syllables {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: 8px;
-  min-height: 86px;
+  gap: var(--syllable-gap);
 }
 .prompt-syllable {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 13px 10px 4px;
-  min-width: 62px;
+  padding: 16px var(--syllable-padding) 4px;
+  min-width: 0;
   border-bottom: 3px solid transparent;
 }
 .prompt-syllable.is-target {
@@ -84,18 +99,23 @@
 }
 .target-label {
   position: absolute;
-  left: 0;
-  right: 0;
   top: 2px;
-  font: 7px DM;
+  left: 50%;
+  translate: -50% 0;
+  font: 700 8px/1.25 DM;
   text-transform: uppercase;
-  text-align: center;
-  letter-spacing: 1px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
   color: #d9e4ba;
 }
 .prompt-character {
   font:
-    38px/1.2 'Segoe UI',
+    clamp(
+        16px,
+        calc(100cqw / var(--syllables) - var(--syllable-space)),
+        var(--max-character-size)
+      ) /
+      1.2 'Segoe UI',
     sans-serif;
   color: #f4e5bf;
 }
@@ -104,26 +124,30 @@
   color: var(--cream);
   min-height: 24px;
 }
-.word-prompt[data-long] .prompt-syllable {
-  min-width: 0;
-  padding-inline: 3px;
+.word-prompt:not([data-letters]) .prompt-syllable {
+  max-width: calc(100% / var(--syllables) - var(--syllable-gap));
 }
-.word-prompt[data-long] .prompt-character {
-  font-size: clamp(16px, calc(100cqw / var(--syllables) - 12px), 30px);
-}
-.word-prompt[data-long] .prompt-romanization {
-  font-size: 13px;
-  max-width: 100%;
-  overflow-wrap: anywhere;
+.word-prompt:not([data-letters]) .prompt-romanization {
+  max-width: calc(100% + 2 * var(--syllable-padding));
+  white-space: nowrap;
   text-align: center;
 }
+@media (min-width: 701px) {
+  .word-prompt[data-long]:not([data-letters]) .prompt-romanization {
+    font-size: clamp(12px, calc((100cqw / var(--syllables) - var(--syllable-space)) / 3.5), 17px);
+  }
+}
+#app[data-world='tide'] .word-prompt[data-long] .prompt-romanization {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .prompt-gloss {
-  --gloss-lines: 2;
+  --gloss-lines: 3;
   grid-area: meaning;
   display: grid;
   align-content: center;
   block-size: calc(1.5em * var(--gloss-lines));
-  font-size: 12px;
+  font-size: 13px;
   color: var(--edge);
   margin: 0;
   line-height: 1.5;
@@ -139,14 +163,14 @@
 .prompt-actions {
   grid-area: controls;
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
   align-items: center;
   gap: 6px;
 }
 .prompt-actions .secondary {
-  font-size: 12px;
+  font-size: 13px;
   height: 44px;
-  padding: 9px 13px;
+  padding: 9px 12px;
   border-color: #83c5bc;
   background: #315e46;
   box-shadow: none;
@@ -175,11 +199,12 @@
 }
 .tone-door {
   position: absolute;
+  container-type: inline-size;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  gap: 9px;
+  gap: 2px;
   min-height: 0;
   border: 0;
   padding: 0;
@@ -211,33 +236,35 @@
 .world-scene:is([data-phase='listening'], [data-moving]) .tone-door {
   opacity: 0.55;
 }
-.tone-symbol {
-  font: 700 42px/1 monospace;
+.tone-door .tone-symbol {
+  --symbol-size: clamp(18px, 60cqw, 52px);
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: var(--symbol-size);
+  block-size: var(--symbol-size);
+  font: 750 var(--symbol-size) / 1 monospace;
   text-shadow: 2px 2px #172b38;
 }
-.tone-symbol.is-mark {
-  font-family: Georgia, serif;
-  font-weight: 500;
-  font-size: 52px;
-  line-height: 0.8;
-}
-.tone-symbol.is-unmarked {
-  font:
-    650 14px/1 DM,
-    system-ui,
-    sans-serif;
+.tone-door .tone-mark {
+  filter: drop-shadow(2px 2px 0 #172b38);
 }
 .tone-name {
-  font: 8px DM;
-  letter-spacing: 1px;
+  font:
+    700 clamp(7px, 18cqw, 13px)/1.15 'Segoe UI',
+    'Noto Sans',
+    sans-serif;
   color: var(--cream);
-  min-height: 11px;
+  text-shadow: 1px 1px #172b38;
+  text-wrap: balance;
 }
 .door-key {
   font: 10px monospace;
   border: 1px solid #647b7c;
   background: #19293d;
-  padding: 2px 5px;
+  padding: 1px 4px;
+  margin: 2px 0 0;
+  white-space: nowrap;
 }
 .tone-door.is-correct {
   color: #c9efba;
@@ -251,26 +278,6 @@
 }
 .tone-door.is-answer {
   box-shadow: inset 0 0 0 2px #a1b98a;
-}
-.world-scene[data-count='4'] .tone-symbol,
-.world-scene:is([data-count='5'], [data-count='6']) .tone-symbol {
-  font-size: 26px;
-}
-.world-scene[data-count='4'] .tone-symbol.is-mark,
-.world-scene:is([data-count='5'], [data-count='6']) .tone-symbol.is-mark {
-  font-size: 38px;
-}
-.world-scene[data-count='4'] .tone-symbol.is-unmarked,
-.world-scene:is([data-count='5'], [data-count='6']) .tone-symbol.is-unmarked {
-  font-size: 11px;
-}
-.world-scene[data-count='4'] .tone-name,
-.world-scene:is([data-count='5'], [data-count='6']) .tone-name {
-  font-size: 6px;
-}
-.world-scene[data-count='4'] .tone-door,
-.world-scene:is([data-count='5'], [data-count='6']) .tone-door {
-  gap: 3px;
 }
 .game-panel {
   grid-row: 4;
@@ -413,43 +420,12 @@
   color: var(--edge);
   margin: 8px 0 0;
 }
+.keyboard kbd {
+  margin-inline-start: 0;
+}
 @media (max-width: 700px), (hover: none) and (pointer: coarse) {
   .game-layout :is(kbd, .keyboard) {
     display: none;
-  }
-}
-@media (max-width: 600px) {
-  .round-prompt {
-    grid-template-columns: minmax(4.25rem, 1fr) minmax(0, 2.25fr) minmax(4.25rem, 1fr);
-    column-gap: 6px;
-  }
-  .round-prompt[data-wide] {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'word word'
-      'meaning controls';
-  }
-  .round-prompt:not([data-wide]):has(.word-prompt[data-long]) {
-    grid-template-columns: minmax(3.5rem, 1fr) minmax(0, 3fr) minmax(3.5rem, 1fr);
-  }
-  .round-prompt:not([data-wide]) .prompt-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .round-prompt:not([data-wide]) #pause-run {
-    width: auto;
-  }
-  .round-prompt:not([data-wide]) .replay-icon {
-    display: none;
-  }
-  .round-prompt:not([data-wide]) .prompt-gloss {
-    --gloss-lines: 3;
-  }
-  .prompt-syllables {
-    min-height: 0;
-  }
-  .round-prompt:not([data-wide]) .prompt-romanization {
-    font-size: clamp(11px, calc((100cqw / var(--syllables) - 12px) / 3.35), 16px);
   }
 }
 .pause-overlay {
@@ -495,64 +471,47 @@
     margin: 12px auto;
   }
   .scene-question {
-    padding: 6px 12px 8px;
+    padding: 6px 8px 8px;
+  }
+  .round-prompt {
+    grid-template-columns: minmax(3.5rem, 1fr) minmax(0, 3fr) minmax(3.5rem, 1fr);
+    column-gap: 4px;
+  }
+  .word-prompt {
+    --max-character-size: 48px;
+    --syllable-gap: 4px;
+    --syllable-padding: 4px;
+  }
+  .word-prompt[data-long] {
+    --syllable-padding: 2px;
   }
   .prompt-syllable {
-    min-width: 45px;
-    padding: 12px 6px 3px;
-  }
-  .prompt-syllables {
-    gap: 4px;
+    padding-bottom: 3px;
   }
   .prompt-gloss {
-    font-size: 10px;
+    --gloss-lines: 4;
+    font-size: 11px;
   }
-  .target-label {
-    font-size: 6px;
-    letter-spacing: 0;
+  .prompt-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
   .prompt-actions .secondary {
-    font-size: 11px;
-    padding: 8px;
-  }
-  .word-prompt[data-long] .prompt-syllable {
-    padding-inline: 2px;
-  }
-  .word-prompt[data-long] .prompt-romanization {
-    font-size: 9px;
-  }
-  .tone-door {
-    gap: 3px;
-  }
-  .tone-symbol {
-    font-size: 30px;
-  }
-  .tone-name {
-    font-size: 6px;
-    letter-spacing: 0;
-  }
-  .world-scene[data-count='4'] .tone-symbol,
-  .world-scene:is([data-count='5'], [data-count='6']) .tone-symbol {
-    font-size: 18px;
-  }
-  .tone-symbol.is-mark {
-    font-size: 40px;
-  }
-  .tone-symbol.is-unmarked {
     font-size: 12px;
+    padding-inline: 6px;
   }
-  .world-scene[data-count='4'] .tone-symbol.is-mark,
-  .world-scene:is([data-count='5'], [data-count='6']) .tone-symbol.is-mark {
-    font-size: 30px;
+  .prompt-actions #pause-run {
+    width: auto;
   }
-  .world-scene[data-count='4'] .tone-symbol.is-unmarked,
-  .world-scene:is([data-count='5'], [data-count='6']) .tone-symbol.is-unmarked {
-    font-size: 9px;
+  .prompt-actions .replay-icon {
+    display: none;
   }
-  .world-scene[data-count='4'] .tone-name,
-  .world-scene:is([data-count='5'], [data-count='6']) .tone-name {
-    font-size: 5px;
-    min-height: 0;
+  .word-prompt:not([data-letters]) .prompt-romanization {
+    font-size: clamp(
+      8px,
+      calc((100cqw / var(--syllables) - var(--syllable-gap)) / 4),
+      var(--max-romanization-size, 17px)
+    );
   }
   .game-panel {
     padding: 10px 12px;
@@ -619,19 +578,6 @@
 body.keyboard-open .game-layout {
   margin-top: 5px;
 }
-body.keyboard-open .prompt-character {
-  font-size: 29px;
-}
-body.keyboard-open .prompt-syllable {
-  padding-top: 10px;
-}
-body.keyboard-open .prompt-romanization {
-  font-size: 18px;
-  min-height: 23px;
-}
-body.keyboard-open .scene-question {
-  padding: 7px 10px;
-}
 body.keyboard-open .game-panel {
   padding: 7px 10px;
 }
@@ -643,14 +589,14 @@ body.keyboard-open .form-controls .small {
     margin-top: 5px;
   }
   .scene-question {
-    padding: 7px 10px;
+    padding-block: 7px;
   }
-  .prompt-character {
-    font-size: 29px;
+  #app[data-world='tide'] .scene-question {
+    padding-inline: 10px;
   }
-  .prompt-romanization {
-    font-size: 18px;
-    min-height: 23px;
+  #app[data-world='tide'] .word-prompt {
+    --max-character-size: 32px;
+    min-height: 84px;
   }
   .game-panel {
     padding: 7px 10px;
@@ -782,10 +728,6 @@ body.keyboard-open #app[data-world='tide'] .world-canvas {
 #app[data-world='tide'] .world-scene {
   max-height: 220px;
 }
-#app[data-world='tide'] .prompt-syllable {
-  padding-top: 12px;
-  padding-bottom: 2px;
-}
 #app[data-world='tide'] .typing-slot {
   padding-top: 8px;
   padding-bottom: 7px;
@@ -846,11 +788,9 @@ body.keyboard-open #app[data-world='tide'] .world-canvas {
   #app[data-world='tone'] .scene-question {
     padding-block: 4px;
   }
-  #app[data-world='tone'] .prompt-syllables {
-    min-height: 64px;
-  }
-  #app[data-world='tone'] .prompt-character {
-    font-size: 25px;
+  #app[data-world='tone'] .word-prompt {
+    --max-character-size: 32px;
+    min-height: 84px;
   }
   #app[data-world='tone'] .prompt-romanization {
     font-size: 15px;
@@ -874,7 +814,6 @@ html {
 }
 .tone-door.is-answer .tone-symbol {
   color: #172b38;
-  max-block-size: 55%;
   text-shadow: none;
   filter: none;
 }
@@ -1441,25 +1380,18 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
     padding: 6px 10px;
     gap: 4px 8px;
   }
-  body.keyboard-open #app[data-world='tide'] .prompt-syllables {
+  body.keyboard-open #app[data-world='tide'] .word-prompt {
+    --max-character-size: 28px;
+    --max-romanization-size: 15px;
+    --syllable-gap: 3px;
+    --syllable-padding: 5px;
     min-height: 0;
-    gap: 3px;
+  }
+  body.keyboard-open #app[data-world='tide'] .word-prompt[data-long] {
+    --syllable-padding: 2px;
   }
   body.keyboard-open #app[data-world='tide'] .prompt-syllable {
     padding-block: 11px 2px;
-  }
-  body.keyboard-open #app[data-world='tide'] .word-prompt:not([data-long]) .prompt-syllable {
-    min-width: 32px;
-    padding-inline: 5px;
-  }
-  body.keyboard-open #app[data-world='tide'] .word-prompt:not([data-long]) .prompt-character {
-    font-size: 28px;
-  }
-  body.keyboard-open #app[data-world='tide'] .prompt-romanization {
-    min-height: 0;
-  }
-  body.keyboard-open #app[data-world='tide'] .word-prompt:not([data-long]) .prompt-romanization {
-    font-size: 15px;
   }
   body.keyboard-open #app[data-world='tide'] .game-layout:not([data-landing='true']) .scene-frame {
     grid-row: 3;
@@ -1477,10 +1409,6 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
     object-fit: cover;
     object-position: center bottom;
   }
-  body.keyboard-open #app[data-world='tide'] .prompt-actions .secondary {
-    min-height: 44px;
-    font-size: 12px;
-  }
   body.keyboard-open #app[data-world='tide'] .typing-slot {
     grid-row: 4;
     padding: 7px 10px;
@@ -1493,56 +1421,6 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
   }
 }
 
-/* The written tone stays under a dust creature until a door is chosen. */
-.tone-door .tone-mark {
-  width: 2.3em;
-  height: 2.3em;
-  filter: drop-shadow(2px 2px 0 #172b38);
-}
-.tone-door.has-mark {
-  gap: 2px;
-}
-.tone-door.has-mark .tone-name {
-  font:
-    700 15px/1.2 'Segoe UI',
-    'Noto Sans',
-    'Helvetica Neue',
-    Arial,
-    sans-serif;
-  letter-spacing: 0;
-  text-shadow: 1px 1px #172b38;
-}
-[data-language='cmn'] .tone-door.has-mark .tone-name {
-  font-weight: 500;
-}
-.tone-door.has-mark .door-key {
-  margin-top: 5px;
-}
-.world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .tone-name {
-  font-size: 12px;
-}
-.world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .door-key {
-  margin-top: 1px;
-}
-.tone-door.has-mark .tone-name {
-  white-space: nowrap;
-}
-@media (max-width: 700px) {
-  .tone-door .tone-mark {
-    width: 1.9em;
-    height: 1.9em;
-  }
-  .tone-door.has-mark .tone-name {
-    font-size: 11px;
-  }
-  .world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .has-mark .tone-name {
-    font-size: 8px;
-  }
-  .world-scene:is([data-count='4'], [data-count='5'], [data-count='6']) .tone-door .tone-mark {
-    width: 1.75em;
-    height: 1.75em;
-  }
-}
 .world-scene .tone-door.is-answer {
   gap: 1px;
 }
@@ -1556,8 +1434,9 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
   text-shadow: none;
   white-space: nowrap;
 }
-.prompt-syllable.has-tone-cover {
-  padding-top: 36px;
+/* The written tone stays under a dust creature until a door is chosen. */
+.word-prompt[data-letters] .prompt-syllable {
+  padding-top: calc(var(--target-label-space, 0px) + 24px);
 }
 .tone-carrier {
   position: relative;
@@ -1629,12 +1508,15 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
 
 /* A written word is as wide as its letters, so its size follows their count. */
 #app[data-world='tone'] .word-prompt[data-letters] .prompt-character {
-  font-size: clamp(13px, calc((100cqw - var(--syllables) * 28px) / var(--letters) / 0.62), 38px);
+  font-size: clamp(
+    9px,
+    calc((100cqw - var(--syllables) * var(--syllable-space)) / var(--letters) / 0.62),
+    min(42px, var(--max-character-size))
+  );
 }
 #app[data-world='tone'] .word-prompt[data-letters] .prompt-syllable {
   min-width: 0;
   flex-shrink: 0;
-  padding-inline: 10px;
 }
 /* A syllable never breaks around its covered letter. */
 .word-prompt[data-letters] .prompt-character {
@@ -1649,25 +1531,14 @@ body.keyboard-open #app[data-world] .game-layout[data-terminal='true'] .world-ca
   visibility: hidden;
 }
 @media (max-width: 700px) {
-  #app[data-world='tone'] .word-prompt[data-letters] .prompt-syllable {
-    padding-inline: 5px;
-  }
-  #app[data-world='tone'] .word-prompt[data-letters][data-long] .prompt-syllable {
-    padding-inline: 2px;
-  }
-  #app[data-world='tone'] .word-prompt[data-letters] .prompt-character {
-    font-size: clamp(11px, calc((100cqw - var(--syllables) * 14px) / var(--letters) / 0.62), 34px);
-  }
   #app[data-world='tone'] .word-prompt[data-letters] .prompt-romanization {
-    font-size: 11px;
-    min-height: 16px;
-  }
-}
-@media (max-height: 540px) and (min-width: 560px) {
-  #app[data-world='tone'] .word-prompt[data-letters] .prompt-character {
-    font-size: clamp(13px, calc((100cqw - var(--syllables) * 24px) / var(--letters) / 0.62), 25px);
-  }
-  .prompt-syllable.has-tone-cover {
-    padding-top: 26px;
+    /* Keep tone names readable below narrow syllables without widening those syllables. */
+    inline-size: 2rem;
+    margin-inline: -1rem;
+    min-height: 2.3em;
+    font-size: 10px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
   }
 }

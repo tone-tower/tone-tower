@@ -120,8 +120,7 @@ export function createGameMarkup(state: () => Presentation) {
     const spaceOnly = rail && profile.allowWordSpaces;
     const wordLanguage = escape(textLanguage(profile, script));
     const syllables = run.word.syllables.length;
-    const wide = covered ? syllables >= 3 || letters >= 12 : syllables > 4;
-    return /* HTML */ `<div class="round-prompt" ${wide ? 'data-wide' : ''}>
+    return /* HTML */ `<div class="round-prompt">
       <div
         class="word-prompt"
         data-length="${syllables}"
@@ -144,8 +143,7 @@ export function createGameMarkup(state: () => Presentation) {
                   : rail || reveal
                     ? profile.format(s.transcription)
                     : profile.withoutTones(s.transcription);
-              return /* HTML */ `<span
-                class="prompt-syllable ${target ? 'is-target' : ''} ${hidden ? 'has-tone-cover' : ''}"
+              return /* HTML */ `<span class="prompt-syllable${target ? ' is-target' : ''}"
                 >${!rail && target && run.targets.length === 1 ? '<span class="target-label">Listen here</span>' : ''}<span
                   class="prompt-character"
                   lang="${wordLanguage}"
@@ -193,7 +191,7 @@ export function createGameMarkup(state: () => Presentation) {
         return /* HTML */ `<button
           style="${slots[index]}"
           type="button"
-          class="tone-door ${tone.markPath !== undefined ? 'has-mark' : ''} ${(phase === 'correct' || phase === 'landing') && t === run.word.tone ? 'is-correct' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
+          class="tone-door ${(phase === 'correct' || phase === 'landing') && t === run.word.tone ? 'is-correct' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
           data-tone="${t}"
           aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: ' : 'Choose '}${escape(toneLabel(profile, t))}"
           aria-keyshortcuts="${[...arrows, number].join(' ')}"

@@ -95,9 +95,14 @@ test('the selector centers the title and fits all three language cards in the vi
   const brand = await page.locator('.brand').boundingBox();
   const header = await page.locator('.site-header').boundingBox();
   expect(brand.x + brand.width / 2).toBeCloseTo(header.x + header.width / 2, 1);
+  await expect(page.locator('.brand-wordmark')).toHaveText('Tone Tower');
+  await expect(page.locator('.brand svg')).toBeVisible();
   const cards = page.locator('.language-card');
   await expect(cards).toHaveCount(3);
-  for (const card of await cards.all()) await expect(card).toBeInViewport({ ratio: 1 });
+  for (const card of await cards.all()) {
+    await expect(card).toBeInViewport({ ratio: 1 });
+    expect((await card.boundingBox()).height).toBeGreaterThanOrEqual(100);
+  }
   await noOverflow(page);
 });
 

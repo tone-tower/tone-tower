@@ -113,14 +113,20 @@ const skyrailLayout = [
 
 for (const world of ['tone', 'tide']) {
   test(`${world} centers the word and keeps the meaning in a stable slot`, async ({ page }) => {
-    const phone = page.viewportSize().width <= 600;
+    const phone = page.viewportSize().width <= 700;
     if (phone) await page.setViewportSize({ width: 320, height: 640 });
     await start(page, world);
-    const selectors = ['.prompt-syllables', '.prompt-gloss', '#replay-word', '.round-prompt'];
+    const selectors = [
+      '.prompt-syllables',
+      '.prompt-gloss',
+      '.prompt-actions',
+      '.round-prompt',
+      '.scene-question',
+    ];
     const boxes = await layoutBoxes(page, selectors);
-    const [syllables, meaningBox, replay, prompt] = boxes;
+    const [syllables, meaningBox, actions, prompt] = boxes;
     const gloss = page.locator('.prompt-gloss > span');
-    const lineCount = phone ? 3 : 2;
+    const lineCount = phone ? 4 : 3;
     await expect(gloss).toHaveCSS('-webkit-line-clamp', String(lineCount));
     const lineHeight = parseFloat(
       await gloss.evaluate((node) => getComputedStyle(node).lineHeight),
@@ -128,8 +134,16 @@ for (const world of ['tone', 'tide']) {
     expect(meaningBox.height).toBeCloseTo(lineHeight * lineCount, 1);
     expect(syllables.x + syllables.width / 2).toBeCloseTo(prompt.x + prompt.width / 2, 1);
     expect(meaningBox.x + meaningBox.width).toBeLessThan(syllables.x);
-    expect(syllables.x + syllables.width).toBeLessThan(replay.x);
+    expect(syllables.x + syllables.width).toBeLessThan(actions.x);
+    expect(meaningBox.y + meaningBox.height / 2).toBeCloseTo(syllables.y + syllables.height / 2, 1);
+    expect(actions.y + actions.height / 2).toBeCloseTo(syllables.y + syllables.height / 2, 1);
+    await expect(page.locator('.word-prompt')).toHaveCSS('min-height', '120px');
+    await expect(page.locator('.prompt-character').first()).toHaveCSS(
+      'font-size',
+      phone ? '48px' : '50px',
+    );
     if (world === 'tide') {
+      const replay = await page.locator('#replay-word').boundingBox();
       const pause = await page.locator('#pause-run').boundingBox();
       expect(pause.height).toBe(replay.height);
       if (phone) expect(pause.width).toBe(replay.width);
@@ -155,6 +169,60 @@ for (const world of ['tone', 'tide']) {
     await expectNoOverflow(page);
   });
 }
+
+test('a long Tower word fits beside Replay and leaves space for Listen here', async ({ page }) => {
+  const phone = page.viewportSize().width <= 600;
+  if (phone) await page.setViewportSize({ width: 320, height: 640 });
+  const phrase = {
+    id: 'long',
+    gloss: 'Cantonese language class',
+    syllables: ['廣', '東', '話', '班'].map((character, i) => ({
+      character,
+      jyutping: ['gwong2', 'dung1', 'waa2', 'baan1'][i],
+      tone: [2, 1, 2, 1][i],
+    })),
+  };
+  await page.route('**/catalogs/yue.json', (route) =>
+    route.fulfill({
+      json: cantoneseCatalog({
+        ...catalog,
+        words: [...singles, phrase],
+        recordings: [
+          ...catalog.recordings.filter((recording) => recording.anchor),
+          { id: phrase.id, wordId: phrase.id, audio: 'audio/long.mp3' },
+        ],
+      }),
+    }),
+  );
+  await page.reload();
+  await start(page, 'tone');
+  await page.clock.runFor(2200);
+  await expect(page.locator('.prompt-character')).toHaveText(['廣', '東', '話', '班']);
+  const [label, character, word, replay] = await layoutBoxes(page, [
+    '.target-label',
+    '.is-target .prompt-character',
+    '.prompt-syllables',
+    '#replay-word',
+  ]);
+  expect(label.y + label.height).toBeLessThan(character.y);
+  expect(word.x + word.width).toBeLessThan(replay.x);
+  expect(replay.y + replay.height / 2).toBeGreaterThan(word.y);
+  const characters = await page.locator('.prompt-character').evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const { left, right, top } = node.getBoundingClientRect();
+      return { left: left + scrollX, right: right + scrollX, top };
+    }),
+  );
+  expect(new Set(characters.map(({ top }) => Math.round(top))).size).toBe(1);
+  expect(characters[0].left).toBeGreaterThanOrEqual(word.x);
+  expect(characters.at(-1).right).toBeLessThanOrEqual(word.x + word.width);
+  expect(character.height).toBeGreaterThan(phone ? 32 : 48);
+  const question = page.locator('.scene-question');
+  const height = (await question.boundingBox()).height;
+  await page.locator('.tone-door:enabled').first().click();
+  expect((await question.boundingBox()).height).toBe(height);
+  await expectNoOverflow(page);
+});
 
 test('Cantonese character style updates the current prompt and carries over to the guide', async ({
   page,
@@ -185,6 +253,12 @@ test('Cantonese character style updates the current prompt and carries over to t
   for (const shortcut of await shortcuts.all()) {
     if (page.viewportSize().width <= 700) await expect(shortcut).toBeHidden();
     else await expect(shortcut).toBeVisible();
+  }
+  await expect(page.locator('.keyboard')).toHaveText(
+    'Choose a tone with the keys shown on its door. Replay with Space or R.',
+  );
+  for (const key of await page.locator('.keyboard kbd').all()) {
+    await expect(key).toHaveCSS('margin-inline-start', '0px');
   }
   await page.keyboard.press(tone);
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
@@ -462,9 +536,12 @@ test('phone keyboard keeps the rail journey visible above the typing field', asy
   await start(page, 'tide');
   await page.clock.runFor(150);
   const size = page.viewportSize();
+  const prompt = page.locator('.scene-question');
+  const restingHeight = (await prompt.boundingBox()).height;
   await page.setViewportSize({ width: size.width, height: size.width === 360 ? 380 : 450 });
   await page.getByRole('textbox').focus();
   await expect(page.locator('body')).toHaveClass(/keyboard-open/);
+  expect((await prompt.boundingBox()).height).toBeLessThan(restingHeight);
   const scene = page.locator('.world-scene');
   await expect(scene).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('textbox')).toBeInViewport({ ratio: 1 });
@@ -555,11 +632,10 @@ for (const { text, parts, gloss } of [
     expect(new Set(characters.map(({ top }) => Math.round(top))).size).toBe(1);
     expect(characters[0].left).toBeGreaterThanOrEqual(word.x);
     expect(characters.at(-1).right).toBeLessThanOrEqual(word.x + word.width);
-    if (parts.length === 4) {
-      expect(meaning.x + meaning.width).toBeLessThan(word.x);
-      expect(word.x + word.width).toBeLessThan(controls.x);
-      expect(meaning.y + meaning.height / 2).toBeCloseTo(word.y + word.height / 2, 1);
-    } else expect(word.y + word.height).toBeLessThanOrEqual(controls.y);
+    expect(meaning.x + meaning.width).toBeLessThan(word.x);
+    expect(word.x + word.width).toBeLessThan(controls.x);
+    expect(meaning.y + meaning.height / 2).toBeCloseTo(word.y + word.height / 2, 1);
+    expect(controls.y + controls.height / 2).toBeCloseTo(word.y + word.height / 2, 1);
     await expectNoOverflow(page);
   });
 }
