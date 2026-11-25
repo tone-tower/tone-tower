@@ -18,6 +18,7 @@ import type {
   Tone,
   ControllerPhase,
   FailureReason,
+  RunCheckpoint,
 } from '../types.ts';
 type Timer = ReturnType<typeof setTimeout>;
 interface CountdownOptions {
@@ -41,6 +42,9 @@ interface ControllerOptions {
   words: ExerciseRow[];
   script?: string;
   onFinish?: (run: Run) => void;
+  onCheckpoint?: (checkpoint: RunCheckpoint) => void;
+  onDiscard?: () => void;
+  recoveryWarning?: () => string;
   victoryMessage?: (run: Run) => string;
   onRetry?: (config: RunInput) => void;
   onHome?: () => void;
@@ -94,13 +98,14 @@ export function createCountdown({
     handle = later(tick, Math.min(50, left));
   }
   return {
-    start(ms: number) {
+    start(ms: number, endsAt = now() + ms) {
       clearHandle();
       total = left = Math.max(0, ms);
+      deadline = endsAt;
       expired = false;
-      running = false;
-      onTick(left, total);
-      if (total > 0) this.resume();
+      running = total > 0;
+      if (running) tick();
+      else onTick(left, total);
     },
     pause() {
       left = remaining();
@@ -126,6 +131,9 @@ export function createCountdown({
     get total() {
       return total;
     },
+    get deadline() {
+      return total ? deadline : null;
+    },
     get running() {
       return running;
     },
@@ -140,6 +148,9 @@ export function createGameController({
   words,
   script: initialScript = profile.defaultScript,
   onFinish = () => {},
+  onCheckpoint = () => {},
+  onDiscard = () => {},
+  recoveryWarning = () => '',
   victoryMessage = () => '',
   onRetry = () => {},
   onHome = () => {},
@@ -148,6 +159,7 @@ export function createGameController({
 }: ControllerOptions) {
   requireProfile(profile);
   const doc = environment.document ?? globalThis.document;
+  const now = environment.now ?? Date.now;
   const later = environment.setTimeout ?? globalThis.setTimeout;
   const cancel = environment.clearTimeout ?? globalThis.clearTimeout;
   const animateScene = environment.animateWorld ?? animateWorld;
@@ -155,12 +167,14 @@ export function createGameController({
   let phase: ControllerPhase = 'idle',
     active = false,
     paused = false,
+    reloadPause = false,
     attached = false;
   let generation = 0,
     audioGeneration = 0,
     auto: Timer | null = null,
     audioReady = false,
-    audioFailed = false;
+    audioFailed = false,
+    promptPlaybackStarted = false;
   let inputValue = '',
     message = '',
     towerReady = true,
@@ -178,13 +192,32 @@ export function createGameController({
   const manualPause = () => isTide() || run.timeLimit() > 0;
   const answering = () =>
     active && !paused && phase === 'answering' && audioReady && !audioFailed && !doc?.hidden;
+  const choosingTone = () =>
+    active &&
+    !isTide() &&
+    !paused &&
+    !doc.hidden &&
+    !audioFailed &&
+    !entryVisual &&
+    (phase === 'answering' || (phase === 'listening' && promptPlaybackStarted)) &&
+    run.promptState === 'ready';
   const clock = createCountdown({
-    now: environment.now,
+    now,
     setTimeout: later,
     clearTimeout: cancel,
     onTick: updateClock,
     onExpire: () => fail('timeout'),
   });
+  const timedPrompt = () => phase === 'answering' && clock.deadline !== null;
+  const timedOut = () => phase === 'review' && run.lastFailure === 'timeout';
+  function expirePrompt() {
+    if (!active || !timedPrompt() || clock.remaining > 0) return false;
+    fail('timeout');
+    return true;
+  }
+  function checkpoint(deadline = run.promptState === 'ready' ? clock.deadline : null) {
+    onCheckpoint({ run: run.snapshot(), deadline });
+  }
 
   function cancelAuto() {
     if (auto !== null) cancel(auto);
@@ -222,6 +255,7 @@ export function createGameController({
   }
   function visibility() {
     spaceTarget = null;
+    expirePrompt();
     if (active && doc.hidden && phase !== 'interrupted') pause();
   }
   function captureInput() {
@@ -274,13 +308,16 @@ export function createGameController({
       inputValue,
       message,
       answering,
+      choosingTone,
       script,
       unveiling,
     }));
   function railFeedback() {
     const review = phase === 'review';
     const text = audioFailed
-      ? 'Recording unavailable. Clock stopped. Replay to retry.'
+      ? timedPrompt()
+        ? 'Recording unavailable. The clock is still running. Replay to retry.'
+        : 'Recording unavailable. Replay to retry.'
       : review
         ? (run.lastFailure === 'timeout' ? 'Time’s up. The answer is ' : 'The answer is ') +
           run.targets.map((i) => profile.format(run.word.syllables[i].transcription)).join(' ')
@@ -293,7 +330,7 @@ export function createGameController({
       '"><span id="rail-message">' +
       escape(text) +
       '</span>' +
-      (audioFailed
+      (audioFailed && !timedPrompt()
         ? '<button class="primary rail-continue" id="replace-recording" type="button">Replace word →</button>'
         : '') +
       '</div>'
@@ -418,14 +455,19 @@ export function createGameController({
     const text = audioFailed
       ? 'Recording unavailable. Replay to retry, or replace this word.'
       : review
-        ? (towerTerminal() ? 'Not quite' : 'You chose ' + said(run.lastAnswer)) +
+        ? (run.lastFailure === 'timeout'
+            ? 'Time’s up'
+            : towerTerminal()
+              ? 'Not quite'
+              : 'You chose ' + said(run.lastAnswer)) +
           '. The correct tone is ' +
           said(run.word.tone) +
           '.'
         : '';
-    const action = audioFailed
-      ? '<button class="primary tower-continue" id="replace-recording" type="button">Replace word →</button>'
-      : '';
+    const action =
+      audioFailed && !timedPrompt()
+        ? '<button class="primary tower-continue" id="replace-recording" type="button">Replace word →</button>'
+        : '';
     return (
       '<div class="game-feedback tower-feedback' +
       (review && !audioFailed ? ' sr-only' : '') +
@@ -450,8 +492,9 @@ export function createGameController({
         <p class="eyebrow">Paused</p>
         <h2 id="pause-title">${escape(exitConfirmation?.title ?? 'Run paused.')}</h2>
         <p>
-          ${escape(exitConfirmation?.message ?? 'Reloading or closing this page ends the run. Resume to continue.')}
+          ${escape(exitConfirmation?.message ?? (timedPrompt() ? 'The clock is still running.' : 'Resume when you’re ready.'))}
         </p>
+        ${exitConfirmation && timedPrompt() ? '<p>The clock is still running.</p>' : ''}
         <div class="game-actions">
           <button class="primary" id="resume-game" type="button">
             Resume <span aria-hidden="true">→</span></button
@@ -493,9 +536,10 @@ export function createGameController({
       maxLives: run.maxLives,
       practice: run.config.practice && run.config.format === 'drill',
       timed: run.timeLimit() > 0,
-      remaining: (clock.total ? clock.remaining : run.timeLimit()) / 1000,
-      approach:
-        clock.total && ['answering', 'review'].includes(phase)
+      remaining: timedOut() ? 0 : (clock.total ? clock.remaining : run.timeLimit()) / 1000,
+      approach: timedOut()
+        ? 1
+        : clock.total && ['answering', 'review'].includes(phase)
           ? Math.min(1, Math.max(0, 1 - clock.remaining / clock.total))
           : 0,
     };
@@ -549,6 +593,7 @@ export function createGameController({
           : phase === 'correct' || phase === 'landing'
             ? success
             : '';
+    const recovery = recoveryWarning();
     const markup = /* HTML */ `<div
       class="game-layout"
       tabindex="-1"
@@ -577,6 +622,9 @@ export function createGameController({
           ${run.config.practice && run.status === 'playing' ? '<button class="quiet" id="finish-practice" type="button">Finish practice</button>' : ''}
         </div>
         <div id="audio-error" class="error" role="alert"></div>
+        <p id="recovery-status" class="small" role="status" ${recovery ? '' : 'hidden'}>
+          ${escape(recovery)}
+        </p>
         ${!isTide() && !inTowerLanding && !terminal() ? `<p class="small keyboard">${phase === 'listening' || phase === 'answering' ? 'Choose a tone with the keys shown on its door. ' : ''}Replay with <kbd>Space</kbd> or <kbd>R</kbd>.</p>` : ''}
       </div>
       <p id="audio-status" class="game-message sr-only" role="status"></p>
@@ -737,6 +785,7 @@ export function createGameController({
     q('#resume-game')?.addEventListener('click', resume);
     q('#end-run')?.addEventListener('click', () => {
       const leave = exitConfirmation?.confirm ?? onHome;
+      onDiscard();
       dispose();
       leave();
     });
@@ -750,41 +799,40 @@ export function createGameController({
     const count = q('#countdown')!,
       initialLimit = !audioReady ? run.timeLimit() : 0;
     if (count)
-      count.textContent = total
-        ? Math.ceil(left / 1000) + 's'
-        : initialLimit
-          ? Math.ceil(initialLimit / 1000) + 's'
-          : '∞';
+      count.textContent = timedOut()
+        ? '0s'
+        : total
+          ? Math.ceil(left / 1000) + 's'
+          : initialLimit
+            ? Math.ceil(initialLimit / 1000) + 's'
+            : '∞';
     const scene = q('.world-scene')!,
-      fraction =
-        phase === 'review' && run.lastFailure === 'timeout'
-          ? 1
-          : total
-            ? Math.min(1, Math.max(0, 1 - left / total))
-            : 0;
+      fraction = timedOut() ? 1 : total ? Math.min(1, Math.max(0, 1 - left / total)) : 0;
     scene?.style.setProperty('--rail-progress', `${fraction * 100}%`);
     scene?.classList.toggle('is-danger', fraction >= 0.75);
     syncScene();
   }
   function enableAnswers() {
-    qa('[data-tone]').forEach((button) => (button.disabled = !answering()));
+    qa('[data-tone]').forEach((button) => (button.disabled = !choosingTone()));
     for (const selector of ['#check-answer', '#reveal-answer'] as const) {
       const button = q(selector)!;
       if (button) button.disabled = !answering();
     }
   }
   async function playPrompt() {
-    if (!active || paused || doc?.hidden) return;
+    if (!active || paused || doc?.hidden || expirePrompt()) return;
     const own = ++audioGeneration,
       current = generation,
       first = !audioReady;
     if (first) phase = 'listening';
+    promptPlaybackStarted = true;
     const status = q('#audio-status')!;
     if (status) status.textContent = 'Listening…';
     enableAnswers();
     try {
       await player.play(run.word.audio);
-      if (!active || own !== audioGeneration || current !== generation || paused) return;
+      if (!active || own !== audioGeneration || current !== generation || paused || expirePrompt())
+        return;
       const wasFailed = audioFailed;
       audioReady = true;
       audioFailed = false;
@@ -793,7 +841,8 @@ export function createGameController({
         entryVisual = false;
         phase = 'answering';
         clock.start(run.timeLimit());
-      } else if (wasFailed) clock.resume();
+        if (clock.deadline !== null) checkpoint();
+      }
       if (wasFailed) render({ focus: false });
       app.dataset.outcome = presentation();
       q('.game-layout')!.dataset.outcome = presentation();
@@ -811,16 +860,18 @@ export function createGameController({
       syncScene();
       if (isTide()) submit(true);
     } catch (error) {
-      if (!active || own !== audioGeneration || current !== generation || paused) return;
-      clock.pause();
+      if (!active || own !== audioGeneration || current !== generation || paused || expirePrompt())
+        return;
       captureInput();
       audioFailed = true;
-      message = 'Sound is unavailable. Replay to retry, or replace this word without penalty.';
+      message = timedPrompt()
+        ? 'Sound is unavailable. Replay to retry while the clock is running.'
+        : 'Sound is unavailable. Replay to retry, or replace this word without penalty.';
       render({ focus: false });
     }
   }
   function replay() {
-    if (!active || paused || doc?.hidden) return;
+    if (!active || paused || doc?.hidden || expirePrompt()) return;
     if (entryVisual) {
       cancelAuto();
       entryVisual = false;
@@ -856,31 +907,31 @@ export function createGameController({
     stopPlayback();
     audioReady = false;
     audioFailed = false;
+    promptPlaybackStarted = false;
     inputValue = '';
     message = '';
     towerReady = true;
     outcome = null;
     phase = 'listening';
     answeredPosition = run.opened + 1;
+    checkpoint();
     render();
     player.preload?.([run.word.audio]);
+    if (paused) return;
     if (doc?.hidden) pause();
     else if (entryVisual) playOpening();
     else playPrompt();
   }
   function choose(value: Tone | undefined) {
-    if (!answering() || q('.world-scene')?.hasAttribute('data-moving')) return;
+    if (expirePrompt() || !choosingTone() || q('.world-scene')?.hasAttribute('data-moving')) return;
     const result = run.answer(value);
     if (result?.kind === 'empty') return;
     settle(result);
   }
   function submit(quiet = false) {
-    if (!isTide() || !answering() || q('#transcription-answer')?.composing) return;
-    captureInput();
-    if (clock.total && clock.remaining <= 0) {
-      fail('timeout');
+    if (!isTide() || expirePrompt() || !answering() || q('#transcription-answer')?.composing)
       return;
-    }
+    captureInput();
     const expected = run.expectedParts();
     if (
       quiet &&
@@ -904,6 +955,7 @@ export function createGameController({
       return;
     }
     if (!result?.correct) {
+      checkpoint();
       message = run.config.practice
         ? 'Not quite — try again.'
         : 'Not quite—try again. No life lost.';
@@ -923,8 +975,10 @@ export function createGameController({
     stopPlayback();
     message = '';
     outcome = result;
+    audioFailed = false;
     phase = result.correct ? (result.landing ? 'landing' : 'correct') : 'review';
     towerReady = !towerStop();
+    if (!terminal()) checkpoint();
     unveiling = true;
     render();
     unveiling = false;
@@ -944,16 +998,24 @@ export function createGameController({
     );
   }
   function fail(reason: FailureReason) {
-    if (!answering()) return;
+    if (reason === 'timeout') {
+      if (!active || !timedPrompt() || run.promptState !== 'ready') return;
+      if (reloadPause) {
+        reloadPause = false;
+        paused = false;
+      }
+    } else if (expirePrompt() || !answering()) return;
     captureInput();
     clock.pause();
     stopPlayback();
     cancelAuto();
     outcome = run.fail(reason);
+    audioFailed = false;
     if (isTide()) run.lastAnswer = inputValue;
     message = '';
     phase = 'review';
     towerReady = !towerStop();
+    if (!terminal()) checkpoint();
     unveiling = true;
     render();
     unveiling = false;
@@ -982,7 +1044,7 @@ export function createGameController({
     }
   }
   function replace() {
-    if (!active || paused || !audioFailed) return;
+    if (!active || paused || expirePrompt() || !audioFailed || timedPrompt()) return;
     stop({ keepScene: true });
     try {
       if (run.replace()) beginPrompt();
@@ -1028,9 +1090,9 @@ export function createGameController({
   }
   function pause() {
     if (!active || paused) return;
+    expirePrompt();
     captureInput();
     paused = true;
-    clock.pause();
     cancelAuto();
     stopPlayback();
     render();
@@ -1043,13 +1105,15 @@ export function createGameController({
   }
   function resume() {
     if (!active || !paused || doc?.hidden) return;
+    expirePrompt();
+    const replayRestoredPrompt = reloadPause;
+    reloadPause = false;
     paused = false;
     exitConfirmation = null;
     render({ focus: false });
     if (['listening', 'answering'].includes(phase)) {
       if (entryVisual) playOpening();
-      else if (!audioReady) playPrompt();
-      else if (!audioFailed) clock.resume();
+      else if (!audioReady || replayRestoredPrompt) playPrompt();
       enableAnswers();
     } else if (towerStop() && !towerReady) unlockTowerStop();
     else if (phase === 'correct' && !towerStop()) scheduleAdvance();
@@ -1106,7 +1170,7 @@ export function createGameController({
     } else if (!typing && event.key === 'Enter' && q('#continue-game')) {
       event.preventDefault();
       advance();
-    } else if (!typing && !isTide() && answering()) {
+    } else if (!typing && choosingTone()) {
       const keyed = /^[1-9]$/.test(event.key) ? profile.tones[Number(event.key) - 1] : undefined;
       const index = arrowChoiceIndex(run.choices.length, event.key);
       if (keyed !== undefined || index !== null) {
@@ -1124,6 +1188,7 @@ export function createGameController({
     stop();
     active = false;
     paused = false;
+    reloadPause = false;
     exitConfirmation = null;
     spaceTarget = null;
     if (siteHeader) siteHeader.inert = false;
@@ -1138,6 +1203,57 @@ export function createGameController({
       active = true;
       attach();
       beginPrompt();
+      return run;
+    },
+    restore(saved: RunCheckpoint, { paused: pauseOnReload = false } = {}) {
+      dispose();
+      run = createRun(saved.run.config, words, {
+        profile,
+        heartRandom: environment.heartRandom,
+        snapshot: saved.run,
+      });
+      const limit = run.timeLimit();
+      if (
+        saved.deadline !== null &&
+        (!limit || run.promptState !== 'ready' || saved.deadline > now() + limit)
+      )
+        throw Error('The saved prompt has an invalid deadline.');
+
+      active = true;
+      entryVisual = false;
+      audioFailed = false;
+      audioReady = saved.deadline !== null;
+      promptPlaybackStarted = audioReady;
+      attach();
+      if (run.promptState === 'ready' && saved.deadline === null) {
+        paused = reloadPause = pauseOnReload;
+        beginPrompt();
+        return run;
+      }
+
+      inputValue = isTide() && typeof run.lastAnswer === 'string' ? run.lastAnswer : '';
+      message = '';
+      outcome = run.lastResult;
+      answeredPosition = run.opened + (run.promptState === 'answered' ? 0 : 1);
+      towerReady = true;
+      phase =
+        run.promptState === 'ready'
+          ? 'answering'
+          : run.promptState === 'failed'
+            ? 'review'
+            : outcome?.landing
+              ? 'landing'
+              : 'correct';
+      paused = reloadPause =
+        pauseOnReload && (phase === 'answering' || (phase === 'correct' && !towerStop()));
+      checkpoint(saved.deadline);
+      if (saved.deadline !== null) {
+        clock.start(limit, saved.deadline);
+        if (run.promptState === 'failed') return run;
+      }
+      render();
+      if (doc.hidden) pause();
+      else if (!paused && phase === 'correct' && !towerStop()) scheduleAdvance();
       return run;
     },
     pause,

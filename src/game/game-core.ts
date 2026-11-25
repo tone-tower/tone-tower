@@ -9,6 +9,7 @@ import type {
   FailureReason,
   PracticePrompt,
   RunResult,
+  RunSnapshot,
 } from '../types.ts';
 import { shuffle, buildChoices } from './logic.ts';
 import { chooseWordRecording, wordIdentity } from '../content/catalog.ts';
@@ -252,6 +253,17 @@ export function validatePractice(
   return { valid: !errors.length, errors, config };
 }
 
+function recordingSignature(word: ExerciseRow) {
+  return JSON.stringify([
+    word.audio,
+    word.syllables.map(({ transcription, tone, toneEligible }) => [
+      transcription,
+      tone,
+      toneEligible !== false,
+    ]),
+  ]);
+}
+
 export function createRun(
   input: RunInput = {},
   words: ExerciseRow[] = [],
@@ -259,7 +271,13 @@ export function createRun(
     profile,
     random = Math.random,
     heartRandom = Math.random,
-  }: { profile?: LanguageProfile; random?: () => number; heartRandom?: () => number } = {},
+    snapshot,
+  }: {
+    profile?: LanguageProfile;
+    random?: () => number;
+    heartRandom?: () => number;
+    snapshot?: RunSnapshot;
+  } = {},
 ): Run {
   profile = requireProfile(profile);
   let config = normalizeConfig(input, profile);
@@ -614,7 +632,109 @@ export function createRun(
       this.status = 'complete';
       return true;
     },
+    snapshot() {
+      return structuredClone({
+        config,
+        recordingId: this.word.id,
+        recordingSignature: recordingSignature(this.word),
+        targets: this.targets,
+        choices: this.choices,
+        usedIds: [...used],
+        toneBag,
+        skippedReviews,
+        heartAhead,
+        opened: this.opened,
+        cleared: this.cleared,
+        attempts: this.attempts,
+        mistakes: this.mistakes,
+        guesses: this.guesses,
+        lives: this.lives,
+        status: this.status,
+        missedIds: this.missedIds,
+        missedPrompts: this.missedPrompts,
+        confusions: this.confusions,
+        assisted: this.assisted,
+        wordAssisted: this.word.assisted === true,
+        promptState: this.promptState,
+        lastAnswer:
+          typeof this.lastAnswer === 'string' || typeof this.lastAnswer === 'number'
+            ? this.lastAnswer
+            : null,
+        lastFailure: this.lastFailure,
+        lastResult: this.lastResult,
+        stages: this.stages,
+      });
+    },
   };
-  run.next();
+  if (!snapshot) {
+    run.next();
+    return run;
+  }
+  const recordings = new Map(pool.map((word) => [word.id, word]));
+  const recording = recordings.get(snapshot.recordingId);
+  const targetIndex = snapshot.targets[0];
+  const tone = recording?.syllables[targetIndex]?.tone;
+  const countInStages = (key: 'attempts' | 'correct' | 'mistakes') =>
+    snapshot.stages.reduce((sum, stage) => sum + stage[key], 0);
+  if (
+    !recording ||
+    snapshot.recordingSignature !== recordingSignature(recording) ||
+    tone === undefined ||
+    snapshot.targets.some((i) => !recording.syllables[i]) ||
+    new Set(snapshot.targets).size !== snapshot.targets.length ||
+    (config.challenge === 'tone'
+      ? snapshot.targets.length !== 1 ||
+        recording.syllables[targetIndex].toneEligible === false ||
+        !snapshot.choices.includes(tone) ||
+        !profile.choiceCounts.includes(snapshot.choices.length) ||
+        new Set(snapshot.choices).size !== snapshot.choices.length
+      : snapshot.choices.length !== 0) ||
+    snapshot.usedIds.some((id) => !recordings.has(id)) ||
+    (!reviewPrompts && !snapshot.usedIds.includes(recording.id)) ||
+    (!reviewPrompts && snapshot.skippedReviews !== 0) ||
+    snapshot.toneBag.some((item) => !config.tones.includes(item)) ||
+    snapshot.opened !== start + snapshot.cleared ||
+    snapshot.attempts !== snapshot.cleared + snapshot.mistakes ||
+    snapshot.attempts !== countInStages('attempts') ||
+    snapshot.cleared !== countInStages('correct') ||
+    snapshot.mistakes !== countInStages('mistakes') ||
+    (maxLives === null
+      ? snapshot.lives !== null
+      : snapshot.lives === null || snapshot.lives > maxLives) ||
+    (snapshot.status === 'playing' && snapshot.lives === 0) ||
+    (!config.practice && snapshot.status !== 'playing') ||
+    (config.practice && snapshot.status === 'won')
+  )
+    throw Error('This saved run no longer matches the recording library.');
+  used = new Set(snapshot.usedIds);
+  usedWords = new Set(pool.filter((word) => used.has(word.id)).map(wordIdentity));
+  toneBag = [...snapshot.toneBag];
+  skippedReviews = snapshot.skippedReviews;
+  heartAhead = snapshot.heartAhead;
+  run.word = {
+    ...recording,
+    syllables: recording.syllables.map((syllable) => ({ ...syllable })),
+    targetIndex,
+    ...(config.challenge === 'tone' && { tone }),
+    assisted: snapshot.wordAssisted,
+  };
+  run.targets = [...snapshot.targets];
+  run.choices = [...snapshot.choices];
+  run.opened = snapshot.opened;
+  run.cleared = snapshot.cleared;
+  run.attempts = snapshot.attempts;
+  run.mistakes = snapshot.mistakes;
+  run.guesses = snapshot.guesses;
+  run.lives = snapshot.lives;
+  run.status = snapshot.status;
+  run.missedIds = [...snapshot.missedIds];
+  run.missedPrompts = structuredClone(snapshot.missedPrompts);
+  run.confusions = { ...snapshot.confusions };
+  run.assisted = snapshot.assisted;
+  run.promptState = snapshot.promptState;
+  run.lastAnswer = snapshot.lastAnswer;
+  run.lastFailure = snapshot.lastFailure;
+  run.lastResult = snapshot.lastResult && { ...snapshot.lastResult, expected: run.expected() };
+  run.stages = structuredClone(snapshot.stages);
   return run;
 }

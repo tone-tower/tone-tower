@@ -215,6 +215,38 @@ export type RunResult =
   | (ResultDetails & { kind: 'empty'; correct: false })
   | (ResultDetails & { kind: 'wrong'; correct: false })
   | (ResultDetails & { kind: 'correct'; correct: true; heartDrop?: true });
+export interface RunSnapshot {
+  config: ExerciseConfig;
+  recordingId: string;
+  recordingSignature: string;
+  targets: number[];
+  choices: Tone[];
+  usedIds: string[];
+  toneBag: Tone[];
+  skippedReviews: number;
+  heartAhead: boolean;
+  opened: number;
+  cleared: number;
+  attempts: number;
+  mistakes: number;
+  guesses: number;
+  lives: number | null;
+  status: Run['status'];
+  missedIds: string[];
+  missedPrompts: PracticePrompt[];
+  confusions: Record<string, number>;
+  assisted: number;
+  wordAssisted: boolean;
+  promptState: Run['promptState'];
+  lastAnswer: Tone | null;
+  lastFailure: FailureReason | null;
+  lastResult: RunResult | null;
+  stages: Run['stages'];
+}
+export interface RunCheckpoint {
+  run: RunSnapshot;
+  deadline: number | null;
+}
 export interface Run {
   config: ExerciseConfig;
   profile: LanguageProfile;
@@ -252,6 +284,7 @@ export interface Run {
   answer(value: unknown): RunResult;
   fail(reason?: FailureReason): RunResult;
   finish(): boolean;
+  snapshot(): RunSnapshot;
 }
 export type ControllerPhase =
   | 'idle'

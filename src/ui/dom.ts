@@ -24,6 +24,7 @@ export type SelectorElement<S extends string> = S extends '#transcription-answer
                         | '#start-adventure'
                         | '#retry-run'
                         | '#resume-game'
+                        | '#resume-run'
                         | '#continue-game'
                         | '#credits-prev'
                         | '#credits-next'

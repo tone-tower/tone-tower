@@ -1,4 +1,4 @@
-import { cantonese } from '../../src/languages/profiles.ts';
+import { cantonese, mandarin } from '../../src/languages/profiles.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
@@ -6,6 +6,9 @@ import {
   saveProgress,
   recordRun,
   emptyProgress,
+  loadRunCheckpoint,
+  updateRunCheckpoint,
+  completeSavedRun,
 } from '../../src/persistence/progress.ts';
 import { createRun, defaultPractice } from '../../src/game/game-core.ts';
 const PROGRESS_KEY = cantonese.storageKey;
@@ -71,6 +74,44 @@ test('challenge records save once and practice never changes official records', 
   assert.equal(progress.records.tone.normal.wins, 0);
   const target = storage();
   assert.equal(saveProgress(cantonese, progress, target), true);
+  assert.deepEqual(loadProgress(cantonese, target), progress);
+});
+
+test('run checkpoints are language-scoped, survive settings writes, and settle once', () => {
+  const target = storage();
+  const run = createRun({ challenge: 'tone', variant: 'extreme' }, words, {
+    profile: cantonese,
+    random: () => 0.2,
+  });
+  const checkpoint = { run: run.snapshot(), deadline: null };
+  assert.equal(updateRunCheckpoint(cantonese, null, { id: 'one', checkpoint }, target), 'saved');
+  assert.equal(loadRunCheckpoint(mandarin, target).status, 'empty');
+  const settings = loadProgress(cantonese, target);
+  settings.settings.tideVariant = 'full';
+  assert.equal(saveProgress(cantonese, settings, target), true);
+  assert.equal(loadRunCheckpoint(cantonese, target).id, 'one');
+  assert.equal(updateRunCheckpoint(cantonese, 'one', { id: 'two', checkpoint }, target), 'saved');
+  assert.equal(updateRunCheckpoint(cantonese, 'one', null, target), 'stale');
+  run.fail();
+  run.next();
+  run.fail();
+  assert.equal(run.status, 'lost');
+  assert.equal(completeSavedRun(cantonese, run, 'one', settings, target).status, 'stale');
+  assert.equal(completeSavedRun(cantonese, run, 'two', settings, target).status, 'saved');
+  assert.equal(completeSavedRun(cantonese, run, 'two', settings, target).status, 'stale');
+  assert.equal(loadRunCheckpoint(cantonese, target).status, 'empty');
+  const finished = loadProgress(cantonese, target);
+  assert.equal(finished.records.tone.extreme.runs, 1);
+  assert.equal(finished.settings.tideVariant, 'full');
+});
+
+test('an invalid checkpoint leaves completed progress readable', () => {
+  const progress = emptyProgress(cantonese);
+  progress.records.tone.normal.runs = 2;
+  const target = storage({
+    [PROGRESS_KEY]: { ...progress, activeRun: { version: 1, id: 'bad', checkpoint: {} } },
+  });
+  assert.equal(loadRunCheckpoint(cantonese, target).status, 'invalid');
   assert.deepEqual(loadProgress(cantonese, target), progress);
 });
 

@@ -433,6 +433,14 @@ p {
   max-width: 270px;
   text-align: right;
 }
+#saved-run {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--edge);
+}
+#saved-run .game-actions {
+  justify-content: flex-start;
+}
 .home-world .game-hud small {
   display: block;
   font-size: 10px;
