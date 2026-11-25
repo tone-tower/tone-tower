@@ -30,6 +30,7 @@ interface Presentation {
   inputValue: string;
   message: string;
   answering: () => boolean;
+  choosingTone: () => boolean;
   script: string;
   unveiling: boolean;
 }
@@ -179,7 +180,7 @@ export function createGameMarkup(state: () => Presentation) {
     </div>`;
   }
   function toneButtons() {
-    const { run, phase, profile, answering } = state();
+    const { run, phase, profile, choosingTone } = state();
     const slots = doorSlots(run.choices.length).map(
       ([x, y, w, h]: number[]) =>
         `left:${x / 4.8}%;top:${y / 2.4}%;width:${w / 4.8}%;height:${h / 2.4}%`,
@@ -200,7 +201,7 @@ export function createGameMarkup(state: () => Presentation) {
           data-tone="${t}"
           aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: ' : 'Choose '}${escape(toneLabel(profile, t))}"
           aria-keyshortcuts="${[...arrows, number].join(' ')}"
-          ${!answering() ? 'disabled' : ''}
+          ${!choosingTone() ? 'disabled' : ''}
         >
           ${toneSymbolMarkup(profile, t)}<span class="tone-name"
             >${phase === 'review' && t === run.lastAnswer ? '✕ Your choice' : phase === 'review' && t === run.word.tone ? '✓ Correct' : escape(name)}</span

@@ -41,10 +41,12 @@ test.beforeEach(async ({ page }) => {
   errors.set(page, pageErrors);
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.clock.install();
-  await page.route('**/catalogs/yue.json', (route) =>
-    route.fulfill({ json: withSimplifiedCantonese(cantoneseCatalog(catalog)) }),
-  );
-  await page.addInitScript(() => {
+  await page
+    .context()
+    .route('**/catalogs/yue.json', (route) =>
+      route.fulfill({ json: withSimplifiedCantonese(cantoneseCatalog(catalog)) }),
+    );
+  await page.context().addInitScript(() => {
     window.__audioPlays = [];
     window.Audio = class {
       constructor(src) {
@@ -59,7 +61,7 @@ test.beforeEach(async ({ page }) => {
       }
       play() {
         window.__audioPlays.push(this.src);
-        this.end = setTimeout(() => this.onended?.(), 100);
+        this.end = setTimeout(() => this.onended?.(), window.__audioEndDelay ?? 100);
         return Promise.resolve();
       }
     };
@@ -470,7 +472,7 @@ test('header navigation pauses an unfinished run and confirms the full destinati
   await page.keyboard.press('Tab');
   await expect(resume).toBeFocused();
   await page.clock.runFor(5000);
-  await expect(clock).toHaveText(remaining);
+  await expect(clock).toHaveText(`${Number.parseInt(remaining, 10) - 5}s`);
   await expect(page).toHaveURL(/cantonese\/$/);
   await resume.click();
   await expect(input).toBeFocused();
@@ -482,6 +484,123 @@ test('header navigation pauses an unfinished run and confirms the full destinati
   await page.getByRole('button', { name: 'End run & go to Jyutping guide' }).press('Enter');
   await expect(page).toHaveURL(/cantonese\/guide\/$/);
   await expect(page.getByRole('heading', { name: 'Jyutping guide', exact: true })).toBeFocused();
+});
+
+test('Skyrail reload restores the game and charges an expired prompt only once', async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await start(page, 'tide');
+  await page.clock.runFor(150);
+  const prompt = await page.locator('.is-target .prompt-character').innerText();
+  await page.clock.runFor(5000);
+  await page.reload();
+  const resume = page.getByRole('button', { name: 'Resume', exact: true });
+  await expect(resume).toBeFocused();
+  await expect(page.locator('.is-target .prompt-character')).toHaveText(prompt);
+  await expect(page.locator('#countdown')).toHaveText('10s');
+  expect(await page.evaluate(() => window.__audioPlays.length)).toBe(0);
+  await resume.click();
+  expect(await page.evaluate(() => window.__audioPlays.length)).toBe(1);
+  await expect(page.locator('#countdown')).toHaveText('10s');
+
+  await page.reload();
+  await expect(resume).toBeVisible();
+  await page.clock.runFor(11000);
+  await expect(resume).toBeHidden();
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'timeout');
+  await expect(page.locator('#countdown')).toHaveText('0s');
+  await expect(page.locator('.game-readout')).toContainText('3 of 4 lives remaining');
+  await page.reload();
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'timeout');
+  await expect(resume).toBeHidden();
+  await expect(page.locator('.game-readout')).toContainText('3 of 4 lives remaining');
+
+  await page.getByRole('button', { name: 'Pause game' }).click();
+  await page.getByRole('button', { name: 'End run & return' }).click();
+  await page.reload();
+  await expect(page.locator('#start-adventure')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resume run' })).toBeHidden();
+});
+
+test('reloading a Tower prompt restores the game and waits for Resume before playing', async ({
+  page,
+}) => {
+  await start(page, 'tone');
+  await page.clock.runFor(2200);
+  const prompt = await page.locator('.is-target .prompt-character').innerText();
+  const choices = page.locator('.tone-door');
+  const originalChoices = await choices.allTextContents();
+
+  await page.reload();
+  const resume = page.getByRole('button', { name: 'Resume', exact: true });
+  await expect(resume).toBeFocused();
+  await expect(page.locator('.is-target .prompt-character')).toHaveText(prompt);
+  await expect(choices).toHaveText(originalChoices);
+  await page.clock.runFor(2200);
+  expect(await page.evaluate(() => window.__audioPlays.length)).toBe(0);
+  await resume.click();
+  expect(await page.evaluate(() => window.__audioPlays.length)).toBe(1);
+  await expect(choices.first()).toBeEnabled();
+});
+
+test('an unfinished Tower run can be reopened, kept, or discarded from Home', async ({
+  page,
+  context,
+}) => {
+  await start(page, 'tone');
+  await page.clock.runFor(2200);
+  const tone = await currentTone(page);
+  const wrong = page.locator(`[data-tone]:not([data-tone="${tone}"])`).first();
+  const wrongTone = await wrong.getAttribute('data-tone');
+  await wrong.click();
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'wrong');
+  const url = page.url();
+  const pageErrors = errors.get(page);
+  await page.close();
+
+  const reopened = await context.newPage();
+  reopened.on('pageerror', (error) => pageErrors.push(error.message));
+  await reopened.goto(url);
+  const resume = reopened.getByRole('button', { name: 'Resume run' });
+  await expect(resume).toBeVisible();
+  await reopened.locator('#start-adventure').click();
+  await reopened.getByRole('button', { name: 'Keep saved run' }).click();
+  await resume.click();
+  await expect(reopened.locator('#app')).toHaveAttribute('data-outcome', 'wrong');
+  await expect(reopened.locator('.tone-door.is-wrong')).toHaveAttribute('data-tone', wrongTone);
+  await expect(reopened.locator('.game-readout')).toContainText('3 of 4 lives remaining');
+
+  await reopened.goto('about:blank');
+  await reopened.goto(url);
+  await reopened.locator('#start-adventure').click();
+  await reopened.getByRole('button', { name: 'Start new run' }).click();
+  await expect(reopened.locator('.game-readout')).toContainText('4 of 4 lives remaining');
+  await reopened.goto('about:blank');
+  await reopened.goto(url);
+  await reopened.getByRole('button', { name: 'Discard run' }).click();
+  await expect(resume).toBeHidden();
+  await reopened.reload();
+  await expect(resume).toBeHidden();
+});
+
+test('a Tower door can be activated while the recording is still playing', async ({
+  page,
+  hasTouch,
+}) => {
+  await page.evaluate(() => {
+    window.__audioEndDelay = 10000;
+  });
+  await start(page, 'tone');
+  await page.clock.runFor(2000);
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'listening');
+  expect(await page.evaluate(() => window.__audioPlays.length)).toBe(1);
+  const door = page.locator(`[data-tone="${await currentTone(page)}"]`);
+  await expect(door).toBeEnabled();
+  if (hasTouch) await door.tap();
+  else await door.click();
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+  await expect(page.locator('.tone-door:enabled')).toHaveCount(0);
 });
 
 test('Tower returns pointer replay focus to gameplay and keeps arrow shortcuts off buttons', async ({
@@ -622,7 +741,7 @@ test('Skyrail retry, crossing, pause and timeout keep the input usable', async (
   await start(page, 'tide');
   await page.clock.runFor(150);
   await expect(page.locator('.rail-feedback')).toBeHidden();
-  const input = page.getByRole('textbox');
+  const input = page.locator('#transcription-answer');
   const character = await page.locator('.is-target .prompt-character').innerText();
   await expect(input).toHaveAccessibleName('Jyutping for the highlighted syllable, ' + character);
   const originalInput = await input.elementHandle();
@@ -642,17 +761,18 @@ test('Skyrail retry, crossing, pause and timeout keep the input usable', async (
   await expect(input).toHaveValue('');
   expect(await input.evaluate((node, original) => node === original, originalInput)).toBe(true);
   await input.fill('unfinished');
+  const answerLayout = await layoutBoxes(page, skyrailLayout);
   await page.getByRole('button', { name: 'Pause game' }).click();
+  await expect(page.getByRole('dialog')).toContainText('The clock is still running.');
   await page.clock.runFor(20000);
   await expect(input).toHaveValue('unfinished');
+  await expect(page.locator('#countdown')).toHaveText('0s');
   await page.getByRole('button', { name: 'Resume', exact: false }).click();
-  const reviewLayout = await layoutBoxes(page, skyrailLayout);
-  await page.clock.runFor(16000);
   await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'timeout');
   await expect(page.locator('.rail-feedback')).toHaveCSS('clip-path', 'inset(50%)');
   const report = page.locator('.rail-review-actions .recording-report');
   await expect(report).toBeVisible();
-  expect(await layoutBoxes(page, skyrailLayout)).toEqual(reviewLayout);
+  expect(await layoutBoxes(page, skyrailLayout)).toEqual(answerLayout);
   const [actions, scenery] = await layoutBoxes(page, ['.rail-review-actions', '.scene-frame']);
   expect(actions.y + actions.height).toBeLessThanOrEqual(scenery.y);
   const nextCar = page.getByRole('button', { name: /Catch the next car/ });

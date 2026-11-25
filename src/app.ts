@@ -7,6 +7,7 @@ import type {
   ExerciseConfig,
   RunInput,
   Run,
+  RunCheckpoint,
 } from './types.ts';
 import { siteRoot, siteURL, localizeAssets } from './site-root.ts';
 import { languages } from './languages/profiles.ts';
@@ -23,7 +24,14 @@ import {
   RAIL_DIFFICULTIES,
   TONE_VARIANTS,
 } from './game/game-core.ts';
-import { loadProgress, saveProgress, recordRun, challengeRecords } from './persistence/progress.ts';
+import {
+  loadProgress,
+  saveProgress,
+  challengeRecords,
+  loadRunCheckpoint,
+  updateRunCheckpoint,
+  completeSavedRun,
+} from './persistence/progress.ts';
 import { createGameController } from './game/game-controller.ts';
 import { districts } from './world/worlds.js';
 import { animateWorld } from './world/world-runtime.js';
@@ -82,6 +90,8 @@ let progress = loadProgress(profile),
   controller: ReturnType<typeof createGameController> | null = null,
   dialogOpener: HTMLElement | null = null,
   screen = 'home';
+let runOwner: { id: string; expectedId: string | null } | null = null;
+let runSaveStatus: ReturnType<typeof updateRunCheckpoint> = 'saved';
 const availability = () => (catalog ?? guideCatalog)?.availability;
 const libraryUnavailable = () => availability()?.ready === false;
 function loadLibrary(): Promise<ExerciseRow[]> {
@@ -109,11 +119,43 @@ function applyScript(script: string) {
   }
   controller?.setScript(script);
 }
-const persist = () => saveProgress(profile, progress);
+const persist = () => {
+  progress = { ...loadProgress(profile), settings: progress.settings };
+  saveProgress(profile, progress);
+};
+const recoveryWarning = () =>
+  runSaveStatus === 'unavailable'
+    ? 'This browser couldn’t save the run. Recovery may be unavailable.'
+    : runSaveStatus === 'stale'
+      ? 'The saved run changed in another tab. Progress in this tab can’t be saved.'
+      : '';
+function setRunSaveStatus(status: typeof runSaveStatus) {
+  runSaveStatus = status;
+  const warning = query(app, '#recovery-status');
+  if (warning) {
+    warning.textContent = recoveryWarning();
+    warning.hidden = !warning.textContent;
+  }
+}
+function saveCheckpoint(checkpoint: RunCheckpoint) {
+  if (!runOwner || runSaveStatus === 'stale') return;
+  const { id, expectedId } = runOwner;
+  const status = updateRunCheckpoint(profile, expectedId, { id, checkpoint });
+  if (status === 'saved') {
+    runOwner.expectedId = id;
+    setRunHistory(id);
+  }
+  setRunSaveStatus(status);
+}
+function discardCheckpoint() {
+  if (runOwner && runSaveStatus !== 'stale' && runOwner.expectedId)
+    setRunSaveStatus(updateRunCheckpoint(profile, runOwner.expectedId, null));
+  runOwner = null;
+}
 const rewardMessages = new WeakMap<Run, string>();
 let homecoming: string[] = [];
 function victoryMessage(run: Run): string {
-  if (run.config.practice || run.status !== 'won') return '';
+  if (run.config.practice || run.status !== 'won' || runSaveStatus === 'stale') return '';
   const cached = rewardMessages.get(run);
   if (cached !== undefined) return cached;
   const difficulty = homeDifficulties.find(
@@ -149,6 +191,7 @@ function resetView(view: string) {
     else link.removeAttribute('aria-current');
   });
   setPageLocation(['sounds', 'about', 'home'].includes(view) ? view : 'home', true);
+  setRunHistory(null);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 function focusTitle() {
@@ -295,6 +338,15 @@ function home(world?: Challenge, initialPractice = false) {
         </div>
         <div class="dock">
           <div>
+            <section id="saved-run" aria-labelledby="saved-run-title" hidden>
+              <h2 id="saved-run-title">Unfinished run</h2>
+              <p id="saved-run-details" class="small"></p>
+              <div class="game-actions">
+                <button id="resume-run" class="primary" type="button">Resume run</button>
+                <button id="discard-run" class="quiet" type="button">Discard run</button>
+              </div>
+            </section>
+            <p id="saved-run-status" class="small" role="status" hidden></p>
             <h2 id="destination-title"></h2>
             <div class="setup-tabs" role="group" aria-label="Game or practice">
               <button type="button" id="setup-game" aria-pressed="true">Play game</button>
@@ -555,6 +607,7 @@ function home(world?: Challenge, initialPractice = false) {
       }),
   );
   select(mapDestination);
+  showRunRecovery();
   mapNavigationCleanup = bindMapNavigation({
     document,
     container: app,
@@ -593,13 +646,102 @@ function showWorkshop() {
   query(app, '#setup-practice')?.focus();
 }
 
-function begin(config: RunInput) {
+function showRunRecovery() {
+  const card = query(app, '#saved-run');
+  if (!card) return;
+  const saved = loadRunCheckpoint(profile);
+  const status = required(app, '#saved-run-status');
+  const announce = (message: string) => {
+    status.textContent = message;
+    status.hidden = !message;
+  };
+  card.hidden = saved.status !== 'saved';
+  announce(
+    saved.status === 'invalid'
+      ? 'This saved run is incompatible. You can start a fresh run.'
+      : saved.status === 'unavailable'
+        ? 'Run recovery is unavailable in this browser.'
+        : '',
+  );
+  if (saved.status !== 'saved') return;
+  const { run } = saved.checkpoint;
+  const activity = challenges[run.config.challenge].title;
+  required(card, '#saved-run-details').textContent = run.config.practice
+    ? `${activity} practice · ${run.cleared} correct · ${run.mistakes} missed`
+    : `${activity} · ${run.opened} of 100 cleared · ${run.lives} ${run.lives === 1 ? 'life' : 'lives'} left`;
+  const resume = required(card, '#resume-run');
+  const discard = required(card, '#discard-run');
+  discard.onclick = () => {
+    const result = updateRunCheckpoint(profile, saved.id, null);
+    showRunRecovery();
+    if (result === 'saved') {
+      announce('Saved run discarded.');
+      query(app, '#start-adventure')?.focus();
+    } else if (result === 'unavailable') announce('This browser couldn’t discard the saved run.');
+  };
+  resume.onclick = async () => {
+    resume.disabled = true;
+    announce('Loading the recording library…');
+    try {
+      await loadLibrary();
+    } catch {
+      if (card.isConnected) announce('Couldn’t load the recording library. Try again.');
+      return;
+    } finally {
+      resume.disabled = false;
+    }
+    if (!card.isConnected || dialog.open) return;
+    if (libraryUnavailable()) {
+      announce('The recording library is unavailable. Try again later.');
+      return;
+    }
+    const latest = loadRunCheckpoint(profile);
+    if (latest.status !== 'saved' || latest.id !== saved.id) {
+      showRunRecovery();
+      return;
+    }
+    enterGame(latest.checkpoint.run.config, latest.id, latest.checkpoint);
+  };
+}
+
+function begin(config: RunInput, approvedId?: string) {
   if (libraryUnavailable()) {
     screenError(
       'There are not enough recordings for this collection yet. Please explore the guide for now.',
     );
     return;
   }
+  const saved = loadRunCheckpoint(profile);
+  if (saved.status === 'saved' && saved.id !== approvedId) {
+    openDialog(
+      /* HTML */ ` <h2 id="dialog-title">Replace your saved run?</h2>
+        <p>Starting a new run discards your unfinished run.</p>
+        <div class="game-actions">
+          <button id="replace-saved-run" class="primary" type="button">Start new run</button>
+          <button id="keep-saved-run" class="quiet" type="button">Keep saved run</button>
+        </div>`,
+    );
+    required(dialogBody, '#keep-saved-run').onclick = () => dialog.close();
+    required(dialogBody, '#replace-saved-run').onclick = () => {
+      dialog.close();
+      begin(config, saved.id);
+    };
+    return;
+  }
+  enterGame(config, saved.status === 'saved' ? saved.id : null);
+}
+
+function enterGame(
+  config: RunInput,
+  expectedId: string | null,
+  saved?: RunCheckpoint,
+  pauseOnRestore = false,
+) {
+  const id = [...crypto.getRandomValues(new Uint32Array(4))]
+    .map((n) => n.toString(16).padStart(8, '0'))
+    .join('');
+  runOwner = { id, expectedId };
+  runSaveStatus = 'saved';
   resetView('game');
   try {
     controller ??= createGameController({
@@ -610,22 +752,39 @@ function begin(config: RunInput) {
       words: data.filter((word) => !word.anchor),
       script: progress.settings.script,
       onFinish: finish,
+      onCheckpoint: saveCheckpoint,
+      onDiscard: discardCheckpoint,
+      recoveryWarning,
       victoryMessage,
       onRetry: begin,
       onHome: home,
       onPractice: (run, mode) => begin(practiceForRun(run, mode)),
     });
-    controller.start(config);
+    if (saved) controller.restore(saved, { paused: pauseOnRestore });
+    else controller.start(config);
   } catch (error) {
+    if (saved) discardCheckpoint();
+    runOwner = null;
     prepare(config.challenge ?? 'tone');
-    screenError(errorMessage(error));
+    screenError(
+      saved ? 'This saved run is incompatible. You can start a fresh run.' : errorMessage(error),
+    );
   }
 }
 function finish(run: Run) {
-  const message = victoryMessage(run);
-  if (!run.recorded && message) homecoming.push(message);
-  recordRun(progress, run);
-  persist();
+  if (!run.recorded) {
+    const message = victoryMessage(run);
+    const result =
+      runSaveStatus === 'stale'
+        ? { status: 'stale' as const, progress: loadProgress(profile) }
+        : completeSavedRun(profile, run, runOwner?.expectedId ?? null, progress);
+    setRunSaveStatus(result.status);
+    progress = result.progress;
+    run.recorded = true;
+    runOwner = null;
+    setRunHistory(null);
+    if (message && result.status !== 'stale') homecoming.push(message);
+  }
   if (run.config.practice) {
     controller?.dispose();
     showResults(run);
@@ -640,6 +799,7 @@ function showResults(run: Run) {
       <div><strong>${run.cleared}</strong><span>Correct answers</span></div>
       <div><strong>${run.mistakes}</strong><span>Missed answers</span></div>
     </div>
+    ${recoveryWarning() ? `<p class="small" role="status">${escape(recoveryWarning())}</p>` : ''}
     <div class="results-actions">
       <button id="retry" class="primary" type="button">Practice again</button>
       <button id="result-home" class="text-button" type="button">Back to Home</button>
@@ -710,6 +870,18 @@ function bindToneAudio(
         }
       }),
   );
+}
+function runHistoryId() {
+  const state: unknown = history.state;
+  return state !== null &&
+    typeof state === 'object' &&
+    'toneTowerRun' in state &&
+    typeof state.toneTowerRun === 'string'
+    ? state.toneTowerRun
+    : null;
+}
+function setRunHistory(id: string | null) {
+  if (id !== runHistoryId()) history.replaceState(id === null ? null : { toneTowerRun: id }, '');
 }
 function setPageLocation(page: string, replace = false) {
   const destination = new URL(pages[page].path, appBase);
@@ -885,15 +1057,57 @@ dialog.addEventListener('click', (event) => {
 window.addEventListener('popstate', () => {
   if (screen === 'game' && controller?.active) {
     setPageLocation('home', true);
+    const ownedId = runOwner && runOwner.expectedId === runOwner.id ? runOwner.id : null;
+    setRunHistory(runSaveStatus === 'stale' ? null : ownedId);
     return;
   }
   navigate(pageFromLocation(new URL(location.href), appBase, profile), { replace: true });
 });
-
-navigate(pageFromLocation(new URL(location.href), appBase, profile), {
-  replace: true,
-  focus: false,
+window.addEventListener('storage', (event) => {
+  if (event.key !== profile.storageKey && event.key !== null) return;
+  if (screen === 'home') showRunRecovery();
+  if (runOwner?.expectedId && runSaveStatus === 'saved') {
+    const current = loadRunCheckpoint(profile);
+    if (
+      current.status !== 'unavailable' &&
+      (current.status !== 'saved' || current.id !== runOwner.expectedId)
+    )
+      setRunSaveStatus('stale');
+  }
 });
+
+async function restoreReload(id: string) {
+  const showHome = () => navigate('home', { replace: true, focus: false });
+  const saved = loadRunCheckpoint(profile);
+  if (saved.status !== 'saved' || saved.id !== id) {
+    showHome();
+    return;
+  }
+  app.innerHTML = '<p id="restoring-run" role="status">Restoring your run…</p>';
+  const loading = required(app, '#restoring-run');
+  try {
+    await loadLibrary();
+  } catch {
+    if (loading.isConnected) {
+      showHome();
+      if (!dialog.open)
+        screenError('Couldn’t load the recording library. Select Resume run to try again.');
+    }
+    return;
+  }
+  if (!loading.isConnected) return;
+  const latest = loadRunCheckpoint(profile);
+  if (latest.status !== 'saved' || latest.id !== id || libraryUnavailable() || dialog.open) {
+    showHome();
+    return;
+  }
+  enterGame(latest.checkpoint.run.config, latest.id, latest.checkpoint, true);
+}
+
+const initialPage = pageFromLocation(new URL(location.href), appBase, profile);
+const reloadId = initialPage === 'home' ? runHistoryId() : null;
+if (reloadId) void restoreReload(reloadId);
+else navigate(initialPage, { replace: true, focus: false });
 
 function updateKeyboardViewport() {
   const viewport = window.visualViewport;

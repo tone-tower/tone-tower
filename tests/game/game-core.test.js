@@ -26,6 +26,32 @@ const words = Array.from({ length: 240 }, (_, i) => {
 const random = () => 0.3;
 const clear = (run) => run.answer(run.world === 'tone' ? run.word.tone : run.expected());
 
+test('a restored landing keeps the exact result and recording selection history', () => {
+  const options = { profile: cantonese, random, heartRandom: () => 1 };
+  const run = createRun({ challenge: 'tone' }, words, options);
+  run.answer(run.choices.find((tone) => tone !== run.word.tone));
+  run.next();
+  while (run.opened < 20) {
+    clear(run);
+    if (run.opened < 20) run.next();
+  }
+  const snapshot = JSON.parse(JSON.stringify(run.snapshot()));
+  const restored = createRun(snapshot.config, words, {
+    ...options,
+    random: () => assert.fail('Restore must not draw a new recording'),
+    snapshot,
+  });
+  assert.equal(restored.lastResult.landing, true);
+  assert.equal(restored.lastResult.recovered, 1);
+  assert.equal(restored.stage, 1);
+  assert.deepEqual(restored.snapshot(), run.snapshot());
+  const continued = createRun(snapshot.config, words, { ...options, snapshot });
+  continued.next();
+  assert.ok(!snapshot.usedIds.includes(continued.word.id));
+  run.next();
+  assert.deepEqual(continued.snapshot(), run.snapshot());
+});
+
 test('official tone climb retains stage, recovery, win, and difficulty rules', () => {
   let rolls = 0;
   const run = createRun({ challenge: 'tone', variant: 'normal' }, words, {

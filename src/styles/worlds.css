@@ -234,7 +234,8 @@
 .tone-door:disabled {
   opacity: 1;
 }
-.world-scene:is([data-phase='listening'], [data-moving]) .tone-door {
+.world-scene[data-phase='listening'] .tone-door:disabled,
+.world-scene[data-moving] .tone-door {
   opacity: 0.55;
 }
 .tone-door .tone-symbol {

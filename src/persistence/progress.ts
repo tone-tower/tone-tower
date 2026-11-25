@@ -7,6 +7,7 @@ import {
 } from '../game/game-core.ts';
 import { requireProfile } from '../languages/profile.ts';
 import { decodeTonePair } from './tone-pairs.ts';
+import { CHECKPOINT_VERSION, readStoredRun } from './run-checkpoint.ts';
 import type {
   LanguageProfile,
   Progress,
@@ -14,6 +15,7 @@ import type {
   Challenge,
   Run,
   RunInput,
+  RunCheckpoint,
 } from '../types.ts';
 const PROGRESS_VERSION = 3;
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
@@ -30,6 +32,16 @@ function storageOrNull(storage?: StorageLike): StorageLike | null {
   } catch {
     return null;
   }
+}
+function readSave(target: StorageLike, profile: LanguageProfile) {
+  let value: Record<string, unknown>;
+  try {
+    value = object(JSON.parse(target.getItem(profile.storageKey) ?? 'null'));
+  } catch (error) {
+    if (error instanceof SyntaxError) return {};
+    throw error;
+  }
+  return value.version === PROGRESS_VERSION ? value : {};
 }
 function cleanRecord(value: unknown): ChallengeRecord {
   const v = object(value),
@@ -178,12 +190,91 @@ export function saveProgress(
   try {
     const target = storageOrNull(storage);
     if (!target) return false;
-    target.setItem(profile.storageKey, JSON.stringify(sanitize(progress, profile)));
+    const { activeRun } = readSave(target, profile);
+    target.setItem(
+      profile.storageKey,
+      JSON.stringify({ ...sanitize(progress, profile), activeRun }),
+    );
     return true;
   } catch {
     return false;
   }
 }
+
+export function loadRunCheckpoint(profile: LanguageProfile, storage?: StorageLike) {
+  requireProfile(profile);
+  try {
+    const target = storageOrNull(storage);
+    if (!target) return { status: 'unavailable' } as const;
+    const { activeRun } = readSave(target, profile);
+    if (activeRun === undefined) return { status: 'empty' } as const;
+    const saved = readStoredRun(activeRun, profile);
+    return saved ? ({ status: 'saved', ...saved } as const) : ({ status: 'invalid' } as const);
+  } catch {
+    return { status: 'unavailable' } as const;
+  }
+}
+
+type CheckpointWrite = 'saved' | 'stale' | 'unavailable';
+
+export function updateRunCheckpoint(
+  profile: LanguageProfile,
+  expectedId: string | null,
+  next: { id: string; checkpoint: RunCheckpoint } | null,
+  storage?: StorageLike,
+): CheckpointWrite {
+  requireProfile(profile);
+  try {
+    const target = storageOrNull(storage);
+    if (!target) return 'unavailable';
+    const save = readSave(target, profile);
+    const current = readStoredRun(save.activeRun, profile);
+    if ((current?.id ?? null) !== expectedId) return 'stale';
+    target.setItem(
+      profile.storageKey,
+      JSON.stringify({
+        ...sanitize(save, profile),
+        activeRun: next ? { version: CHECKPOINT_VERSION, ...next } : undefined,
+      }),
+    );
+    return 'saved';
+  } catch {
+    return 'unavailable';
+  }
+}
+
+export function completeSavedRun(
+  profile: LanguageProfile,
+  run: Run,
+  owner: string | null,
+  fallback: Progress,
+  storage?: StorageLike,
+): { progress: Progress; status: CheckpointWrite } {
+  requireProfile(profile);
+  try {
+    const target = storageOrNull(storage);
+    if (target) {
+      const save = readSave(target, profile);
+      const progress = sanitize(save, profile);
+      if (owner && readStoredRun(save.activeRun, profile)?.id !== owner)
+        return { progress, status: 'stale' };
+      recordRun(progress, run);
+      try {
+        target.setItem(
+          profile.storageKey,
+          JSON.stringify({ ...progress, activeRun: owner ? undefined : save.activeRun }),
+        );
+        return { progress, status: 'saved' };
+      } catch {
+        return { progress, status: 'unavailable' };
+      }
+    }
+  } catch {
+    // Keep the result available in memory when storage cannot be read.
+  }
+  return { progress: recordRun(fallback, run), status: 'unavailable' };
+}
+
 export function recordRun(progress: Progress, run: Run): Progress {
   if (!run || run.recorded || !['won', 'lost', 'complete'].includes(run.status)) return progress;
   run.recorded = true;

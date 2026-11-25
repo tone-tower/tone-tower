@@ -166,7 +166,7 @@ test('Tide starts after audio, replay never resets time, and timeout costs one l
   h.controller.dispose();
 });
 
-test('pause and hidden pages freeze time and keep typed text', async () => {
+test('manual and hidden pauses keep typed text while the original deadline runs', async () => {
   const h = harness();
   h.controller.start({ challenge: 'tide' });
   h.audio();
@@ -174,23 +174,64 @@ test('pause and hidden pages freeze time and keep typed text', async () => {
   h.time.advance(5000);
   h.app.querySelector('#transcription-answer').value = 'my answer';
   h.controller.pause();
-  h.time.advance(30000);
+  h.time.advance(4000);
   assert.strictEqual(h.controller.state.mistakes, 0);
   assert.strictEqual(h.app.querySelector('#transcription-answer').value, 'my answer');
   h.controller.resume();
-  assert.strictEqual(h.app.querySelector('#countdown').textContent, '10s');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '6s');
   h.document.hidden = true;
   fire(h.document, 'visibilitychange');
   h.time.advance(30000);
-  assert.strictEqual(h.controller.state.mistakes, 0);
+  assert.strictEqual(h.controller.state.mistakes, 1);
   h.controller.resume();
   assert.ok(h.app.querySelector('#resume-game'));
   h.document.hidden = false;
   h.controller.resume();
   h.time.advance(20000);
   assert.strictEqual(h.controller.state.mistakes, 1);
+  assert.strictEqual(h.controller.state.lives, 3);
+  assert.strictEqual(h.controller.phase, 'review');
   h.controller.dispose();
 });
+
+test('a prompt already expired when restored shows timeout feedback without a reload pause', () => {
+  const h = harness();
+  const run = h.controller.start({ challenge: 'tide' });
+  const saved = { run: run.snapshot(), deadline: h.time.now() + run.timeLimit() };
+  h.controller.dispose();
+  h.time.advance(16000);
+  const restored = h.controller.restore(saved, { paused: true });
+  assert.strictEqual(h.controller.phase, 'review');
+  assert.strictEqual(h.app.dataset.outcome, 'timeout');
+  assert.strictEqual(h.app.querySelector('#resume-game'), null);
+  assert.strictEqual(restored.lives, 3);
+  assert.strictEqual(restored.mistakes, 1);
+});
+
+test.each(['click', 'keyboard'])(
+  'Tone doors accept %s while the first clip is playing',
+  async (method) => {
+    const h = harness();
+    h.controller.start({ challenge: 'tone', practice: true, timer: 'custom', seconds: 1 });
+    const run = h.controller.state;
+    const correct = method === 'click';
+    const tone = correct ? run.word.tone : run.choices.find((choice) => choice !== run.word.tone);
+    const door = h.app.querySelector(`[data-tone="${tone}"]`);
+    assert.strictEqual(h.controller.phase, 'listening');
+    assert.strictEqual(door.disabled, false);
+    if (correct) door.click();
+    else fire(h.document, 'keydown', { key: String(tone), target: h.document.body });
+    const phase = correct ? 'correct' : 'review';
+    assert.strictEqual(h.controller.phase, phase);
+    assert.strictEqual(run.attempts, 1);
+    h.requests[0].resolve();
+    await flush();
+    h.time.advance(1200);
+    assert.strictEqual(run.attempts, 1);
+    assert.strictEqual(h.controller.phase, phase);
+    assert.ok([...h.app.querySelectorAll('[data-tone]')].every((button) => button.disabled));
+  },
+);
 
 test('typing permits spaces, auto-checks only correct input and locks a cleared answer', async () => {
   const h = harness();
@@ -230,18 +271,14 @@ test('typing permits spaces, auto-checks only correct input and locks a cleared 
   h.controller.dispose();
 });
 
-test('failed replay freezes its remaining time and replacement is unscored', async () => {
+test('an initial recording failure can be replaced before the clock starts', async () => {
   const h = harness();
   h.controller.start({ challenge: 'tide' });
-  h.audio();
-  await flush();
-  h.time.advance(5000);
-  h.click('#replay-word');
   h.requests.at(-1).reject(Error('unavailable'));
   await flush();
   h.time.advance(60000);
   assert.strictEqual(h.controller.state.mistakes, 0);
-  assert.strictEqual(h.app.querySelector('#countdown').textContent, '10s');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '15s');
   assert.ok(h.app.querySelector('#replace-recording'));
   h.click('#replace-recording');
   assert.strictEqual(h.controller.state.attempts, 0);
@@ -614,18 +651,34 @@ test('audio recovery clears unavailable and retry styling without resetting the 
   h.requests.at(-1).reject(Error('offline'));
   await flush();
   assert.strictEqual(h.app.dataset.outcome, 'unavailable');
-  assert.match(h.app.innerHTML, /Clock stopped/);
-  assert.ok(h.app.querySelector('#replace-recording'));
-  h.time.advance(30000);
+  assert.match(h.app.innerHTML, /clock is still running/i);
+  assert.strictEqual(h.app.querySelector('#replace-recording'), null);
+  h.time.advance(3000);
   h.click('#replay-word');
   h.audio();
   await flush();
   assert.strictEqual(h.app.dataset.outcome, 'answering');
   assert.strictEqual(h.app.querySelector('#replace-recording'), null);
-  assert.strictEqual(h.app.querySelector('#countdown').textContent, '11s');
+  assert.strictEqual(h.app.querySelector('#countdown').textContent, '8s');
   assert.strictEqual(h.app.querySelector('#transcription-answer').value, 'zz');
   assert.strictEqual(h.controller.state.lives, 4);
   h.controller.dispose();
+});
+
+test('an ongoing deadline expires even when replay audio is unavailable', async () => {
+  const h = harness();
+  h.controller.start({ challenge: 'tide' });
+  h.audio();
+  await flush();
+  h.time.advance(14000);
+  h.click('#replay-word');
+  h.requests.at(-1).reject(Error('offline'));
+  await flush();
+  assert.strictEqual(h.app.dataset.outcome, 'unavailable');
+  h.time.advance(20000);
+  assert.strictEqual(h.controller.state.lives, 3);
+  assert.strictEqual(h.controller.state.mistakes, 1);
+  assert.strictEqual(h.app.dataset.outcome, 'timeout');
 });
 
 test('Tower checkpoints name the next district, restore lives and wait for Continue', async () => {
