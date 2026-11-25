@@ -290,6 +290,7 @@ export function drawSkyrail(ctx, s, base) {
     r(x, 215, RAIL_SPAN, 2, P.stone);
   }
   const newestRepair = j.repaired.size ? Math.max(...j.repaired) : null;
+  let dropSource;
   // Gaps are separate from scenery chunks, so construction and camera motion never reset.
   for (let i = first - 1; i < first + 6; i++) {
     const gx = i * RAIL_SPAN + 270 - cam,
@@ -318,6 +319,7 @@ export function drawSkyrail(ctx, s, base) {
     r(post - 22, 156, 47, 2, P.edge);
     if (i === j.segment) {
       const ready = s.result === 'success';
+      if (s.heartAhead || s.heartDrop) dropSource = { x: post + 1, y: 126 };
       text(
         ready ? 'GO' : s.timed === false ? '∞' : Math.ceil(s.remaining || 0) + 's',
         post + 1,
@@ -429,19 +431,8 @@ export function drawSkyrail(ctx, s, base) {
     ctx,
     s.phase === 'landing' ? { ...s, restTime: Math.max(0, (s.elapsed || 0) - 0.9) } : s,
     P,
-    { x: 160 - (s.maxLives || 4) * 6, y: 141, scale: 2 },
+    { x: 160 - (s.maxLives || 4) * 6, y: 141, scale: 2, dropSource },
   );
-  if (s.recovered && !s.reduced && (s.elapsed || 0) < 1.5) {
-    const p = Math.min(1, (s.elapsed || 0) / 1.1),
-      x = 230 - 75 * p,
-      y = 198 - 57 * p - Math.sin(p * Math.PI) * 28;
-    r(x - 4, y - 3, 3, 3, P.cream);
-    r(x + 1, y - 3, 3, 3, P.cream);
-    r(x - 4, y, 8, 3, P.red);
-    r(x - 2, y + 3, 4, 2, P.red);
-    if (p > 0.3) text('+ LIFE', 222, 125 - Math.min(1, p) * 10, P.cream, 8);
-    for (let k = 0; k < 4; k++) r(x + 8 + k * 6, y + 5 + k * 3, 2, 2, P.gold);
-  }
   if (s.phase === 'review' && s.reason === 'timeout' && (s.elapsed || 0) > 1.2) {
     const p = s.reduced ? 1 : Math.min(1, ((s.elapsed || 0) - 1.2) / 1.2),
       lx = 166,

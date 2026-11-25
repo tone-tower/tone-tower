@@ -3,6 +3,8 @@ const smooth = (value) => {
   return p * p * (3 - 2 * p);
 };
 
+export const HEART_PREVIEW_SECONDS = 0.3;
+
 // Presentation follows the controller outcome; it never awards points or changes deadlines.
 export function sceneMotion({ phase, reason }, elapsed = 0, reduced = false) {
   const success = phase === 'correct' || phase === 'landing',

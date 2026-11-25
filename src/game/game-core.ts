@@ -14,14 +14,17 @@ import { shuffle, buildChoices } from './logic.ts';
 import { chooseWordRecording, wordIdentity } from '../content/catalog.ts';
 
 import { requireProfile } from '../languages/profile.ts';
-export const TONE_VARIANTS: Readonly<Record<string, number>> = Object.freeze({
-  easy: 5,
-  normal: 4,
-  hard: 3,
-  extreme: 1,
-});
+import {
+  heartDropChance,
+  TOWER_HEART_CAPS,
+  TOWER_LAST_HEART_CHANCES,
+  TOWER_LEGACY_HEART_CAPS,
+} from './heart-recovery.ts';
+export const TONE_VARIANTS: Readonly<Record<string, number>> = TOWER_HEART_CAPS;
+const practiceLives: Readonly<Record<string, number>> = TOWER_LEGACY_HEART_CAPS;
 export const TIDE_VARIANTS = Object.freeze(['spelling', 'full']);
 export const RAIL_DIFFICULTIES = TONE_VARIANTS;
+const lastHeartChances: Readonly<Record<string, number>> = TOWER_LAST_HEART_CHANCES;
 export const RAIL_DEADLINES = Object.freeze([15, 13, 11, 9, 7]);
 export const challenges = Object.freeze({
   tone: Object.freeze({
@@ -149,11 +152,11 @@ export function validatePractice(
   if (!profile.challenges.includes(config.challenge)) errors.push('Choose a challenge.');
   if (
     config.challenge === 'tone'
-      ? !Object.hasOwn(TONE_VARIANTS, config.variant)
+      ? !Object.hasOwn(practiceLives, config.variant)
       : !TIDE_VARIANTS.includes(config.variant)
   )
     errors.push('Choose a valid challenge variant.');
-  if (config.challenge === 'tide' && !Object.hasOwn(RAIL_DIFFICULTIES, config.difficulty))
+  if (config.challenge === 'tide' && !Object.hasOwn(practiceLives, config.difficulty))
     errors.push('Choose a valid Skyrail difficulty.');
   if (!['drill', 'rehearsal'].includes(config.format)) errors.push('Choose a practice format.');
   if (
@@ -252,7 +255,11 @@ export function validatePractice(
 export function createRun(
   input: RunInput = {},
   words: ExerciseRow[] = [],
-  { profile, random = Math.random }: { profile?: LanguageProfile; random?: () => number } = {},
+  {
+    profile,
+    random = Math.random,
+    heartRandom = Math.random,
+  }: { profile?: LanguageProfile; random?: () => number; heartRandom?: () => number } = {},
 ): Run {
   profile = requireProfile(profile);
   let config = normalizeConfig(input, profile);
@@ -304,12 +311,17 @@ export function createRun(
   const reviewRecordings = reviewPrompts && new Map(pool.map((word) => [word.id, word]));
   let skippedReviews = 0;
   const start = config.practice && config.format === 'rehearsal' ? config.start - 1 : 0;
+  const difficulty = config.challenge === 'tone' ? config.variant : config.difficulty;
   const maxLives =
     config.practice && config.lives === 'unlimited'
       ? null
-      : config.challenge === 'tone'
-        ? TONE_VARIANTS[config.variant]
-        : RAIL_DIFFICULTIES[config.difficulty];
+      : (config.practice ? practiceLives : TONE_VARIANTS)[difficulty];
+  const previewRailHeart = config.challenge === 'tide' && !config.practice;
+  let heartAhead = false;
+  function rollHeart(lives: number) {
+    const chance = heartDropChance(lives, maxLives ?? 0, lastHeartChances[difficulty]);
+    return chance > 0 && heartRandom() < chance;
+  }
   const run: Run = {
     config,
     profile,
@@ -343,6 +355,9 @@ export function createRun(
         ? 0
         : Math.min(4, Math.floor(this.opened / 20));
     },
+    get heartAhead() {
+      return this.promptState === 'ready' && heartAhead;
+    },
     expectedParts() {
       return this.targets.map((i) =>
         config.practice && config.challenge === 'tide'
@@ -370,6 +385,7 @@ export function createRun(
     },
     next() {
       if (this.status !== 'playing') return false;
+      const newAttempt = this.word.id === '' || this.promptState !== 'ready';
       if (reviewPrompts && reviewRecordings) {
         const prompt = reviewPrompts[this.attempts + skippedReviews];
         if (!prompt) return false;
@@ -452,6 +468,10 @@ export function createRun(
       }
       used.add(this.word.id);
       usedWords.add(wordIdentity(this.word));
+      // A replacement recording keeps the same span and reward.
+      if (previewRailHeart && newAttempt) {
+        heartAhead = this.lives !== null && (this.opened + 1) % 20 !== 0 && rollHeart(this.lives);
+      }
       this.promptState = 'ready';
       this.lastAnswer = null;
       this.lastFailure = null;
@@ -521,9 +541,13 @@ export function createRun(
       let recovered = 0;
       const landing =
         !(config.practice && config.format === 'drill') && !complete && this.opened % 20 === 0;
-      if (this.lives !== null && !complete) {
-        if (landing) recovered = (this.maxLives ?? 0) - this.lives;
-        else if (this.opened % 10 === 0) recovered = Math.min(1, (this.maxLives ?? 0) - this.lives);
+      let heartDrop = false;
+      if (this.lives !== null && maxLives !== null && !complete) {
+        if (landing) recovered = maxLives - this.lives;
+        else if (!config.practice) {
+          heartDrop = previewRailHeart ? heartAhead : rollHeart(this.lives);
+          if (heartDrop) recovered = 1;
+        } else if (this.opened % 10 === 0) recovered = Math.min(1, maxLives - this.lives);
         this.lives += recovered;
       }
       return (this.lastResult = {
@@ -531,6 +555,7 @@ export function createRun(
         correct: true,
         landing,
         recovered,
+        ...(heartDrop && { heartDrop }),
         terminal: complete,
         expected: this.expected(),
       });

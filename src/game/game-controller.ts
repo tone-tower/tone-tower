@@ -48,6 +48,7 @@ interface ControllerOptions {
   environment?: CountdownOptions & {
     document?: Document;
     animateWorld?: typeof animateWorld;
+    heartRandom?: () => number;
   };
 }
 import { recordingIssueUrl } from '../ui/recording-report.ts';
@@ -486,6 +487,8 @@ export function createGameController({
       floor: answeredPosition - 1,
       answer: run.choices.findIndex((t) => t === run.word.tone),
       recovered: outcome?.recovered || 0,
+      heartAhead: run.heartAhead,
+      heartDrop: outcome?.kind === 'correct' && outcome.heartDrop === true,
       lives: run.lives,
       maxLives: run.maxLives,
       practice: run.config.practice && run.config.format === 'drill',
@@ -531,9 +534,21 @@ export function createGameController({
     const inTowerLanding = !isTide() && phase === 'landing';
     const actions = reviewActions();
     const recovered = outcome?.recovered ?? 0;
-    const success = recovered
-      ? `Correct. ${recovered} ${recovered === 1 ? 'life' : 'lives'} restored.`
-      : 'Correct.';
+    const success =
+      outcome?.kind === 'correct' && outcome.heartDrop
+        ? `Heart restored. ${run.lives} of ${run.maxLives} lives remaining.`
+        : recovered
+          ? `Correct. ${recovered} ${recovered === 1 ? 'life' : 'lives'} restored.`
+          : 'Correct.';
+    const statusText = entryVisual
+      ? 'Entering the tower…'
+      : phase === 'listening'
+        ? 'Listening…'
+        : audioFailed
+          ? 'Replay to retry the recording.'
+          : phase === 'correct' || phase === 'landing'
+            ? success
+            : '';
     const markup = /* HTML */ `<div
       class="game-layout"
       tabindex="-1"
@@ -561,12 +576,10 @@ export function createGameController({
           ${run.config.practice ? progressMarkup() : ''}
           ${run.config.practice && run.status === 'playing' ? '<button class="quiet" id="finish-practice" type="button">Finish practice</button>' : ''}
         </div>
-        <p id="audio-status" class="game-message sr-only" role="status">
-          ${entryVisual ? 'Entering the tower…' : phase === 'listening' ? 'Listening…' : audioFailed ? 'Replay to retry the recording.' : phase === 'correct' || phase === 'landing' ? success : ''}
-        </p>
         <div id="audio-error" class="error" role="alert"></div>
         ${!isTide() && !inTowerLanding && !terminal() ? `<p class="small keyboard">${phase === 'listening' || phase === 'answering' ? 'Choose a tone with the keys shown on its door. ' : ''}Replay with <kbd>Space</kbd> or <kbd>R</kbd>.</p>` : ''}
       </div>
+      <p id="audio-status" class="game-message sr-only" role="status"></p>
       ${pauseMarkup()}
     </div>`;
     // Keep the live input and canvas mounted: mobile keyboards and travel survive a word change.
@@ -614,6 +627,8 @@ export function createGameController({
     }
     const mounted = q('.world-scene')!;
     if (mounted) mounted.dataset.sceneKey = sceneKey;
+    const status = required(app, '#audio-status');
+    if (status.textContent !== statusText) status.textContent = statusText;
     bind();
     updateClock(clock.remaining, clock.total);
     syncScene();
@@ -631,7 +646,7 @@ export function createGameController({
   }
   function bind() {
     if (siteHeader) siteHeader.inert = paused;
-    qa('.game-layout > :not(.pause-overlay)').forEach((element) => {
+    qa('.game-layout > :not(.pause-overlay, #audio-status)').forEach((element) => {
       element.inert = paused;
     });
     qa('[data-tone]').forEach((button) =>
@@ -785,7 +800,11 @@ export function createGameController({
       const error = q('#audio-error')!;
       if (error) error.textContent = '';
       if (status)
-        status.textContent = isTide() ? 'Type your answer.' : 'Choose the tone you heard.';
+        status.textContent = run.heartAhead
+          ? 'Type your answer. Clear this span to restore a heart.'
+          : isTide()
+            ? 'Type your answer.'
+            : 'Choose the tone you heard.';
       const scene = q('.world-scene')!;
       if (scene) scene.dataset.phase = phase;
       enableAnswers();
@@ -921,7 +940,7 @@ export function createGameController({
         auto = null;
         if (active && !paused && own === generation) advance();
       },
-      isTide() ? 900 : 1700,
+      isTide() && !(outcome?.kind === 'correct' && outcome.heartDrop) ? 900 : 1700,
     );
   }
   function fail(reason: FailureReason) {
@@ -1114,7 +1133,7 @@ export function createGameController({
   return {
     start(config: RunInput) {
       dispose();
-      run = createRun(config, words, { profile });
+      run = createRun(config, words, { profile, heartRandom: environment.heartRandom });
       entryVisual = run.config.challenge === 'tone' && !run.config.practice;
       active = true;
       attach();

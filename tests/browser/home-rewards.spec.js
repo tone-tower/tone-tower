@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { pausePageClock } from '../helpers/fake-time.js';
 
 const win = { runs: 1, wins: 1, best: 100, fewest: 0 };
 const saved = {
@@ -73,7 +74,7 @@ test('cat targets follow roaming sprites, hold still for focus, and respect redu
   page,
 }) => {
   await page.clock.install();
-  await page.clock.pauseAt(new Date(Date.now() + 1000));
+  await pausePageClock(page);
   await page.addInitScript(
     (progress) => localStorage.setItem('soundbound-cantonese-v1', JSON.stringify(progress)),
     saved,

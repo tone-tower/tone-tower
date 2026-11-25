@@ -16,7 +16,13 @@ import { practiceSetupMarkup } from './ui/practice-setup.ts';
 import { createCreditsDialog } from './ui/credits-dialog.ts';
 import { catalogRows, referenceRows, validateCatalog } from './content/catalog.ts';
 import { Player } from './audio/audio.ts';
-import { challenges, defaultPractice, practiceForRun, TONE_VARIANTS } from './game/game-core.ts';
+import {
+  challenges,
+  defaultPractice,
+  practiceForRun,
+  RAIL_DIFFICULTIES,
+  TONE_VARIANTS,
+} from './game/game-core.ts';
 import { loadProgress, saveProgress, recordRun, challengeRecords } from './persistence/progress.ts';
 import { createGameController } from './game/game-controller.ts';
 import { districts } from './world/worlds.js';
@@ -296,7 +302,10 @@ function home(world?: Challenge, initialPractice = false) {
             </div>
             <div class="map-entry">
               <div id="setup-error" class="error" role="alert" tabindex="-1"></div>
-              <button id="start-adventure" class="primary" type="button">Enter tower →</button>
+              <button id="start-adventure" class="primary" type="button">
+                <span id="start-adventure-label">Enter Tone Tower</span>
+                <span aria-hidden="true">→</span>
+              </button>
               <div id="setup-status" class="small" role="status"></div>
             </div>
             <div id="map-variants" class="title-variants"></div>
@@ -365,52 +374,43 @@ function home(world?: Challenge, initialPractice = false) {
     );
     required(app, '#destination-title').textContent = challenges[challenge].title;
     const variants = required(app, '#map-variants');
-    variants.innerHTML =
-      (rail
-        ? '<div class="rail-difficulty-options" role="group" aria-label="Skyrail difficulty">' +
-          Object.entries({ easy: 5, normal: 4, hard: 3, extreme: 1 })
-            .map(
-              ([d, l]) =>
-                '<button type="button" data-difficulty="' +
-                d +
-                '" aria-pressed="' +
-                (d === progress.settings.tideDifficulty) +
-                '">' +
-                difficultyName(d) +
-                heartPreview(l) +
-                '</button>',
-            )
-            .join('') +
-          '</div>'
-        : '') +
-      '<div class="answer-variants" role="group" aria-label="' +
-      (rail ? 'Answer style' : 'Tower difficulty') +
-      '">' +
-      challenges[challenge].variants
-        .map(
-          (v) =>
-            '<button type="button" data-variant="' +
-            v +
-            '" aria-pressed="' +
-            (v === variant) +
-            '">' +
-            variantName(challenge, v) +
-            (rail ? '' : heartPreview(TONE_VARIANTS[v])) +
-            '</button>',
-        )
-        .join('') +
-      '</div>' +
-      (rail
-        ? '<div class="skyrail-example"><span lang="' +
-          escape(textLanguage(profile, progress.settings.script)) +
-          '">' +
-          escape(profile.example.text) +
-          '</span><span> → ' +
-          (variant === 'full'
-            ? profile.format(profile.example.parts.join(' '))
-            : profile.example.parts.map((part) => profile.withoutTones(part)).join(' ')) +
-          '</span></div>'
-        : '');
+    const selectedDifficulty = rail ? progress.settings.tideDifficulty : variant;
+    variants.innerHTML = /* HTML */ `<div
+        class="difficulty-options"
+        role="group"
+        aria-label="${rail ? 'Skyrail difficulty' : 'Tower difficulty'}"
+      >
+        ${Object.entries(rail ? RAIL_DIFFICULTIES : TONE_VARIANTS)
+          .map(
+            ([difficulty, lives]) =>
+              `<button type="button" ${rail ? 'data-difficulty' : 'data-variant'}="${difficulty}" aria-pressed="${difficulty === selectedDifficulty}">${difficultyName(difficulty)}${heartPreview(lives)}</button>`,
+          )
+          .join('')}
+      </div>
+      ${
+        rail
+          ? /* HTML */ `<div class="answer-variants" role="group" aria-label="Answer style">
+                ${challenges.tide.variants
+                  .map(
+                    (v) =>
+                      `<button type="button" data-variant="${v}" aria-pressed="${v === variant}">${variantName('tide', v)}</button>`,
+                  )
+                  .join('')}
+              </div>
+              <div class="skyrail-example">
+                <span lang="${escape(textLanguage(profile, progress.settings.script))}"
+                  >${escape(profile.example.text)}</span
+                ><span>
+                  →
+                  ${
+                    variant === 'full'
+                      ? profile.format(profile.example.parts.join(' '))
+                      : profile.example.parts.map((part) => profile.withoutTones(part)).join(' ')
+                  }
+                </span>
+              </div>`
+          : ''
+      }`;
     queryAll(variants, '[data-variant]').forEach(
       (b) =>
         (b.onclick = () => {
@@ -491,13 +491,13 @@ function home(world?: Challenge, initialPractice = false) {
       );
     }
     const enter = required(app, '#start-adventure');
-    enter.textContent = practiceMode
+    required(enter, '#start-adventure-label').textContent = practiceMode
       ? rail
-        ? 'Start spelling practice →'
-        : 'Start tone practice →'
+        ? 'Start spelling practice'
+        : 'Start tone practice'
       : rail
-        ? 'Board Skyrail →'
-        : 'Enter tower →';
+        ? 'Board Skyrail'
+        : 'Enter Tone Tower';
     const status = required(app, '#setup-status');
     const error = required(app, '#setup-error');
     const updateAvailability = () => {

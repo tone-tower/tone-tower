@@ -2,6 +2,9 @@ import { cantonese, mandarin, vietnamese } from '../../src/languages/profiles.ts
 import { test, afterEach, assert } from 'vitest';
 import { fakeTime } from '../helpers/fake-time.js';
 import { createCountdown, createGameController } from '../../src/game/game-controller.ts';
+import { drawWorld, P } from '../../src/world/pixel-world.js';
+import { createRailJourney } from '../../src/world/rail-journey.js';
+import { doorSlots } from '../../src/world/worlds.js';
 
 const words = [
   ...Array.from({ length: 6 }, (_, i) => ({
@@ -299,8 +302,15 @@ test('a terminal mistake records once and offers retry in the same scene after i
   h.controller.start({ challenge: 'tone', variant: 'extreme' });
   h.audio();
   await flush();
-  const wrong = h.controller.state.choices.find((tone) => tone !== h.controller.state.word.tone);
-  fire(h.document, 'keydown', { key: String(wrong), target: h.document.body });
+  const miss = () => {
+    const wrong = h.controller.state.choices.find((tone) => tone !== h.controller.state.word.tone);
+    fire(h.document, 'keydown', { key: String(wrong), target: h.document.body });
+  };
+  miss();
+  h.click('#continue-game');
+  h.audio();
+  await flush();
+  miss();
   assert.strictEqual(h.controller.state.status, 'lost');
   assert.strictEqual(h.finished.length, 1);
   assert.strictEqual(h.controller.active, true);
@@ -704,6 +714,185 @@ test.each([false, true])(
   },
 );
 
+test('a restored heart has one mounted status update and clears after automatic advance', async () => {
+  const scenes = [];
+  const h = harness({
+    heartRandom: () => 0,
+    animateWorld: (canvas) => ({ canvas, update: (scene) => scenes.push(scene), dispose() {} }),
+  });
+  h.controller.start({ challenge: 'tone' });
+  h.audio();
+  await flush();
+  const status = h.app.querySelector('#audio-status');
+  const press = (tone) =>
+    fire(h.document, 'keydown', { key: String(tone), target: h.document.body });
+  press(h.controller.state.choices.find((tone) => tone !== h.controller.state.word.tone));
+  h.click('#continue-game');
+  h.audio();
+  await flush();
+  const tone = h.controller.state.word.tone;
+  const slot = h.controller.state.choices.indexOf(tone);
+  press(tone);
+  assert.equal(h.controller.state.lives, 4);
+  assert.equal(status.textContent, 'Heart restored. 4 of 4 lives remaining.');
+  assert.equal(scenes.at(-1).heartDrop, true);
+  assert.equal(scenes.at(-1).answer, slot);
+  const changes = new MutationObserver(() => {});
+  changes.observe(status, { childList: true });
+  h.controller.pause();
+  h.time.advance(2500);
+  assert.equal(scenes.at(-1).paused, true);
+  assert.equal(status.inert, false);
+  assert.equal(h.controller.phase, 'correct');
+  h.controller.resume();
+  assert.equal(h.app.querySelector('#audio-status'), status);
+  assert.equal(changes.takeRecords().length, 0);
+  changes.disconnect();
+  h.time.advance(1700);
+  assert.equal(scenes.at(-1).heartDrop, false);
+  assert.equal(h.controller.phase, 'listening');
+});
+
+test('Skyrail finishes the reward after resume and waits for audio before the next deadline', async () => {
+  const scenes = [];
+  let rolls = 0;
+  const h = harness({
+    heartRandom: () => {
+      rolls++;
+      return 0;
+    },
+    animateWorld: (canvas) => ({ canvas, update: (scene) => scenes.push(scene), dispose() {} }),
+  });
+  h.controller.start({ challenge: 'tide' });
+  h.audio();
+  await flush();
+  h.time.advance(15000);
+  h.click('#continue-game');
+  h.audio();
+  await flush();
+  assert.equal(scenes.at(-1).heartAhead, true);
+  assert.equal(scenes.at(-1).lives, 3);
+  const input = h.app.querySelector('#transcription-answer');
+  input.value = h.controller.state.expected();
+  fire(input, 'input');
+  const status = h.app.querySelector('#audio-status');
+  assert.equal(status.textContent, 'Heart restored. 4 of 4 lives remaining.');
+  assert.equal(scenes.at(-1).heartAhead, false);
+  assert.equal(scenes.at(-1).heartDrop, true);
+
+  h.time.advance(900);
+  assert.equal(h.controller.phase, 'correct');
+  const requests = h.requests.length;
+  const changes = new MutationObserver(() => {});
+  changes.observe(status, { childList: true });
+  h.controller.pause();
+  h.time.advance(3000);
+  assert.equal(scenes.at(-1).paused, true);
+  assert.equal(h.requests.length, requests);
+  h.controller.resume();
+  assert.equal(h.app.querySelector('#audio-status'), status);
+  assert.equal(changes.takeRecords().length, 0);
+  changes.disconnect();
+  assert.equal(rolls, 1);
+
+  h.time.advance(1700);
+  assert.equal(h.controller.phase, 'listening');
+  assert.equal(scenes.at(-1).heartDrop, false);
+  assert.equal(h.requests.length, requests + 1);
+  h.time.advance(16000);
+  assert.equal(h.controller.phase, 'listening');
+  assert.equal(h.controller.state.lives, 4);
+  h.audio();
+  await flush();
+  h.time.advance(14999);
+  assert.equal(h.controller.phase, 'answering');
+  h.time.advance(1);
+  assert.equal(h.controller.phase, 'review');
+  assert.equal(h.controller.state.lives, 3);
+});
+
+function recoveryCanvas(height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 480;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  return { ctx, pixel: (x, y) => ctx.getImageData(x, y, 1, 1).data.slice(0, 3).join(',') };
+}
+const recovered = {
+  phase: 'correct',
+  result: 'success',
+  lives: 3,
+  maxLives: 4,
+  recovered: 1,
+  heartDrop: true,
+};
+const heartColor = [1, 3, 5].map((i) => Number.parseInt(P.red.slice(i, i + 2), 16)).join(',');
+
+test.each([2, 3, 4, 5, 6])('a heart waits in a %i-door room before filling the meter', (count) => {
+  const { ctx, pixel } = recoveryCanvas(240);
+  const state = {
+    ...recovered,
+    scene: 'tone',
+    count,
+    answer: count - 1,
+    selected: count - 1,
+    open: 1,
+  };
+  const [x, y, w, h] = doorSlots(count).at(-1);
+  const source = [Math.round(x + w / 2), Math.round(y + h * 0.36)];
+  drawWorld(ctx, { ...state, elapsed: 0.29 });
+  assert.notEqual(pixel(...source), heartColor);
+  const empty = pixel(137, 26);
+  for (const elapsed of [0.3, 0.7, 1.09]) {
+    drawWorld(ctx, { ...state, elapsed });
+    assert.equal(pixel(...source), heartColor);
+    assert.equal(pixel(137, 26), empty);
+  }
+  drawWorld(ctx, { ...state, elapsed: 1.45 });
+  assert.notEqual(pixel(...source), heartColor);
+  assert.notEqual(pixel(137, 26), empty);
+  drawWorld(ctx, { ...state, elapsed: 0, reduced: true });
+  assert.equal(pixel(...source), heartColor);
+  assert.equal(pixel(137, 26), heartColor);
+});
+
+test('Skyrail’s heart follows the repaired span’s signal and fills the meter', () => {
+  const { ctx, pixel } = recoveryCanvas(288);
+  const journey = createRailJourney();
+  journey.update({ phase: 'answering', progress: 0 });
+  drawWorld(ctx, {
+    scene: 'rail',
+    phase: 'answering',
+    lives: 2,
+    maxLives: 4,
+    heartAhead: true,
+    journey: journey.tick(0),
+  });
+  assert.equal(pixel(346, 126), heartColor);
+  const empty = pixel(167, 145);
+  journey.update({ phase: 'correct', progress: 1 });
+  const render = (elapsed, dt, reduced = false) => {
+    const frame = journey.tick(dt, { reduced });
+    drawWorld(ctx, { ...recovered, scene: 'rail', progress: 1, elapsed, reduced, journey: frame });
+    return Math.round(346 - frame.camera);
+  };
+  const before = render(0, 0);
+  assert.equal(pixel(before, 126), heartColor);
+  assert.equal(pixel(167, 145), empty);
+  const near = render(0.35, 0.35);
+  assert.equal(pixel(near, 126), heartColor);
+  const atSignal = render(0.9, 0.55);
+  assert.notEqual(near, atSignal);
+  assert.equal(pixel(atSignal, 126), heartColor);
+  assert.equal(pixel(167, 145), empty);
+  render(1.45, 0.55);
+  assert.notEqual(pixel(atSignal, 126), heartColor);
+  assert.notEqual(pixel(167, 145), empty);
+  render(0, 0, true);
+  assert.equal(pixel(atSignal, 126), heartColor);
+  assert.equal(pixel(167, 145), heartColor);
+});
+
 test('a Tower ending waits for an explicit action, including after pause and resume', async () => {
   const h = harness();
   h.controller.start({ challenge: 'tone', practice: true, format: 'rehearsal', start: 100 });
@@ -765,6 +954,11 @@ test('a full Tower victory stays in one scene and records without a second endin
 test('a Skyrail terminal timeout stays in-scene, records once, and never starts a new prompt', async () => {
   const h = harness();
   h.controller.start({ challenge: 'tide', difficulty: 'extreme' });
+  h.audio();
+  await flush();
+  h.time.advance(15000);
+  assert.strictEqual(h.controller.state.lives, 1);
+  h.click('#continue-game');
   h.audio();
   await flush();
   h.time.advance(15000);
@@ -1159,11 +1353,10 @@ for (const profile of [cantonese, mandarin]) {
       h.audio();
       await flush();
       assert.strictEqual(
-        h.app.querySelector(
-          '#typed-help, .typing-hint, .keyboard, [data-insert="ü"], .target-label',
-        ),
+        h.app.querySelector('#typed-help, .typing-hint, .keyboard, [data-insert="ü"]'),
         null,
       );
+      assert.equal(h.app.querySelector('.target-label').textContent, 'Listen here');
       assert.strictEqual(h.app.querySelector('#input-status').textContent.trim(), '');
       assert.strictEqual(h.app.querySelector('#rail-message').textContent, '');
       assert.strictEqual(

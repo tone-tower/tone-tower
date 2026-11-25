@@ -1,6 +1,9 @@
 import { drawGlow, drawSky, drawRoof, drawGarden } from './pixel-art.js';
+import { HEART_PREVIEW_SECONDS } from './world-motion.js';
 const districtColors = (P) => [P.grass, P.water, P.gold, P.leaf, '#b4b2dc'];
 const heart = ['11011', '11111', '01110', '00100'];
+const heartPickup = 1.1;
+const heartArrival = 1.45;
 function pixels(ctx) {
   return (x, y, w, h, c) => {
     ctx.fillStyle = c;
@@ -56,7 +59,7 @@ export function drawFloorGauge(ctx, s, P) {
   label(ctx, 'FLOOR ' + String(floor).padStart(2, '0') + ' / 100', 56, 10, P.cream, 8);
 }
 
-export function drawTowerHearts(ctx, s, P, { x = 94, y = 20, scale = 3 } = {}) {
+export function drawTowerHearts(ctx, s, P, { x = 94, y = 20, scale = 3, dropSource } = {}) {
   if (s.lives === undefined) return;
   const r = pixels(ctx),
     max = s.maxLives || 4;
@@ -75,18 +78,20 @@ export function drawTowerHearts(ctx, s, P, { x = 94, y = 20, scale = 3 } = {}) {
     rest = s.restTime;
   const recovered = s.recovered || 0,
     previous = s.lives - recovered;
+  const drop = s.heartDrop && s.phase === 'correct' && recovered === 1;
   const visible =
     rest !== undefined
-      ? Math.min(s.lives, previous + Math.floor(Math.max(0, rest) / 0.25))
+      ? s.reduced
+        ? s.lives
+        : Math.min(s.lives, previous + Math.floor(Math.max(0, rest) / 0.25))
       : s.phase === 'landing'
         ? previous
         : s.lives;
-  const drawHeart = (hx, hy, color, empty = false) => {
+  const drawHeart = (hx, hy, color, empty = false, size = scale) => {
     const shape = (dx, dy, ink) => {
       for (let yy = 0; yy < 4; yy++)
         for (let xx = 0; xx < 5; xx++)
-          if (heart[yy][xx] === '1')
-            r(hx + xx * scale + dx, hy + yy * scale + dy, scale, scale, ink);
+          if (heart[yy][xx] === '1') r(hx + xx * size + dx, hy + yy * size + dy, size, size, ink);
     };
     const outline = empty ? P.stone : '#ffbeb0';
     for (const [dx, dy] of [
@@ -97,17 +102,19 @@ export function drawTowerHearts(ctx, s, P, { x = 94, y = 20, scale = 3 } = {}) {
     ])
       shape(dx, dy, outline);
     shape(0, 0, empty ? P.dark : color);
-    if (!empty) r(hx + 1, hy + 1, Math.max(1, scale - 1), 1, P.cream);
+    if (!empty) r(hx + 1, hy + 1, Math.max(1, size - 1), 1, P.cream);
   };
   for (let i = 0; i < max; i++) {
     const hx = x + i * (scale * 5 + 3),
       fresh = i >= previous && i < s.lives && recovered > 0;
     const age =
       rest !== undefined ? rest - (i - previous) * 0.25 : elapsed - 0.25 - (i - previous) * 0.14;
-    const arrived = !fresh || s.reduced || age > 0.5;
+    const arrived =
+      !fresh || s.reduced || (drop ? elapsed >= heartArrival || !dropSource : age > 0.5);
     const filled = i < visible && arrived;
-    drawHeart(hx, y, fresh && age < 0.8 ? P.cream : P.red, !filled);
-    if (fresh && !s.reduced && age >= 0 && age < 0.8) {
+    const pulse = !s.reduced && (drop ? elapsed < heartArrival + 0.15 : age < 0.8);
+    drawHeart(hx, y, fresh && pulse ? P.cream : P.red, !filled);
+    if (!drop && fresh && !s.reduced && age >= 0 && age < 0.8) {
       const p = Math.min(1, age / 0.5),
         ease = 1 - (1 - p) * (1 - p);
       drawHeart(hx + (1 - ease) * 34, y + (1 - ease) * 38 - Math.sin(p * Math.PI) * 12, P.cream);
@@ -123,6 +130,28 @@ export function drawTowerHearts(ctx, s, P, { x = 94, y = 20, scale = 3 } = {}) {
         );
       }
     }
+  }
+  const revealTime = s.scene === 'rail' ? 0 : HEART_PREVIEW_SECONDS;
+  if (
+    dropSource &&
+    (s.heartAhead || (drop && (s.reduced || (elapsed >= revealTime && elapsed < heartArrival))))
+  ) {
+    const progress =
+      s.heartAhead || s.reduced
+        ? 0
+        : Math.max(0, (elapsed - heartPickup) / (heartArrival - heartPickup));
+    const targetX = x + previous * (scale * 5 + 3) + (scale * 5) / 2;
+    const cx = dropSource.x + (targetX - dropSource.x) * progress;
+    const cy =
+      dropSource.y + (y + scale * 2 - dropSource.y) * progress - 18 * Math.sin(Math.PI * progress);
+    const size = Math.round(4 + (scale - 4) * progress);
+    drawGlow(ctx, cx, cy, P, 1.25);
+    drawHeart(cx - (size * 5) / 2, cy - size * 2, P.red, false, size);
+  }
+  if (drop && (s.reduced || !dropSource || elapsed >= heartPickup)) {
+    const badge = x + width + 18;
+    r(badge - 9, y - 3, 18, 13, P.dark);
+    label(ctx, '+1', badge, y + scale * 2, P.cream, 11);
   }
   // A lost heart lifts out of its empty slot, then breaks into four soft sparks.
   if (

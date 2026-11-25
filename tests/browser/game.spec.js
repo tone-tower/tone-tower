@@ -1,6 +1,7 @@
 import { cantoneseCatalog, withSimplifiedCantonese } from '../../tools/catalog/runtime.mjs';
 import { test, expect } from '@playwright/test';
 import { openHeaderMenu } from '../helpers/header-menu.js';
+import { pausePageClock } from '../helpers/fake-time.js';
 
 // Keep smoke tests independent of downloads and speakers. Real recording playback
 // still needs a quick check on a phone, particularly for browser audio permissions.
@@ -65,7 +66,7 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto('/cantonese/');
   await expect(page.locator('.mode-cards')).toBeVisible();
-  await page.clock.pauseAt(new Date(Date.now() + 1000));
+  await pausePageClock(page);
 });
 
 test.afterEach(async ({ page }) => {
@@ -90,6 +91,158 @@ async function expectNoOverflow(page) {
     true,
   );
 }
+
+test('Tower recovery flies into the meter and clears before the next prompt', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(() => {
+    Math.random = () => 0;
+    window.__heartLabels = [];
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (value, ...args) {
+      if (value === '+1') window.__heartLabels.push(args.slice(0, 2));
+      return fillText.call(this, value, ...args);
+    };
+  });
+  await start(page, 'tone');
+  await page.clock.runFor(2300);
+  const first = await currentTone(page);
+  const wrong = await page
+    .locator(`.tone-door:not([data-tone="${first}"])`)
+    .getAttribute('data-tone');
+  await page.keyboard.press(wrong);
+  await page.keyboard.press('Enter');
+  await page.clock.runFor(200);
+  const status = await page.locator('#audio-status').elementHandle();
+  await page.keyboard.press(await currentTone(page));
+  await expect(page.locator('#audio-status')).toHaveText('Heart restored. 4 of 4 lives remaining.');
+  expect(await status.evaluate((node) => node.isConnected)).toBe(true);
+  await page.clock.runFor(1000);
+  expect(await page.evaluate(() => window.__heartLabels.length)).toBe(0);
+  await expect(page.locator('.tone-door.has-heart-drop .tone-name')).toHaveCSS('opacity', '0');
+  await page.clock.runFor(300);
+  expect(await page.evaluate(() => window.__heartLabels.length)).toBeGreaterThan(0);
+  await page.clock.runFor(1600);
+  const before = await page.evaluate(() => window.__heartLabels.length);
+  await page.clock.runFor(500);
+  expect(await page.evaluate(() => window.__heartLabels.length)).toBe(before);
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'answering');
+  await expectNoOverflow(page);
+});
+
+for (const reducedMotion of ['no-preference', 'reduce']) {
+  test(`Skyrail shows the recovery badge with reduced motion set to ${reducedMotion}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion });
+    await page.evaluate(() => {
+      Math.random = () => 0;
+      window.__railHeartLabels = [];
+      const fillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (value, ...args) {
+        if (value === '+1' || value === '+ LIFE') window.__railHeartLabels.push(value);
+        return fillText.call(this, value, ...args);
+      };
+    });
+    await start(page, 'tide');
+    await page.clock.runFor(200);
+    await page.clock.fastForward(15000);
+    await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'timeout');
+    await page.locator('#continue-game').click();
+    await page.clock.runFor(200);
+    await expect(page.locator('.prompt-syllable.is-target .target-label')).toHaveText(
+      'Listen here',
+    );
+    await expect(page.locator('#audio-status')).toContainText(
+      'Clear this span to restore a heart.',
+    );
+    await page.locator('#transcription-answer').fill('si');
+    await expect(page.locator('#audio-status')).toHaveText(
+      'Heart restored. 4 of 4 lives remaining.',
+    );
+    await page.clock.runFor(950);
+    await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'success');
+    const labels = () => page.evaluate(() => [...new Set(window.__railHeartLabels)]);
+    expect(await labels()).toEqual(reducedMotion === 'reduce' ? ['+1'] : []);
+    await page.clock.runFor(350);
+    expect(await labels()).toEqual(['+1']);
+    await page.clock.runFor(600);
+    await expect(page.locator('#app')).toHaveAttribute('data-outcome', 'answering');
+    await expectNoOverflow(page);
+  });
+}
+
+test('Tower and Skyrail share an equal-sized difficulty grid and save keyboard selections', async ({
+  page,
+}) => {
+  const group = page.getByRole('group', { name: 'Tower difficulty' });
+  const railGroup = page.getByRole('group', { name: 'Skyrail difficulty' });
+  const entry = page.getByRole('button', { name: 'Enter Tone Tower', exact: true });
+  await expect(entry).toBeVisible();
+  const tower = page.locator('.mode-card[data-destination="tone"]');
+  const rail = page.locator('.mode-card[data-destination="rail"]');
+  const viewport = page.viewportSize();
+  const buttonBoxes = async (difficultyGroup) => {
+    const modes = difficultyGroup.getByRole('button');
+    await expect(modes).toHaveCount(4);
+    return modes.evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const rect = button.getBoundingClientRect();
+        const grid = button.parentElement.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNode(button.firstChild);
+        const label = range.getBoundingClientRect();
+        const hearts = [...button.querySelectorAll('.difficulty-hearts svg')];
+        return {
+          x: rect.left - grid.left,
+          y: rect.top - grid.top,
+          width: rect.width,
+          height: rect.height,
+          fits:
+            label.left >= rect.left &&
+            label.right <= rect.right &&
+            hearts.every((heart) => {
+              const bounds = heart.getBoundingClientRect();
+              return bounds.left >= rect.left && bounds.right <= rect.right;
+            }),
+        };
+      }),
+    );
+  };
+  for (const width of [viewport.width, 760, 320]) {
+    await page.setViewportSize({ ...viewport, width });
+    await page.evaluate(() => document.fonts.ready);
+    await tower.click();
+    const boxes = await buttonBoxes(group);
+    await expectNoOverflow(page);
+    await rail.click();
+    expect(await buttonBoxes(railGroup)).toEqual(boxes);
+    const widths = boxes.map((box) => box.width);
+    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(0.1);
+    expect(new Set(boxes.map((box) => box.height)).size).toBe(1);
+    for (const { width, height, fits } of boxes) {
+      expect(width).toBeGreaterThanOrEqual(44);
+      expect(height).toBeGreaterThanOrEqual(44);
+      expect(fits).toBe(true);
+    }
+    await expectNoOverflow(page);
+  }
+  const railHard = railGroup.getByRole('button', { name: /^Hard/ });
+  await railHard.focus();
+  await page.keyboard.press('Space');
+  await expect(railHard).toBeFocused();
+  await expect(railHard).toHaveAttribute('aria-pressed', 'true');
+  await tower.click();
+  const towerExtreme = group.getByRole('button', { name: /Extreme/ });
+  await towerExtreme.focus();
+  await page.keyboard.press('Space');
+  await expect(towerExtreme).toBeFocused();
+  await expect(towerExtreme).toHaveAttribute('aria-pressed', 'true');
+  await page.reload();
+  await expect(towerExtreme).toHaveAttribute('aria-pressed', 'true');
+  await expect(entry).toBeVisible();
+  await rail.click();
+  await expect(railHard).toHaveAttribute('aria-pressed', 'true');
+});
 
 function layoutBoxes(page, selectors) {
   return page.evaluate(
@@ -610,6 +763,7 @@ for (const { text, parts, gloss } of [
     await page.locator('#setup-practice').click();
     await page.locator('#start-adventure').click();
     await page.clock.runFor(150);
+    await expect(page.locator('.prompt-syllables > .target-label')).toHaveText('Listen here');
     const selectors = [...skyrailLayout, '.prompt-syllables', '.prompt-actions'];
     const before = await layoutBoxes(page, selectors);
     await page

@@ -120,6 +120,8 @@ export function createGameMarkup(state: () => Presentation) {
     const spaceOnly = rail && profile.allowWordSpaces;
     const wordLanguage = escape(textLanguage(profile, script));
     const syllables = run.word.syllables.length;
+    const singleTarget = run.targets.length === 1;
+    const listenLabel = '<span class="target-label">Listen here</span>';
     return /* HTML */ `<div class="round-prompt">
       <div
         class="word-prompt"
@@ -129,6 +131,7 @@ export function createGameMarkup(state: () => Presentation) {
         style="--syllables:${syllables}${covered ? ';--letters:' + letters : ''}"
       >
         <div class="prompt-syllables">
+          ${singleTarget ? '' : listenLabel}
           ${run.word.syllables
             .map((s, i) => {
               const target = run.targets.includes(i),
@@ -144,7 +147,7 @@ export function createGameMarkup(state: () => Presentation) {
                     ? profile.format(s.transcription)
                     : profile.withoutTones(s.transcription);
               return /* HTML */ `<span class="prompt-syllable${target ? ' is-target' : ''}"
-                >${!rail && target && run.targets.length === 1 ? '<span class="target-label">Listen here</span>' : ''}<span
+                >${target && singleTarget ? listenLabel : ''}<span
                   class="prompt-character"
                   lang="${wordLanguage}"
                   >${hidden ? concealedMarkup(reveal ? (s.text ?? '') : hidden.base, hidden.index, reveal) : escape(s.text)}</span
@@ -188,10 +191,12 @@ export function createGameMarkup(state: () => Presentation) {
         const arrows = doorArrowKeys[run.choices.length]?.[index] ?? [];
         const symbols = arrows.map((key) => arrowSymbols[key]).join(' ');
         const number = profile.tones.indexOf(t) + 1;
+        const correct = (phase === 'correct' || phase === 'landing') && t === run.word.tone;
+        const drop = correct && run.lastResult?.kind === 'correct' && run.lastResult.heartDrop;
         return /* HTML */ `<button
           style="${slots[index]}"
           type="button"
-          class="tone-door ${(phase === 'correct' || phase === 'landing') && t === run.word.tone ? 'is-correct' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
+          class="tone-door ${correct ? 'is-correct' : ''} ${drop ? 'has-heart-drop' : ''} ${phase === 'review' && t === run.word.tone ? 'is-answer' : ''} ${phase === 'review' && t === run.lastAnswer ? 'is-wrong' : ''}"
           data-tone="${t}"
           aria-label="${phase === 'review' && t === run.word.tone ? 'Correct answer: ' : phase === 'review' && t === run.lastAnswer ? 'Your choice: ' : 'Choose '}${escape(toneLabel(profile, t))}"
           aria-keyshortcuts="${[...arrows, number].join(' ')}"

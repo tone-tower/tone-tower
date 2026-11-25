@@ -21,6 +21,7 @@ export function createTowerJourney(start = 0) {
               ...state,
               scene: state.phase === 'landing' ? 'tower-rest' : 'tone',
               restTime: 99,
+              heartDrop: false,
               result: 'success',
               walk: 1,
               open: 1,

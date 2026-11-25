@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openHeaderMenu } from '../helpers/header-menu.js';
+import { pausePageClock } from '../helpers/fake-time.js';
 
 const entries = [1, 2, 3, 4].map((t) => ({
   id: 'ma' + t,
@@ -83,7 +84,7 @@ test.beforeEach(async ({ page }) => {
 async function loaded(page, url = '/mandarin/') {
   await page.goto(url);
   await expect(page.locator('.mode-cards')).toBeVisible();
-  await page.clock.pauseAt(new Date(Date.now() + 1000));
+  await pausePageClock(page);
 }
 const noOverflow = async (page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -219,6 +220,26 @@ test('chooser loads no catalog and language navigation stays in Mandarin', async
   await expect(page).toHaveURL(/\/mandarin\/guide\/$/);
   expect((await page.request.get('/guide/')).status()).toBe(404);
   await noOverflow(page);
+});
+
+test('desktop Tower tone numbers and marks share the same larger size', async ({ page }) => {
+  test.skip(page.viewportSize().width <= 700, 'Desktop tone sizing');
+  const sizes = [];
+  for (const [language, count] of [
+    ['cantonese', 6],
+    ['mandarin', 5],
+    ['vietnamese', 6],
+  ]) {
+    await page.goto('/' + language + '/');
+    await page.locator('#setup-practice').click();
+    await page.locator('[data-practice-setting="choices"]').selectOption(String(count));
+    await page.locator('#start-adventure').click();
+    const symbols = page.locator('.tone-door .tone-symbol');
+    await expect(symbols).toHaveCount(count);
+    sizes.push(...(await symbols.evaluateAll((nodes) => nodes.map((node) => node.clientWidth))));
+  }
+  expect(new Set(sizes).size).toBe(1);
+  expect(sizes[0]).toBeGreaterThan(52);
 });
 
 test('Mandarin practice renders five doors and accepts neutral-tone keyboard answers', async ({
@@ -378,6 +399,9 @@ test('rapid Skyrail keys cannot activate navigation or dismiss a finished run', 
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('zz');
   await page.keyboard.press('Space');
+  await page.clock.fastForward(16000);
+  await page.locator('#continue-game').click();
+  await page.clock.runFor(150);
   await page.clock.fastForward(16000);
   await expect(page.getByRole('heading', { name: 'Skyrail run ended.' })).toBeFocused();
   await expect(

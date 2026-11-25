@@ -656,7 +656,13 @@ export function drawWorld(ctx, s) {
     }
     // HUD plaques stay above roofs, vines and ending effects in every district.
     drawFloorGauge(ctx, s, P);
-    drawTowerHearts(ctx, s, P);
+    const dropDoor = s.heartDrop && slots[s.answer];
+    drawTowerHearts(ctx, s, P, {
+      dropSource: dropDoor && {
+        x: dropDoor[0] + dropDoor[2] / 2,
+        y: dropDoor[1] + dropDoor[3] * 0.36,
+      },
+    });
   }
   // Subtle ambient specks, all constrained to the same pixel grid.
   if (!s.reduced)

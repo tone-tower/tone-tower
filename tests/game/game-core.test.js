@@ -8,6 +8,7 @@ import {
   practiceForRun,
   validatePractice,
 } from '../../src/game/game-core.ts';
+import { heartDropChance } from '../../src/game/heart-recovery.ts';
 
 const words = Array.from({ length: 240 }, (_, i) => {
   const tone = (i % 6) + 1;
@@ -26,15 +27,20 @@ const random = () => 0.3;
 const clear = (run) => run.answer(run.world === 'tone' ? run.word.tone : run.expected());
 
 test('official tone climb retains stage, recovery, win, and difficulty rules', () => {
+  let rolls = 0;
   const run = createRun({ challenge: 'tone', variant: 'normal' }, words, {
     profile: cantonese,
-    random: random,
+    random,
+    heartRandom: () => {
+      rolls++;
+      return 0.999;
+    },
   });
   assert.equal(run.lives, 4);
   assert.equal(run.timeLimit(), 0);
   for (let i = 0; i < 100; i++) {
     assert.equal(run.choices.length, [2, 3, 4, 6, 6][Math.floor(i / 20)]);
-    if (i === 0 || i === 10 || i === 19) {
+    if (i === 0 || i === 10 || i === 19 || i === 99) {
       const wrong = run.choices.find((t) => t !== run.word.tone);
       assert.equal(run.answer(wrong).correct, false);
       assert.equal(run.opened, i);
@@ -42,26 +48,134 @@ test('official tone climb retains stage, recovery, win, and difficulty rules', (
     }
     const result = clear(run);
     if (i === 9) {
-      assert.equal(result.recovered, 1);
-      assert.equal(run.lives, 4);
+      assert.equal(result.recovered, 0);
+      assert.equal(run.lives, 3);
     }
     if (i === 19) {
       assert.equal(result.landing, true);
-      assert.equal(result.recovered, 2);
+      assert.equal(result.recovered, 3);
     }
     if (i < 99) run.next();
   }
   assert.equal(run.status, 'won');
   assert.equal(run.cleared, 100);
-  assert.equal(run.mistakes, 3);
-  assert.equal(run.attempts, 103);
+  assert.equal(run.mistakes, 4);
+  assert.equal(run.attempts, 104);
+  assert.equal(rolls, 19);
+  assert.equal(run.lives, 3);
   assert.equal(run.next(), false);
   const extreme = createRun({ challenge: 'tone', variant: 'extreme' }, words, {
     profile: cantonese,
     random: random,
   });
   extreme.answer(extreme.choices.find((t) => t !== extreme.word.tone));
-  assert.equal(extreme.status, 'lost');
+  assert.equal(extreme.lives, 1);
+  assert.equal(extreme.status, 'playing');
+  assert.throws(() => createRun({ variant: 'impossible' }, words, { profile: cantonese, random }));
+});
+
+test('the recovery roll awards one heart once and consumes no selection randomness', () => {
+  const bad = (run) => run.answer(run.choices.find((tone) => tone !== run.word.tone));
+  const selection = () => {
+    let calls = 0;
+    return () => (++calls % 13) / 13;
+  };
+  let rolls = 0;
+  const gain = createRun({}, words, {
+    profile: cantonese,
+    random: selection(),
+    heartRandom: () => {
+      rolls++;
+      return heartDropChance(3, 4, 0.23) - 0.001;
+    },
+  });
+  const miss = createRun({}, words, {
+    profile: cantonese,
+    random: selection(),
+    heartRandom: () => heartDropChance(3, 4, 0.23),
+  });
+  for (const run of [gain, miss]) {
+    bad(run);
+    run.next();
+  }
+  assert.equal(clear(gain).heartDrop, true);
+  assert.equal(clear(miss).heartDrop, undefined);
+  assert.equal(clear(gain).ignored, true);
+  assert.equal(rolls, 1);
+  assert.equal(gain.lives, 4);
+  assert.equal(miss.lives, 3);
+  assert.deepEqual(gain.next(), miss.next());
+  assert.deepEqual(gain.choices, miss.choices);
+});
+
+test.each(['spelling', 'full'])('official Skyrail %s uses the shared heart drops', (variant) => {
+  let rolls = 0;
+  const run = createRun({ challenge: 'tide', variant, difficulty: 'extreme' }, words, {
+    profile: cantonese,
+    random,
+    heartRandom: () => (++rolls === 1 ? 0.249 : 0.25),
+  });
+  assert.equal(run.maxLives, 2);
+  for (let span = 1; span <= 100; span++) {
+    if ([2, 3, 99].includes(span)) {
+      run.fail('timeout');
+      assert.equal(run.lives, 1);
+      run.next();
+    }
+    if (span === 2) {
+      assert.equal(run.heartAhead, true);
+      const original = run.word.id;
+      assert.notEqual(run.replace().id, original);
+      assert.equal(run.heartAhead, true);
+      assert.equal(run.answer('zzz').kind, 'wrong');
+      assert.equal(run.lives, 1);
+      assert.equal(rolls, 1);
+    }
+    assert.equal(run.heartAhead, span === 2);
+    const result = clear(run);
+    assert.equal(run.heartAhead, false);
+    assert.equal(result.heartDrop, span === 2 ? true : undefined);
+    assert.equal(result.recovered, Number(span === 2 || span === 20));
+    if (span === 2) {
+      assert.equal(run.lives, run.maxLives);
+      assert.equal(clear(run).ignored, true);
+      assert.equal(rolls, 1);
+    }
+    if (span === 20) {
+      assert.equal(result.landing, true);
+      assert.equal(run.lives, run.maxLives);
+    }
+    if (span < 100) run.next();
+  }
+  assert.equal(run.status, 'won');
+  assert.equal(run.lives, 1);
+  assert.equal(rolls, 19);
+});
+
+test('finite practice retains its original caps and midpoint recovery', () => {
+  const options = {
+    profile: cantonese,
+    random,
+    heartRandom: () => assert.fail('Cannot roll in practice.'),
+  };
+  for (const challenge of ['tone', 'tide']) {
+    const config = { challenge, practice: true, lives: 'standard' };
+    const extreme = createRun(
+      challenge === 'tone'
+        ? { ...config, variant: 'extreme' }
+        : { ...config, difficulty: 'extreme' },
+      words,
+      options,
+    );
+    assert.equal(extreme.maxLives, 1);
+    const run = createRun(config, words, options);
+    run.fail();
+    run.next();
+    for (let i = 1; i <= 10; i++) {
+      assert.equal(clear(run).recovered, Number(i === 10));
+      run.next();
+    }
+  }
 });
 
 test('Skyrail stages shorten the deadline; full typing requires tone digits', () => {
@@ -95,6 +209,8 @@ test('Tower combination practice uses all doors from the final floor for 20 atte
     clear(run);
     run.next();
   }
+  run.answer(run.choices.find((tone) => tone !== run.word.tone));
+  run.next();
   run.answer(run.choices.find((tone) => tone !== run.word.tone));
   assert.equal(run.status, 'lost');
   assert.equal(run.choices.length, 3);
@@ -355,7 +471,7 @@ test('language adapter accepts spaces and case while keeping exact full-tone spe
 });
 
 test('Skyrail difficulty uses the same lives as Tower, independently of spelling variant', () => {
-  for (const [difficulty, lives] of Object.entries({ easy: 5, normal: 4, hard: 3, extreme: 1 }))
+  for (const [difficulty, lives] of Object.entries({ easy: 5, normal: 4, hard: 3, extreme: 2 }))
     for (const variant of ['spelling', 'full']) {
       const run = createRun({ challenge: 'tide', difficulty, variant }, words, {
         profile: cantonese,
@@ -366,7 +482,7 @@ test('Skyrail difficulty uses the same lives as Tower, independently of spelling
       assert.equal(run.timeLimit(), 15000);
       run.fail('timeout');
       assert.equal(run.lives, lives - 1);
-      assert.equal(run.status, lives === 1 ? 'lost' : 'playing');
+      assert.equal(run.status, 'playing');
     }
   const practice = createRun(
     { ...defaultPractice('tide', cantonese), lives: 'standard', difficulty: 'hard' },

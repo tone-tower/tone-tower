@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openHeaderMenu } from '../helpers/header-menu.js';
+import { pausePageClock } from '../helpers/fake-time.js';
 
 const marks = { '́': 'sắc', '̀': 'huyền', '̉': 'hỏi', '̃': 'ngã', '̣': 'nặng' };
 const toneOf = (syllable) =>
@@ -88,7 +89,7 @@ test.beforeEach(async ({ page }) => {
 async function loaded(page, url = '/vietnamese/') {
   await page.goto(url);
   await expect(page.locator('#start-adventure')).toBeVisible();
-  await page.clock.pauseAt(new Date(Date.now() + 1000));
+  await pausePageClock(page);
 }
 async function practice(page, choices) {
   await loaded(page);
