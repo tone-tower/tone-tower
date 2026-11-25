@@ -1,3 +1,8 @@
+export async function pausePageClock(page) {
+  const clientTime = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(clientTime + 10000);
+}
+
 export function fakeTime() {
   let time = 0,
     id = 0;

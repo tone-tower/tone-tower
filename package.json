@@ -12,6 +12,7 @@
     "audio:coverage": "node --import tsx tools/content/listening-cli.mjs coverage",
     "audio:analyze": "node --import tsx tools/content/listening-cli.mjs analyze",
     "mandarin:tones": "node --import tsx tools/content/tone-examples.mjs",
+    "balance:hearts": "node --import tsx tools/balance/heart-report.mjs",
     "catalog": "node --import tsx tools/catalog/build.mjs",
     "prestart": "npm run catalog",
     "start": "node --import tsx tools/server/serve.mjs",

@@ -44,15 +44,19 @@ test('current records and preferences round-trip through storage', () => {
 
 test('challenge records save once and practice never changes official records', () => {
   const progress = emptyProgress(cantonese);
+  progress.records.tone.extreme = { runs: 2, wins: 1, best: 100, fewest: 0 };
   const run = createRun({ challenge: 'tone', variant: 'extreme' }, words, {
     profile: cantonese,
     random: () => 0.2,
   });
+  run.fail();
+  run.next();
   run.answer(run.choices.find((t) => t !== run.word.tone));
   recordRun(progress, run);
   recordRun(progress, run);
-  assert.equal(progress.records.tone.extreme.runs, 1);
-  assert.deepEqual(progress.missedIds, [run.word.id]);
+  assert.equal(progress.records.tone.extreme.runs, 3);
+  assert.equal(progress.records.tone.extreme.wins, 1);
+  assert.deepEqual(progress.missedIds, run.missedIds);
   assert.equal(Object.values(progress.confusions)[0], 1);
   const practice = createRun(
     { ...defaultPractice('tone', cantonese), format: 'rehearsal', start: 100 },
@@ -66,6 +70,19 @@ test('challenge records save once and practice never changes official records', 
   assert.equal(progress.practice.cleared, 1);
   assert.equal(progress.records.tone.normal.wins, 0);
   const target = storage();
+  assert.equal(saveProgress(cantonese, progress, target), true);
+  assert.deepEqual(loadProgress(cantonese, target), progress);
+});
+
+test('a saved Impossible selection moves to Extreme and keeps historical records', () => {
+  const previous = emptyProgress(cantonese);
+  previous.settings.toneVariant = 'impossible';
+  previous.records.tone.impossible = { runs: 2, wins: 1, best: 100, fewest: 0 };
+  const target = storage({ [PROGRESS_KEY]: previous });
+  const progress = loadProgress(cantonese, target);
+  assert.equal(progress.settings.toneVariant, 'extreme');
+  assert.deepEqual(progress.records.tone.impossible, previous.records.tone.impossible);
+  assert.deepEqual(progress.records.tone.extreme, previous.records.tone.extreme);
   assert.equal(saveProgress(cantonese, progress, target), true);
   assert.deepEqual(loadProgress(cantonese, target), progress);
 });
@@ -130,6 +147,8 @@ test('Skyrail difficulty records save independently', () => {
     ],
     { profile: cantonese, random: () => 0.2 },
   );
+  run.fail('timeout');
+  run.next();
   run.fail('timeout');
   recordRun(progress, run);
   recordRun(progress, run);

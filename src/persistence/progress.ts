@@ -104,7 +104,8 @@ function sanitize(value: unknown, profile: LanguageProfile): Progress {
     records = object(v.records);
   if (typeof settings.script === 'string' && profile.scripts.includes(settings.script))
     p.settings.script = settings.script;
-  if (
+  if (settings.toneVariant === 'impossible') p.settings.toneVariant = 'extreme';
+  else if (
     typeof settings.toneVariant === 'string' &&
     Object.hasOwn(TONE_VARIANTS, settings.toneVariant)
   )
@@ -129,6 +130,8 @@ function sanitize(value: unknown, profile: LanguageProfile): Progress {
     if (challenge === 'tone') {
       for (const variant of Object.keys(p.records.tone))
         p.records.tone[variant] = cleanRecord(saved[variant]);
+      if (Object.hasOwn(saved, 'impossible'))
+        p.records.tone.impossible = cleanRecord(saved.impossible);
     } else
       for (const variant of TIDE_VARIANTS)
         for (const difficulty of Object.keys(RAIL_DIFFICULTIES))

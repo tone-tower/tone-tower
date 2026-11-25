@@ -3,7 +3,7 @@ import { drawFinale } from './world-finale.js';
 import { P } from './pixel-world.js';
 import { createRailJourney } from './rail-journey.js';
 import { createTowerJourney } from './tower-journey.js';
-import { sceneMotion } from './world-motion.js';
+import { HEART_PREVIEW_SECONDS, sceneMotion } from './world-motion.js';
 import { drawWorld, destinations } from './pixel-world.js';
 // Preserve scene dimensions when a run restarts on the same mounted canvas.
 const canvasSizes = new WeakMap();
@@ -49,7 +49,10 @@ export function animateWorld(canvas, initial = {}) {
       journey.update({ ...state, ...next });
     if (next.scene === 'tone' && !tower) tower = createTowerJourney(next.progress || 0);
     if (tower && next.scene === 'tone') tower.update({ ...state, ...next });
-    if (next.phase !== undefined && next.phase !== state.phase) effect = 0;
+    if (next.phase !== undefined && next.phase !== state.phase) {
+      effect = 0;
+      if (state.heartDrop) scene?.style.removeProperty('--heart-door-label-opacity');
+    }
     if (next.scene !== undefined && next.scene !== state.scene) {
       entry = 0;
       effect = 0;
@@ -109,6 +112,10 @@ export function animateWorld(canvas, initial = {}) {
       }
     }
     const motion = sceneMotion(state, effect, reduced.matches);
+    if (state.scene === 'tone' && state.heartDrop) {
+      const opacity = reduced.matches ? 0 : Math.max(0, 1 - effect / HEART_PREVIEW_SECONDS);
+      scene?.style.setProperty('--heart-door-label-opacity', String(opacity));
+    }
     const rail =
       state.scene === 'rail'
         ? journey?.tick(dt, {

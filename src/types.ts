@@ -214,10 +214,11 @@ interface ResultDetails {
 export type RunResult =
   | (ResultDetails & { kind: 'empty'; correct: false })
   | (ResultDetails & { kind: 'wrong'; correct: false })
-  | (ResultDetails & { kind: 'correct'; correct: true });
+  | (ResultDetails & { kind: 'correct'; correct: true; heartDrop?: true });
 export interface Run {
   config: ExerciseConfig;
   profile: LanguageProfile;
+  readonly heartAhead: boolean;
   world: Challenge;
   opened: number;
   cleared: number;

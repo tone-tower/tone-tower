@@ -1,0 +1,1287 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tone Tower heart balance</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font:
+          16px/1.5 system-ui,
+          sans-serif;
+        color: #1d2828;
+        background: #f5f7f4;
+      }
+      body {
+        max-width: 1100px;
+        margin: 32px auto;
+        padding: 0 20px;
+      }
+      section {
+        margin: 30px 0;
+        padding: 18px;
+        background: white;
+        border: 1px solid #cad5cd;
+        border-radius: 12px;
+      }
+      h2 {
+        margin-top: 0;
+      }
+      figure {
+        margin: 18px 0;
+        max-width: 760px;
+      }
+      svg {
+        width: 100%;
+        display: block;
+        font-size: 12px;
+        fill: #263936;
+      }
+      .grid {
+        fill: none;
+        stroke: #d8dfda;
+      }
+      figcaption {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      figcaption i {
+        display: inline-block;
+        width: 12px;
+        height: 3px;
+        margin-right: 4px;
+        vertical-align: middle;
+      }
+      .table-wrap {
+        overflow: auto;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      td,
+      th {
+        padding: 6px 8px;
+        border-bottom: 1px solid #d8dfda;
+      }
+      th:first-child {
+        text-align: left;
+      }
+      summary {
+        cursor: pointer;
+      }
+      details {
+        margin: 12px 0 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Tone Tower heart balance</h1>
+    <p>
+      Modeled probabilities for reference listeners. Section clear rates are conditional on reaching
+      the section. The original win-rate column uses the old four difficulty caps and midpoint
+      heart.
+    </p>
+    <section>
+      <h2>Recovery settings</h2>
+      <p>
+        Target 25% fewer section failures than the midpoint rule at the selected caps. Each language
+        and section has equal weight. A dash marks an unreachable target or a one-heart cap.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Difficulty</th>
+              <th scope="col">Hearts</th>
+              <th scope="col">Chance at one heart</th>
+              <th scope="col">Midpoint clear</th>
+              <th scope="col">Target clear</th>
+              <th scope="col">Selected clear</th>
+              <th scope="col">Fitted chance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Easy</th>
+              <td>5</td>
+              <td>23.000%</td>
+              <td>96.796%</td>
+              <td>97.597%</td>
+              <td>97.609%</td>
+              <td>22.879%</td>
+            </tr>
+            <tr>
+              <th scope="row">Normal</th>
+              <td>4</td>
+              <td>23.000%</td>
+              <td>92.307%</td>
+              <td>94.230%</td>
+              <td>94.284%</td>
+              <td>22.740%</td>
+            </tr>
+            <tr>
+              <th scope="row">Hard</th>
+              <td>3</td>
+              <td>23.000%</td>
+              <td>82.562%</td>
+              <td>86.921%</td>
+              <td>86.981%</td>
+              <td>22.837%</td>
+            </tr>
+            <tr>
+              <th scope="row">Extreme</th>
+              <td>2</td>
+              <td>25.000%</td>
+              <td>62.696%</td>
+              <td>72.022%</td>
+              <td>71.883%</td>
+              <td>25.315%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Mandarin</h2>
+      <p>Full-set accuracy benchmark 90.0%. Each section starts with full hearts.</p>
+      <figure>
+        <svg
+          viewBox="0 0 684 290"
+          role="img"
+          aria-label="Mandarin tower win probability by listening accuracy"
+        >
+          <text x="61" y="20">Whole-tower win probability</text>
+          <path class="grid" d="M61 236H651" />
+          <text x="54" y="240" text-anchor="end">0%</text>
+          <path class="grid" d="M61 186.5H651" />
+          <text x="54" y="190.5" text-anchor="end">25%</text>
+          <path class="grid" d="M61 137H651" />
+          <text x="54" y="141" text-anchor="end">50%</text>
+          <path class="grid" d="M61 87.5H651" />
+          <text x="54" y="91.5" text-anchor="end">75%</text>
+          <path class="grid" d="M61 38H651" />
+          <text x="54" y="42" text-anchor="end">100%</text>
+          <text x="61" y="254" text-anchor="middle">75%</text>
+          <text x="179.0000000000001" y="254" text-anchor="middle">80%</text>
+          <text x="296.99999999999994" y="254" text-anchor="middle">85%</text>
+          <text x="415.00000000000006" y="254" text-anchor="middle">90%</text>
+          <text x="532.9999999999999" y="254" text-anchor="middle">95%</text>
+          <text x="651" y="254" text-anchor="middle">100%</text>
+          <polyline
+            fill="none"
+            stroke="#167451"
+            stroke-width="2.5"
+            points="61.0,207.5 84.6,199.8 108.2,190.9 131.8,180.7 155.4,169.5 179.0,157.5 202.6,144.7 226.2,131.6 249.8,118.5 273.4,105.8 297.0,93.7 320.6,82.5 344.2,72.5 367.8,63.9 391.4,56.6 415.0,50.8 438.6,46.4 462.2,43.1 485.8,40.9 509.4,39.5 533.0,38.6 556.6,38.2 580.2,38.1 603.8,38.0 627.4,38.0 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#145da0"
+            stroke-width="2.5"
+            points="61.0,226.3 84.6,222.6 108.2,218.0 131.8,212.2 155.4,205.2 179.0,196.9 202.6,187.2 226.2,176.2 249.8,164.1 273.4,151.1 297.0,137.5 320.6,123.5 344.2,109.7 367.8,96.4 391.4,84.1 415.0,72.9 438.6,63.3 462.2,55.4 485.8,49.2 509.4,44.6 533.0,41.4 556.6,39.5 580.2,38.5 603.8,38.1 627.4,38.0 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#a04315"
+            stroke-width="2.5"
+            points="61.0,234.3 84.6,233.4 108.2,232.1 131.8,230.3 155.4,227.8 179.0,224.5 202.6,220.3 226.2,214.8 249.8,208.0 273.4,199.7 297.0,189.8 320.6,178.3 344.2,165.4 367.8,151.3 391.4,136.2 415.0,120.6 438.6,105.1 462.2,90.1 485.8,76.4 509.4,64.5 533.0,54.6 556.6,47.2 580.2,42.2 603.8,39.3 627.4,38.2 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#813e9a"
+            stroke-width="2.5"
+            points="61.0,235.9 84.6,235.8 108.2,235.7 131.8,235.6 155.4,235.3 179.0,234.8 202.6,234.2 226.2,233.2 249.8,231.7 273.4,229.7 297.0,226.8 320.6,222.8 344.2,217.5 367.8,210.6 391.4,201.7 415.0,190.7 438.6,177.4 462.2,161.7 485.8,144.0 509.4,124.7 533.0,104.6 556.6,84.8 580.2,66.6 603.8,51.6 627.4,41.6 651.0,38.0"
+          />
+          <text x="356" y="278" text-anchor="middle">Accuracy with all tones visible</text>
+        </svg>
+        <figcaption>
+          <span><i style="background: #167451"></i>Easy</span
+          ><span><i style="background: #145da0"></i>Normal</span
+          ><span><i style="background: #a04315"></i>Hard</span
+          ><span><i style="background: #813e9a"></i>Extreme</span>
+        </figcaption>
+      </figure>
+      <details>
+        <summary>Win odds at each plotted accuracy</summary>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Full-set accuracy</th>
+                <th scope="col">Easy</th>
+                <th scope="col">Normal</th>
+                <th scope="col">Hard</th>
+                <th scope="col">Extreme</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">75%</th>
+                <td>14.372086%</td>
+                <td>4.919296%</td>
+                <td>0.880579%</td>
+                <td>0.045884%</td>
+              </tr>
+              <tr>
+                <th scope="row">76%</th>
+                <td>18.268990%</td>
+                <td>6.756570%</td>
+                <td>1.335296%</td>
+                <td>0.079294%</td>
+              </tr>
+              <tr>
+                <th scope="row">77%</th>
+                <td>22.787932%</td>
+                <td>9.097588%</td>
+                <td>1.984677%</td>
+                <td>0.134432%</td>
+              </tr>
+              <tr>
+                <th scope="row">78%</th>
+                <td>27.905360%</td>
+                <td>12.012208%</td>
+                <td>2.891855%</td>
+                <td>0.223619%</td>
+              </tr>
+              <tr>
+                <th scope="row">79%</th>
+                <td>33.563624%</td>
+                <td>15.557339%</td>
+                <td>4.131421%</td>
+                <td>0.365016%</td>
+              </tr>
+              <tr>
+                <th scope="row">80%</th>
+                <td>39.670454%</td>
+                <td>19.768992%</td>
+                <td>5.787771%</td>
+                <td>0.584715%</td>
+              </tr>
+              <tr>
+                <th scope="row">81%</th>
+                <td>46.101676%</td>
+                <td>24.654431%</td>
+                <td>7.951635%</td>
+                <td>0.919236%</td>
+              </tr>
+              <tr>
+                <th scope="row">82%</th>
+                <td>52.707260%</td>
+                <td>30.185454%</td>
+                <td>10.714485%</td>
+                <td>1.418292%</td>
+              </tr>
+              <tr>
+                <th scope="row">83%</th>
+                <td>59.320347%</td>
+                <td>36.293878%</td>
+                <td>14.160732%</td>
+                <td>2.147572%</td>
+              </tr>
+              <tr>
+                <th scope="row">84%</th>
+                <td>65.768459%</td>
+                <td>42.870258%</td>
+                <td>18.357936%</td>
+                <td>3.191122%</td>
+              </tr>
+              <tr>
+                <th scope="row">85%</th>
+                <td>71.885777%</td>
+                <td>49.766571%</td>
+                <td>23.345658%</td>
+                <td>4.652681%</td>
+              </tr>
+              <tr>
+                <th scope="row">86%</th>
+                <td>77.525148%</td>
+                <td>56.803210%</td>
+                <td>29.124014%</td>
+                <td>6.655128%</td>
+              </tr>
+              <tr>
+                <th scope="row">87%</th>
+                <td>82.568508%</td>
+                <td>63.780044%</td>
+                <td>35.643405%</td>
+                <td>9.337012%</td>
+              </tr>
+              <tr>
+                <th scope="row">88%</th>
+                <td>86.934563%</td>
+                <td>70.490705%</td>
+                <td>42.797177%</td>
+                <td>12.845066%</td>
+              </tr>
+              <tr>
+                <th scope="row">89%</th>
+                <td>90.582957%</td>
+                <td>76.738726%</td>
+                <td>50.419032%</td>
+                <td>17.321669%</td>
+              </tr>
+              <tr>
+                <th scope="row">90%</th>
+                <td>93.514576%</td>
+                <td>82.353755%</td>
+                <td>58.286759%</td>
+                <td>22.886629%</td>
+              </tr>
+              <tr>
+                <th scope="row">91%</th>
+                <td>95.768134%</td>
+                <td>87.205916%</td>
+                <td>66.133293%</td>
+                <td>29.613277%</td>
+              </tr>
+              <tr>
+                <th scope="row">92%</th>
+                <td>97.413602%</td>
+                <td>91.216569%</td>
+                <td>73.665239%</td>
+                <td>37.500007%</td>
+              </tr>
+              <tr>
+                <th scope="row">93%</th>
+                <td>98.543331%</td>
+                <td>94.364108%</td>
+                <td>80.587864%</td>
+                <td>46.439738%</td>
+              </tr>
+              <tr>
+                <th scope="row">94%</th>
+                <td>99.261927%</td>
+                <td>96.684073%</td>
+                <td>86.634473%</td>
+                <td>56.191446%</td>
+              </tr>
+              <tr>
+                <th scope="row">95%</th>
+                <td>99.675925%</td>
+                <td>98.263519%</td>
+                <td>91.597078%</td>
+                <td>66.359438%</td>
+              </tr>
+              <tr>
+                <th scope="row">96%</th>
+                <td>99.884217%</td>
+                <td>99.230144%</td>
+                <td>95.354750%</td>
+                <td>76.387201%</td>
+              </tr>
+              <tr>
+                <th scope="row">97%</th>
+                <td>99.970098%</td>
+                <td>99.737049%</td>
+                <td>97.896211%</td>
+                <td>85.572886%</td>
+              </tr>
+              <tr>
+                <th scope="row">98%</th>
+                <td>99.995721%</td>
+                <td>99.944047%</td>
+                <td>99.334238%</td>
+                <td>93.112449%</td>
+              </tr>
+              <tr>
+                <th scope="row">99%</th>
+                <td>99.999855%</td>
+                <td>99.996239%</td>
+                <td>99.911491%</td>
+                <td>98.173723%</td>
+              </tr>
+              <tr>
+                <th scope="row">100%</th>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <figure>
+        <svg
+          viewBox="0 0 684 290"
+          role="img"
+          aria-label="Mandarin conditional clear probability at the benchmark"
+        >
+          <text x="61" y="20">Clear probability on entry</text>
+          <path class="grid" d="M61 236H651" />
+          <text x="54" y="240" text-anchor="end">0%</text>
+          <path class="grid" d="M61 186.5H651" />
+          <text x="54" y="190.5" text-anchor="end">25%</text>
+          <path class="grid" d="M61 137H651" />
+          <text x="54" y="141" text-anchor="end">50%</text>
+          <path class="grid" d="M61 87.5H651" />
+          <text x="54" y="91.5" text-anchor="end">75%</text>
+          <path class="grid" d="M61 38H651" />
+          <text x="54" y="42" text-anchor="end">100%</text>
+          <text x="61" y="254" text-anchor="middle">1 (2 doors)</text>
+          <text x="208.5" y="254" text-anchor="middle">2 (3 doors)</text>
+          <text x="356" y="254" text-anchor="middle">3 (4 doors)</text>
+          <text x="503.5" y="254" text-anchor="middle">4 (5 doors)</text>
+          <text x="651" y="254" text-anchor="middle">5 (5 doors)</text>
+          <polyline
+            fill="none"
+            stroke="#167451"
+            stroke-width="2.5"
+            points="61.0,38.0 208.5,38.3 356.0,39.8 503.5,43.5 651.0,43.5"
+          />
+          <polyline
+            fill="none"
+            stroke="#145da0"
+            stroke-width="2.5"
+            points="61.0,38.1 208.5,39.6 356.0,44.2 503.5,52.6 651.0,52.6"
+          />
+          <polyline
+            fill="none"
+            stroke="#a04315"
+            stroke-width="2.5"
+            points="61.0,39.1 208.5,45.2 356.0,57.1 503.5,73.5 651.0,73.5"
+          />
+          <polyline
+            fill="none"
+            stroke="#813e9a"
+            stroke-width="2.5"
+            points="61.0,46.2 208.5,65.5 356.0,89.7 503.5,114.7 651.0,114.7"
+          />
+          <text x="356" y="278" text-anchor="middle">Section</text>
+        </svg>
+        <figcaption>
+          <span><i style="background: #167451"></i>Easy</span
+          ><span><i style="background: #145da0"></i>Normal</span
+          ><span><i style="background: #a04315"></i>Hard</span
+          ><span><i style="background: #813e9a"></i>Extreme</span>
+        </figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Difficulty</th>
+              <th scope="col">1 (2 doors)</th>
+              <th scope="col">2 (3 doors)</th>
+              <th scope="col">3 (4 doors)</th>
+              <th scope="col">4 (5 doors)</th>
+              <th scope="col">5 (5 doors)</th>
+              <th scope="col">Old win rate</th>
+              <th scope="col">Win rate</th>
+              <th scope="col">Accuracy for 50% wins</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Easy</th>
+              <td>99.992621%</td>
+              <td>99.831655%</td>
+              <td>99.085099%</td>
+              <td>97.234015%</td>
+              <td>97.233634%</td>
+              <td>91.549177%</td>
+              <td>93.514576%</td>
+              <td>81.592%</td>
+            </tr>
+            <tr>
+              <th scope="row">Normal</th>
+              <td>99.930778%</td>
+              <td>99.174821%</td>
+              <td>96.879614%</td>
+              <td>92.614352%</td>
+              <td>92.613014%</td>
+              <td>76.770178%</td>
+              <td>82.353755%</td>
+              <td>85.033%</td>
+            </tr>
+            <tr>
+              <th scope="row">Hard</th>
+              <td>99.421043%</td>
+              <td>96.365357%</td>
+              <td>90.369373%</td>
+              <td>82.050732%</td>
+              <td>82.047797%</td>
+              <td>46.709017%</td>
+              <td>58.286759%</td>
+              <td>88.946%</td>
+            </tr>
+            <tr>
+              <th scope="row">Extreme</th>
+              <td>95.851724%</td>
+              <td>86.090482%</td>
+              <td>73.873405%</td>
+              <td>61.276503%</td>
+              <td>61.269547%</td>
+              <td>0.056783%</td>
+              <td>22.886629%</td>
+              <td>93.373%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Per-prompt accuracy by section 97.34% · 94.79% · 92.35% · 90.00% · 90.00%.</p>
+    </section>
+    <section>
+      <h2>Cantonese</h2>
+      <p>Full-set accuracy benchmark 87.0%. Each section starts with full hearts.</p>
+      <figure>
+        <svg
+          viewBox="0 0 684 290"
+          role="img"
+          aria-label="Cantonese tower win probability by listening accuracy"
+        >
+          <text x="61" y="20">Whole-tower win probability</text>
+          <path class="grid" d="M61 236H651" />
+          <text x="54" y="240" text-anchor="end">0%</text>
+          <path class="grid" d="M61 186.5H651" />
+          <text x="54" y="190.5" text-anchor="end">25%</text>
+          <path class="grid" d="M61 137H651" />
+          <text x="54" y="141" text-anchor="end">50%</text>
+          <path class="grid" d="M61 87.5H651" />
+          <text x="54" y="91.5" text-anchor="end">75%</text>
+          <path class="grid" d="M61 38H651" />
+          <text x="54" y="42" text-anchor="end">100%</text>
+          <text x="61" y="254" text-anchor="middle">75%</text>
+          <text x="179.0000000000001" y="254" text-anchor="middle">80%</text>
+          <text x="296.99999999999994" y="254" text-anchor="middle">85%</text>
+          <text x="415.00000000000006" y="254" text-anchor="middle">90%</text>
+          <text x="532.9999999999999" y="254" text-anchor="middle">95%</text>
+          <text x="651" y="254" text-anchor="middle">100%</text>
+          <polyline
+            fill="none"
+            stroke="#167451"
+            stroke-width="2.5"
+            points="61.0,200.6 84.6,192.3 108.2,183.0 131.8,172.6 155.4,161.5 179.0,149.6 202.6,137.3 226.2,124.9 249.8,112.5 273.4,100.6 297.0,89.4 320.6,79.1 344.2,69.9 367.8,62.0 391.4,55.3 415.0,50.0 438.6,45.8 462.2,42.8 485.8,40.7 509.4,39.4 533.0,38.6 556.6,38.2 580.2,38.1 603.8,38.0 627.4,38.0 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#145da0"
+            stroke-width="2.5"
+            points="61.0,222.2 84.6,217.8 108.2,212.4 131.8,205.8 155.4,198.1 179.0,189.2 202.6,179.1 226.2,168.0 249.8,156.0 273.4,143.3 297.0,130.2 320.6,117.0 344.2,104.0 367.8,91.7 391.4,80.3 415.0,70.1 438.6,61.3 462.2,54.0 485.8,48.3 509.4,44.1 533.0,41.2 556.6,39.4 580.2,38.5 603.8,38.1 627.4,38.0 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#a04315"
+            stroke-width="2.5"
+            points="61.0,233.0 84.6,231.7 108.2,229.9 131.8,227.5 155.4,224.3 179.0,220.3 202.6,215.2 226.2,208.9 249.8,201.3 273.4,192.3 297.0,181.9 320.6,170.2 344.2,157.3 367.8,143.4 391.4,128.8 415.0,114.0 438.6,99.5 462.2,85.7 485.8,73.0 509.4,62.1 533.0,53.1 556.6,46.4 580.2,41.8 603.8,39.2 627.4,38.2 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#813e9a"
+            stroke-width="2.5"
+            points="61.0,235.8 84.6,235.7 108.2,235.5 131.8,235.2 155.4,234.7 179.0,234.0 202.6,233.0 226.2,231.6 249.8,229.6 273.4,227.0 297.0,223.3 320.6,218.5 344.2,212.4 367.8,204.6 391.4,194.9 415.0,183.3 438.6,169.6 462.2,154.0 485.8,136.7 509.4,118.1 533.0,99.1 556.6,80.7 580.2,64.0 603.8,50.4 627.4,41.3 651.0,38.0"
+          />
+          <text x="356" y="278" text-anchor="middle">Accuracy with all tones visible</text>
+        </svg>
+        <figcaption>
+          <span><i style="background: #167451"></i>Easy</span
+          ><span><i style="background: #145da0"></i>Normal</span
+          ><span><i style="background: #a04315"></i>Hard</span
+          ><span><i style="background: #813e9a"></i>Extreme</span>
+        </figcaption>
+      </figure>
+      <details>
+        <summary>Win odds at each plotted accuracy</summary>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Full-set accuracy</th>
+                <th scope="col">Easy</th>
+                <th scope="col">Normal</th>
+                <th scope="col">Hard</th>
+                <th scope="col">Extreme</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">75%</th>
+                <td>17.863182%</td>
+                <td>6.954038%</td>
+                <td>1.504061%</td>
+                <td>0.103585%</td>
+              </tr>
+              <tr>
+                <th scope="row">76%</th>
+                <td>22.048067%</td>
+                <td>9.190131%</td>
+                <td>2.172988%</td>
+                <td>0.168781%</td>
+              </tr>
+              <tr>
+                <th scope="row">77%</th>
+                <td>26.772662%</td>
+                <td>11.936662%</td>
+                <td>3.084403%</td>
+                <td>0.270351%</td>
+              </tr>
+              <tr>
+                <th scope="row">78%</th>
+                <td>31.995816%</td>
+                <td>15.241642%</td>
+                <td>4.302070%</td>
+                <td>0.425767%</td>
+              </tr>
+              <tr>
+                <th scope="row">79%</th>
+                <td>37.648932%</td>
+                <td>19.137169%</td>
+                <td>5.897087%</td>
+                <td>0.659335%</td>
+              </tr>
+              <tr>
+                <th scope="row">80%</th>
+                <td>43.637062%</td>
+                <td>23.633600%</td>
+                <td>7.945188%</td>
+                <td>1.004073%</td>
+              </tr>
+              <tr>
+                <th scope="row">81%</th>
+                <td>49.842324%</td>
+                <td>28.714368%</td>
+                <td>10.522578%</td>
+                <td>1.503741%</td>
+              </tr>
+              <tr>
+                <th scope="row">82%</th>
+                <td>56.129538%</td>
+                <td>34.332127%</td>
+                <td>13.700245%</td>
+                <td>2.214810%</td>
+              </tr>
+              <tr>
+                <th scope="row">83%</th>
+                <td>62.353748%</td>
+                <td>40.406904%</td>
+                <td>17.536902%</td>
+                <td>3.208101%</td>
+              </tr>
+              <tr>
+                <th scope="row">84%</th>
+                <td>68.369034%</td>
+                <td>46.826835%</td>
+                <td>22.070895%</td>
+                <td>4.569651%</td>
+              </tr>
+              <tr>
+                <th scope="row">85%</th>
+                <td>74.037828%</td>
+                <td>53.451824%</td>
+                <td>27.311720%</td>
+                <td>6.400281%</td>
+              </tr>
+              <tr>
+                <th scope="row">86%</th>
+                <td>79.239872%</td>
+                <td>60.120188%</td>
+                <td>33.232025%</td>
+                <td>8.813204%</td>
+              </tr>
+              <tr>
+                <th scope="row">87%</th>
+                <td>83.879925%</td>
+                <td>66.657997%</td>
+                <td>39.761184%</td>
+                <td>11.928980%</td>
+              </tr>
+              <tr>
+                <th scope="row">88%</th>
+                <td>87.893483%</td>
+                <td>72.890446%</td>
+                <td>46.781632%</td>
+                <td>15.867161%</td>
+              </tr>
+              <tr>
+                <th scope="row">89%</th>
+                <td>91.249945%</td>
+                <td>78.654305%</td>
+                <td>54.129103%</td>
+                <td>20.734125%</td>
+              </tr>
+              <tr>
+                <th scope="row">90%</th>
+                <td>93.952964%</td>
+                <td>83.810235%</td>
+                <td>61.597698%</td>
+                <td>26.606974%</td>
+              </tr>
+              <tr>
+                <th scope="row">91%</th>
+                <td>96.037979%</td>
+                <td>88.253700%</td>
+                <td>68.950271%</td>
+                <td>33.513894%</td>
+              </tr>
+              <tr>
+                <th scope="row">92%</th>
+                <td>97.567233%</td>
+                <td>91.923259%</td>
+                <td>75.934037%</td>
+                <td>41.412146%</td>
+              </tr>
+              <tr>
+                <th scope="row">93%</th>
+                <td>98.622801%</td>
+                <td>94.805226%</td>
+                <td>82.300635%</td>
+                <td>50.165767%</td>
+              </tr>
+              <tr>
+                <th scope="row">94%</th>
+                <td>99.298295%</td>
+                <td>96.934090%</td>
+                <td>87.829160%</td>
+                <td>59.526059%</td>
+              </tr>
+              <tr>
+                <th scope="row">95%</th>
+                <td>99.690048%</td>
+                <td>98.388427%</td>
+                <td>92.350123%</td>
+                <td>69.118863%</td>
+              </tr>
+              <tr>
+                <th scope="row">96%</th>
+                <td>99.888559%</td>
+                <td>99.282481%</td>
+                <td>95.768035%</td>
+                <td>78.443242%</td>
+              </tr>
+              <tr>
+                <th scope="row">97%</th>
+                <td>99.971027%</td>
+                <td>99.753798%</td>
+                <td>98.080338%</td>
+                <td>86.886246%</td>
+              </tr>
+              <tr>
+                <th scope="row">98%</th>
+                <td>99.995826%</td>
+                <td>99.947361%</td>
+                <td>99.391080%</td>
+                <td>93.757664%</td>
+              </tr>
+              <tr>
+                <th scope="row">99%</th>
+                <td>99.999857%</td>
+                <td>99.996445%</td>
+                <td>99.918806%</td>
+                <td>98.346779%</td>
+              </tr>
+              <tr>
+                <th scope="row">100%</th>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <figure>
+        <svg
+          viewBox="0 0 684 290"
+          role="img"
+          aria-label="Cantonese conditional clear probability at the benchmark"
+        >
+          <text x="61" y="20">Clear probability on entry</text>
+          <path class="grid" d="M61 236H651" />
+          <text x="54" y="240" text-anchor="end">0%</text>
+          <path class="grid" d="M61 186.5H651" />
+          <text x="54" y="190.5" text-anchor="end">25%</text>
+          <path class="grid" d="M61 137H651" />
+          <text x="54" y="141" text-anchor="end">50%</text>
+          <path class="grid" d="M61 87.5H651" />
+          <text x="54" y="91.5" text-anchor="end">75%</text>
+          <path class="grid" d="M61 38H651" />
+          <text x="54" y="42" text-anchor="end">100%</text>
+          <text x="61" y="254" text-anchor="middle">1 (2 doors)</text>
+          <text x="208.5" y="254" text-anchor="middle">2 (3 doors)</text>
+          <text x="356" y="254" text-anchor="middle">3 (4 doors)</text>
+          <text x="503.5" y="254" text-anchor="middle">4 (6 doors)</text>
+          <text x="651" y="254" text-anchor="middle">5 (6 doors)</text>
+          <polyline
+            fill="none"
+            stroke="#167451"
+            stroke-width="2.5"
+            points="61.0,38.0 208.5,38.5 356.0,40.5 503.5,53.3 651.0,53.3"
+          />
+          <polyline
+            fill="none"
+            stroke="#145da0"
+            stroke-width="2.5"
+            points="61.0,38.2 208.5,40.1 356.0,45.8 503.5,70.1 651.0,70.1"
+          />
+          <polyline
+            fill="none"
+            stroke="#a04315"
+            stroke-width="2.5"
+            points="61.0,39.4 208.5,46.7 356.0,60.6 503.5,99.8 651.0,99.8"
+          />
+          <polyline
+            fill="none"
+            stroke="#813e9a"
+            stroke-width="2.5"
+            points="61.0,47.5 208.5,69.2 356.0,95.5 503.5,145.4 651.0,145.4"
+          />
+          <text x="356" y="278" text-anchor="middle">Section</text>
+        </svg>
+        <figcaption>
+          <span><i style="background: #167451"></i>Easy</span
+          ><span><i style="background: #145da0"></i>Normal</span
+          ><span><i style="background: #a04315"></i>Hard</span
+          ><span><i style="background: #813e9a"></i>Extreme</span>
+        </figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Difficulty</th>
+              <th scope="col">1 (2 doors)</th>
+              <th scope="col">2 (3 doors)</th>
+              <th scope="col">3 (4 doors)</th>
+              <th scope="col">4 (6 doors)</th>
+              <th scope="col">5 (6 doors)</th>
+              <th scope="col">Old win rate</th>
+              <th scope="col">Win rate</th>
+              <th scope="col">Accuracy for 50% wins</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Easy</th>
+              <td>99.989115%</td>
+              <td>99.761121%</td>
+              <td>98.753395%</td>
+              <td>92.278032%</td>
+              <td>92.277034%</td>
+              <td>78.636046%</td>
+              <td>83.879925%</td>
+              <td>81.025%</td>
+            </tr>
+            <tr>
+              <th scope="row">Normal</th>
+              <td>99.906300%</td>
+              <td>98.919079%</td>
+              <td>96.045172%</td>
+              <td>83.802348%</td>
+              <td>83.800690%</td>
+              <td>57.033970%</td>
+              <td>66.657997%</td>
+              <td>84.481%</td>
+            </tr>
+            <tr>
+              <th scope="row">Hard</th>
+              <td>99.277710%</td>
+              <td>95.585850%</td>
+              <td>88.603550%</td>
+              <td>68.768177%</td>
+              <td>68.766246%</td>
+              <td>27.380914%</td>
+              <td>39.761184%</td>
+              <td>88.442%</td>
+            </tr>
+            <tr>
+              <th scope="row">Extreme</th>
+              <td>95.209520%</td>
+              <td>84.254534%</td>
+              <td>70.983525%</td>
+              <td>45.772430%</td>
+              <td>45.768652%</td>
+              <td>0.011983%</td>
+              <td>11.928980%</td>
+              <td>92.982%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Per-prompt accuracy by section 97.15% · 94.43% · 91.83% · 87.00% · 87.00%.</p>
+    </section>
+    <section>
+      <h2>Vietnamese</h2>
+      <p>Full-set accuracy benchmark 88.0%. Each section starts with full hearts.</p>
+      <figure>
+        <svg
+          viewBox="0 0 684 290"
+          role="img"
+          aria-label="Vietnamese tower win probability by listening accuracy"
+        >
+          <text x="61" y="20">Whole-tower win probability</text>
+          <path class="grid" d="M61 236H651" />
+          <text x="54" y="240" text-anchor="end">0%</text>
+          <path class="grid" d="M61 186.5H651" />
+          <text x="54" y="190.5" text-anchor="end">25%</text>
+          <path class="grid" d="M61 137H651" />
+          <text x="54" y="141" text-anchor="end">50%</text>
+          <path class="grid" d="M61 87.5H651" />
+          <text x="54" y="91.5" text-anchor="end">75%</text>
+          <path class="grid" d="M61 38H651" />
+          <text x="54" y="42" text-anchor="end">100%</text>
+          <text x="61" y="254" text-anchor="middle">75%</text>
+          <text x="179.0000000000001" y="254" text-anchor="middle">80%</text>
+          <text x="296.99999999999994" y="254" text-anchor="middle">85%</text>
+          <text x="415.00000000000006" y="254" text-anchor="middle">90%</text>
+          <text x="532.9999999999999" y="254" text-anchor="middle">95%</text>
+          <text x="651" y="254" text-anchor="middle">100%</text>
+          <polyline
+            fill="none"
+            stroke="#167451"
+            stroke-width="2.5"
+            points="61.0,201.0 84.6,192.7 108.2,183.2 131.8,172.8 155.4,161.4 179.0,149.4 202.6,137.0 226.2,124.5 249.8,112.0 273.4,100.1 297.0,88.8 320.6,78.5 344.2,69.4 367.8,61.5 391.4,54.9 415.0,49.7 438.6,45.6 462.2,42.7 485.8,40.6 509.4,39.3 533.0,38.6 556.6,38.2 580.2,38.1 603.8,38.0 627.4,38.0 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#145da0"
+            stroke-width="2.5"
+            points="61.0,222.6 84.6,218.2 108.2,212.7 131.8,206.2 155.4,198.4 179.0,189.4 202.6,179.3 226.2,168.0 249.8,155.9 273.4,143.0 297.0,129.8 320.6,116.5 344.2,103.5 367.8,91.1 391.4,79.7 415.0,69.6 438.6,60.8 462.2,53.7 485.8,48.0 509.4,43.9 533.0,41.1 556.6,39.4 580.2,38.5 603.8,38.1 627.4,38.0 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#a04315"
+            stroke-width="2.5"
+            points="61.0,233.2 84.6,231.9 108.2,230.1 131.8,227.7 155.4,224.6 179.0,220.5 202.6,215.4 226.2,209.1 249.8,201.5 273.4,192.4 297.0,182.0 320.6,170.1 344.2,157.1 367.8,143.1 391.4,128.4 415.0,113.6 438.6,99.0 462.2,85.2 485.8,72.6 509.4,61.8 533.0,52.9 556.6,46.2 580.2,41.7 603.8,39.2 627.4,38.2 651.0,38.0"
+          />
+          <polyline
+            fill="none"
+            stroke="#813e9a"
+            stroke-width="2.5"
+            points="61.0,235.8 84.6,235.7 108.2,235.5 131.8,235.2 155.4,234.8 179.0,234.1 202.6,233.1 226.2,231.7 249.8,229.8 273.4,227.1 297.0,223.5 320.6,218.7 344.2,212.5 367.8,204.7 391.4,195.0 415.0,183.2 438.6,169.5 462.2,153.7 485.8,136.3 509.4,117.8 533.0,98.8 556.6,80.3 580.2,63.7 603.8,50.2 627.4,41.2 651.0,38.0"
+          />
+          <text x="356" y="278" text-anchor="middle">Accuracy with all tones visible</text>
+        </svg>
+        <figcaption>
+          <span><i style="background: #167451"></i>Easy</span
+          ><span><i style="background: #145da0"></i>Normal</span
+          ><span><i style="background: #a04315"></i>Hard</span
+          ><span><i style="background: #813e9a"></i>Extreme</span>
+        </figcaption>
+      </figure>
+      <details>
+        <summary>Win odds at each plotted accuracy</summary>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Full-set accuracy</th>
+                <th scope="col">Easy</th>
+                <th scope="col">Normal</th>
+                <th scope="col">Hard</th>
+                <th scope="col">Extreme</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">75%</th>
+                <td>17.666743%</td>
+                <td>6.771895%</td>
+                <td>1.426476%</td>
+                <td>0.093826%</td>
+              </tr>
+              <tr>
+                <th scope="row">76%</th>
+                <td>21.886732%</td>
+                <td>9.001711%</td>
+                <td>2.078760%</td>
+                <td>0.154800%</td>
+              </tr>
+              <tr>
+                <th scope="row">77%</th>
+                <td>26.659194%</td>
+                <td>11.751620%</td>
+                <td>2.973730%</td>
+                <td>0.250840%</td>
+              </tr>
+              <tr>
+                <th scope="row">78%</th>
+                <td>31.940761%</td>
+                <td>15.071451%</td>
+                <td>4.176757%</td>
+                <td>0.399274%</td>
+              </tr>
+              <tr>
+                <th scope="row">79%</th>
+                <td>37.659341%</td>
+                <td>18.994281%</td>
+                <td>5.760919%</td>
+                <td>0.624384%</td>
+              </tr>
+              <tr>
+                <th scope="row">80%</th>
+                <td>43.715494%</td>
+                <td>23.530308%</td>
+                <td>7.804155%</td>
+                <td>0.959365%</td>
+              </tr>
+              <tr>
+                <th scope="row">81%</th>
+                <td>49.986291%</td>
+                <td>28.661468%</td>
+                <td>10.384863%</td>
+                <td>1.448434%</td>
+              </tr>
+              <tr>
+                <th scope="row">82%</th>
+                <td>56.331514%</td>
+                <td>34.337550%</td>
+                <td>13.575898%</td>
+                <td>2.148880%</td>
+              </tr>
+              <tr>
+                <th scope="row">83%</th>
+                <td>62.601777%</td>
+                <td>40.474518%</td>
+                <td>17.437140%</td>
+                <td>3.132756%</td>
+              </tr>
+              <tr>
+                <th scope="row">84%</th>
+                <td>68.647882%</td>
+                <td>46.955621%</td>
+                <td>22.007033%</td>
+                <td>4.487738%</td>
+              </tr>
+              <tr>
+                <th scope="row">85%</th>
+                <td>74.330541%</td>
+                <td>53.635585%</td>
+                <td>27.293808%</td>
+                <td>6.316602%</td>
+              </tr>
+              <tr>
+                <th scope="row">86%</th>
+                <td>79.529522%</td>
+                <td>60.347904%</td>
+                <td>33.267329%</td>
+                <td>8.734629%</td>
+              </tr>
+              <tr>
+                <th scope="row">87%</th>
+                <td>84.151305%</td>
+                <td>66.914820%</td>
+                <td>39.852742%</td>
+                <td>11.864240%</td>
+              </tr>
+              <tr>
+                <th scope="row">88%</th>
+                <td>88.134518%</td>
+                <td>73.159252%</td>
+                <td>46.927161%</td>
+                <td>15.826194%</td>
+              </tr>
+              <tr>
+                <th scope="row">89%</th>
+                <td>91.452630%</td>
+                <td>78.917597%</td>
+                <td>54.320529%</td>
+                <td>20.726931%</td>
+              </tr>
+              <tr>
+                <th scope="row">90%</th>
+                <td>94.113736%</td>
+                <td>84.052159%</td>
+                <td>61.821549%</td>
+                <td>26.641991%</td>
+              </tr>
+              <tr>
+                <th scope="row">91%</th>
+                <td>96.157507%</td>
+                <td>88.461854%</td>
+                <td>69.189016%</td>
+                <td>33.596059%</td>
+              </tr>
+              <tr>
+                <th scope="row">92%</th>
+                <td>97.649700%</td>
+                <td>92.090018%</td>
+                <td>76.168310%</td>
+                <td>41.540947%</td>
+              </tr>
+              <tr>
+                <th scope="row">93%</th>
+                <td>98.674814%</td>
+                <td>94.928348%</td>
+                <td>82.512027%</td>
+                <td>50.333746%</td>
+              </tr>
+              <tr>
+                <th scope="row">94%</th>
+                <td>99.327604%</td>
+                <td>97.016464%</td>
+                <td>88.003113%</td>
+                <td>59.718330%</td>
+              </tr>
+              <tr>
+                <th scope="row">95%</th>
+                <td>99.704276%</td>
+                <td>98.436999%</td>
+                <td>92.478343%</td>
+                <td>69.314229%</td>
+              </tr>
+              <tr>
+                <th scope="row">96%</th>
+                <td>99.894151%</td>
+                <td>99.306533%</td>
+                <td>95.849848%</td>
+                <td>78.617350%</td>
+              </tr>
+              <tr>
+                <th scope="row">97%</th>
+                <td>99.972611%</td>
+                <td>99.762914%</td>
+                <td>98.122566%</td>
+                <td>87.016952%</td>
+              </tr>
+              <tr>
+                <th scope="row">98%</th>
+                <td>99.996074%</td>
+                <td>99.949502%</td>
+                <td>99.406155%</td>
+                <td>93.832228%</td>
+              </tr>
+              <tr>
+                <th scope="row">99%</th>
+                <td>99.999867%</td>
+                <td>99.996603%</td>
+                <td>99.921049%</td>
+                <td>98.369807%</td>
+              </tr>
+              <tr>
+                <th scope="row">100%</th>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+                <td>100.000000%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <figure>
+        <svg
+          viewBox="0 0 684 290"
+          role="img"
+          aria-label="Vietnamese conditional clear probability at the benchmark"
+        >
+          <text x="61" y="20">Clear probability on entry</text>
+          <path class="grid" d="M61 236H651" />
+          <text x="54" y="240" text-anchor="end">0%</text>
+          <path class="grid" d="M61 186.5H651" />
+          <text x="54" y="190.5" text-anchor="end">25%</text>
+          <path class="grid" d="M61 137H651" />
+          <text x="54" y="141" text-anchor="end">50%</text>
+          <path class="grid" d="M61 87.5H651" />
+          <text x="54" y="91.5" text-anchor="end">75%</text>
+          <path class="grid" d="M61 38H651" />
+          <text x="54" y="42" text-anchor="end">100%</text>
+          <text x="61" y="254" text-anchor="middle">1 (2 doors)</text>
+          <text x="208.5" y="254" text-anchor="middle">2 (3 doors)</text>
+          <text x="356" y="254" text-anchor="middle">3 (4 doors)</text>
+          <text x="503.5" y="254" text-anchor="middle">4 (6 doors)</text>
+          <text x="651" y="254" text-anchor="middle">5 (6 doors)</text>
+          <polyline
+            fill="none"
+            stroke="#167451"
+            stroke-width="2.5"
+            points="61.0,38.0 208.5,38.3 356.0,39.7 503.5,49.1 651.0,49.1"
+          />
+          <polyline
+            fill="none"
+            stroke="#145da0"
+            stroke-width="2.5"
+            points="61.0,38.1 208.5,39.6 356.0,44.0 503.5,63.3 651.0,63.3"
+          />
+          <polyline
+            fill="none"
+            stroke="#a04315"
+            stroke-width="2.5"
+            points="61.0,39.1 208.5,45.1 356.0,56.6 503.5,90.5 651.0,90.5"
+          />
+          <polyline
+            fill="none"
+            stroke="#813e9a"
+            stroke-width="2.5"
+            points="61.0,46.2 208.5,65.3 356.0,88.9 503.5,135.5 651.0,135.5"
+          />
+          <text x="356" y="278" text-anchor="middle">Section</text>
+        </svg>
+        <figcaption>
+          <span><i style="background: #167451"></i>Easy</span
+          ><span><i style="background: #145da0"></i>Normal</span
+          ><span><i style="background: #a04315"></i>Hard</span
+          ><span><i style="background: #813e9a"></i>Extreme</span>
+        </figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Difficulty</th>
+              <th scope="col">1 (2 doors)</th>
+              <th scope="col">2 (3 doors)</th>
+              <th scope="col">3 (4 doors)</th>
+              <th scope="col">4 (6 doors)</th>
+              <th scope="col">5 (6 doors)</th>
+              <th scope="col">Old win rate</th>
+              <th scope="col">Win rate</th>
+              <th scope="col">Accuracy for 50% wins</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Easy</th>
+              <td>99.992665%</td>
+              <td>99.835458%</td>
+              <td>99.126968%</td>
+              <td>94.374291%</td>
+              <td>94.372953%</td>
+              <td>84.231559%</td>
+              <td>88.134518%</td>
+              <td>81.002%</td>
+            </tr>
+            <tr>
+              <th scope="row">Normal</th>
+              <td>99.931023%</td>
+              <td>99.190140%</td>
+              <td>96.990475%</td>
+              <td>87.235236%</td>
+              <td>87.232715%</td>
+              <td>64.901677%</td>
+              <td>73.159252%</td>
+              <td>84.458%</td>
+            </tr>
+            <tr>
+              <th scope="row">Hard</th>
+              <td>99.421680%</td>
+              <td>96.416060%</td>
+              <td>90.616282%</td>
+              <td>73.502809%</td>
+              <td>73.499371%</td>
+              <td>34.385670%</td>
+              <td>46.927161%</td>
+              <td>88.419%</td>
+            </tr>
+            <tr>
+              <th scope="row">Extreme</th>
+              <td>95.849564%</td>
+              <td>86.210110%</td>
+              <td>74.286320%</td>
+              <td>50.782019%</td>
+              <td>50.770255%</td>
+              <td>0.023230%</td>
+              <td>15.826194%</td>
+              <td>92.963%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Per-prompt accuracy by section 97.34% · 94.82% · 92.43% · 88.00% · 88.00%.</p>
+    </section>
+  </body>
+</html>
