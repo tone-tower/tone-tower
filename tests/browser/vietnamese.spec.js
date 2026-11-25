@@ -244,8 +244,9 @@ test('a wrong door names both tones, and number keys follow the door order', asy
   await noOverflow(page);
 });
 
-for (const text of ['trung học chuyên nghiệp', 'nghiêng nghiêng', 'phòng thí nghiệm'])
+for (const text of ['trung học chuyên nghiệp', 'nghiêng nghiêng', 'phòng thí nghiệm', 'tỉ mẩn'])
   test('a long word stays on one line without overlapping Replay: ' + text, async ({ page }) => {
+    if (page.viewportSize().width <= 360) await page.setViewportSize({ width: 320, height: 640 });
     await page.route('**/catalogs/vi.json', (route) =>
       route.fulfill({ json: catalogOf([...references, [text]], { examplesOnly: true }) }),
     );
@@ -259,19 +260,26 @@ for (const text of ['trung học chuyên nghiệp', 'nghiêng nghiêng', 'phòng
     const syllables = await page
       .locator('.prompt-syllable')
       .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
+    const wordPrompt = page.locator('.word-prompt');
     const replay = await page.locator('#replay-word').boundingBox(),
-      question = await page.locator('.scene-question').boundingBox();
+      word = await wordPrompt.boundingBox();
     expect(new Set(syllables.map((box) => Math.round(box.top))).size).toBe(1);
-    expect(syllables[0].left).toBeGreaterThanOrEqual(question.x);
-    expect(syllables.at(-1).right).toBeLessThanOrEqual(question.x + question.width);
-    if (page.viewportSize().width <= 600) expect(syllables[0].bottom).toBeLessThanOrEqual(replay.y);
-    else expect(syllables.at(-1).right).toBeLessThanOrEqual(replay.x);
+    expect(word.height).toBe(
+      await wordPrompt.evaluate((node) => parseFloat(getComputedStyle(node).minHeight)),
+    );
+    expect(syllables[0].left).toBeGreaterThanOrEqual(word.x);
+    expect(syllables.at(-1).right).toBeLessThanOrEqual(word.x + word.width);
+    expect(word.x + word.width).toBeLessThan(replay.x);
+    expect(replay.y + replay.height / 2).toBeGreaterThan(word.y);
+    expect(replay.y + replay.height / 2).toBeLessThan(word.y + word.height);
     // No syllable is broken across lines around its covered letter.
     for (const character of await page.locator('.prompt-character').all()) {
       const box = await character.boundingBox(),
         size = parseFloat(await character.evaluate((node) => getComputedStyle(node).fontSize));
       expect(box.height).toBeLessThan(size * 2);
     }
+    await page.locator('.tone-door:enabled').first().click();
+    expect((await wordPrompt.boundingBox()).height).toBe(word.height);
     await noOverflow(page);
   });
 
