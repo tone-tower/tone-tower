@@ -20,6 +20,25 @@ export interface DictionarySource {
   attribution?: string;
   [key: string]: unknown;
 }
+export type HskLevel = '1' | '2' | '3' | '4' | '5' | '6' | '7-9';
+export interface HskSource {
+  scheme: 'hsk-3.0';
+  edition: string;
+  attribution: string;
+  url: string;
+  downloadUrl: string;
+  snapshotSha256: string;
+  snapshotDate: string;
+  license: string;
+  licenseUrl: string;
+}
+export interface HskMembership {
+  level: HskLevel;
+  sourceRows: number[];
+  match: 'form-and-pinyin';
+}
+export type VocabularyTier = 'easy' | 'normal' | 'hard';
+
 export interface Entry {
   id: string;
   forms: Forms;
@@ -27,7 +46,8 @@ export interface Entry {
   fullGloss?: string;
   dictionarySource?: DictionarySource;
   glossSource?: unknown;
-  metadata?: Record<string, unknown>;
+  practiceTier?: VocabularyTier;
+  metadata?: Record<string, unknown> & { hsk?: HskMembership };
 }
 export interface Pronunciation {
   id: string;
@@ -78,6 +98,7 @@ export interface Catalog {
   pronunciations: Pronunciation[];
   recordings: Recording[];
   references: ToneReference[];
+  hskSource?: HskSource;
   availability?: Availability;
 }
 export interface ExerciseRow {
@@ -88,6 +109,7 @@ export interface ExerciseRow {
   gloss?: string;
   forms?: Forms;
   transcription?: string;
+  practiceTier?: VocabularyTier;
   wordId?: string;
   pronunciationId?: string;
   anchor?: boolean;

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "recordings": {
+    "commons-157434809": {
+      "reason": "GitHub issue #8. The clip says a different word.",
+      "excluded": true
+    },
+    "commons-147795353": {
+      "reason": "GitHub issue #11. The first syllable is cut off.",
+      "excluded": true
+    },
+    "commons-71029108": {
+      "reason": "GitHub issue #12. The initial sounds wrong for the assigned word.",
+      "excluded": true
+    },
+    "commons-124568239": {
+      "reason": "GitHub issue #16. Background noise interferes with listening.",
+      "excluded": true
+    },
+    "commons-71029060": {
+      "reason": "GitHub issue #17. Background noise interferes with listening.",
+      "excluded": true
+    },
+    "commons-157434943": {
+      "reason": "GitHub issue #18. The clip contains an extra syllable.",
+      "excluded": true
+    },
+    "commons-157480802": {
+      "reason": "GitHub issue #21. The recorded second tone conflicts with the exercise answer.",
+      "excluded": true
+    }
+  }
+}

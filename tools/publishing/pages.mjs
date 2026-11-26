@@ -83,6 +83,7 @@ export function renderPage(template, key, catalog) {
       pronunciations,
       recordings,
       references: catalog.references,
+      hskSource: catalog.hskSource,
       availability: catalog.availability,
     };
     const json = JSON.stringify(guideCatalog).replace(/</g, '\\u003c');

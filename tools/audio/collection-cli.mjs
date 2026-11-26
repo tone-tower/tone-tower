@@ -6,6 +6,7 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     collection: { type: 'string', default: 'cmn' },
+    speaker: { type: 'string' },
     limit: { type: 'string' },
     refresh: { type: 'boolean' },
     'retry-review': { type: 'boolean' },
@@ -22,6 +23,7 @@ try {
   if (values.help) {
     console.log('Download/resume: npm run audio:download:mandarin');
     console.log('Small batch:     npm run audio:download:mandarin -- --limit 20');
+    console.log('One speaker:     npm run audio:download:mandarin -- --speaker Luilui6666');
     console.log('Check progress:  npm run audio:status:mandarin');
     console.log(
       '--refresh rescans Commons and pending source metadata; saved source versions remain pinned.',
@@ -78,6 +80,7 @@ try {
       collection: values.collection,
       limit: values.limit === undefined ? Infinity : Number(values.limit),
       refresh: values.refresh,
+      speaker: values.speaker,
       retryReview: values['retry-review'],
       signal: abort.signal,
     });

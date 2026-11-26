@@ -5,7 +5,7 @@ does not replace the licences of the material below.
 
 ## Human speech recordings
 
-Recordings come from Wikimedia Commons. Each recording keeps its own licence:
+Wikimedia Commons recordings each keep their own licence:
 CC BY-SA 4.0, CC BY 4.0 or CC0. The published catalog.json identifies its creator,
 source page, licence URL and conversion credit. The same information is available
 in the game's recording directory. The source inventory is data/audio/content.json.
@@ -26,6 +26,15 @@ data/audio/collections/cmn/recordings.json. Downloaded MP3s live in audio/cmn/.
 Accepted licences are CC0 1.0, CC BY 4.0 and CC BY-SA 4.0, as identified for each
 recording. Share-alike audio derivatives retain their indicated licence. The
 publication build includes only the clips referenced in its playable catalog; the application's MIT licence does not replace audio licences.
+
+The [Shtooka Mandarin collections](https://www.yojik.eu/audiocollections/audiocollections.html#cmn-balm-congcong)
+also supply recordings by Congcong, © 2010 Association Shtooka, under
+[CC BY 3.0 US](https://creativecommons.org/licenses/by/3.0/us/) and by Yue Tan,
+© 2009 Yue Tan, recorded by the University of Caen, under
+[CC BY-SA 3.0 US](https://creativecommons.org/licenses/by-sa/3.0/us/).
+The originals were converted from FLAC to MP3. The conversion preserves pitch
+and speed. Per-clip hashes, source Pinyin when available and attribution are in
+`data/audio/mandarin-shtooka.json`.
 
 ### Matched Mandarin tone examples
 
@@ -75,6 +84,48 @@ Licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
 Citation: Sio and Morgado da Costa (2019), “Building the Cantonese Wordnet,”
 Proceedings of the Tenth Global Wordnet Conference, pp. 206–215. This cross-check
 does not imply that a recording is supplied or endorsed by Cantonese Wordnet.
+
+## HSK vocabulary metadata
+
+Mandarin level tags adapt the
+[HSK 3.0 word list, all levels by Gushi](https://gushichinese.com/hsk-3.0/downloads)
+under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Gushi's
+compilation follows the November 2025 HSK examination syllabus. Tone Tower
+retains simplified written forms, Pinyin, tone numbers and levels, and combines
+the advanced levels into the syllabus's shared 7–9 band. The derived tags retain
+CC BY-SA 4.0. The catalog records the source download and checksum.
+
+The Mandarin practice-tier review uses simplified forms, Pinyin and levels
+from NihaoLearn's 2021 standard and HSK 2.0 downloads. The practice data records
+each exact form-and-reading match and its edition. The older levels inform
+Tone Tower's practice tiers. [NihaoLearn data and licences](https://nihaolearn.com/licenses)
+
+The exports' vocabulary data derives from complete-hsk-vocabulary under the
+following MIT notice. [Upstream licence](https://github.com/drkameleon/complete-hsk-vocabulary/blob/main/LICENSE)
+
+```text
+MIT License
+
+Copyright (c) 2026 Yanis Zafirópulos
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Corpus frequency metadata
 

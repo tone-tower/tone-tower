@@ -12,6 +12,7 @@
   ],
   "selection": {
     "maxWrittenCharacters": 4,
+    "terminalPunctuationSpeakers": ["Luilui6666"],
     "minDurationSeconds": 0.1,
     "maxDurationSeconds": 10,
     "maxOriginalBytes": 20971520,

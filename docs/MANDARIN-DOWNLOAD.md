@@ -19,6 +19,7 @@ For a smaller batch, or to check progress in another terminal:
 
 ```sh
 npm run audio:download:mandarin -- --limit 20
+npm run audio:download:mandarin -- --speaker Luilui6666
 npm run audio:status:mandarin
 ```
 
@@ -32,7 +33,9 @@ make network requests or decode every recording again.
 The initial source is Commons'
 [Mandarin Lingua Libre category](https://commons.wikimedia.org/wiki/Category:Lingua_Libre_pronunciation-cmn).
 Selection keeps recognized Mandarin filenames whose text consists of one to four
-Han characters. This includes short words, names and expressions; it does not
+Han characters. One final question mark or exclamation mark is ignored in a
+Luilui6666 title when the Commons speaker credit agrees. This includes short
+words, names and expressions; it does not
 claim that every selected clip is common vocabulary, one dictionary word or an
 HSK item. Longer phrases, numeric/Latin labels and ambiguous language categories
 are left out of this first collection.
@@ -134,3 +137,24 @@ command; `npm run audio:download:mandarin` uses its own archive.
 
 There is no need to run `audio:sync` after a Mandarin download: that command
 belongs to the current Cantonese catalog. The Mandarin beta uses downloaded clips with unambiguous dictionary matches, applies common tone changes, and keeps corrections separately. Run `npm run mandarin:dictionary` and `npm run catalog` to include newly downloaded written forms. Manual listening approval is optional. See [the Mandarin beta workflow](MANDARIN-WEBSITE.md).
+
+## Shtooka recordings
+
+The separate Shtooka inventory uses the pinned
+[Congcong](https://www.yojik.eu/audiocollections/audiocollections.html#cmn-balm-congcong)
+and [Yue Tan](https://www.yojik.eu/audiocollections/audiocollections.html#cmn-caen-tan)
+FLAC archives. Download the FLAC archives locally and pass them to the importer,
+then refresh the dictionary and build the catalog. The importer needs `tar` and
+FFmpeg on PATH.
+
+```sh
+npm run mandarin:shtooka -- --congcong path/to/cmn-balm-congcong_flac.tar.xz --tan path/to/cmn-caen-tan_flac.tar.xz
+npm run mandarin:dictionary
+npm run catalog
+```
+
+The importer uses the original written form and any supplied Pinyin to select a
+CC-CEDICT reading. Unresolved readings stay outside gameplay. Conversion and
+decode checks retain per-clip hashes in `data/audio/mandarin-shtooka.json`.
+Matched clips enter the beta with assumed tone status. The recording directory
+shows the original source and licence for both collections.

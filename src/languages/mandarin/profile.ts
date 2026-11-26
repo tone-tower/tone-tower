@@ -8,6 +8,10 @@ export const mandarin: LanguageProfile = Object.freeze<LanguageProfile>({
   dictionarySources: [cedictSource],
   slug: 'mandarin',
   label: 'Mandarin',
+  copy: {
+    recordings:
+      'Mandarin recordings come from Wikimedia Commons contributors and the Shtooka Project. The recording directory lists the creator, original source and licence for each clip.',
+  },
   toneSummary: 'four tones and neutral tone',
   romanization: 'Pinyin',
   transcriptionSystem: 'pinyin',

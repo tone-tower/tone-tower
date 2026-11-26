@@ -35,8 +35,8 @@ content files, and MP3s together when preparing a committed release.
 
 ## Content assumptions and corrections
 
-The beta includes a clip when its source text resolves to one dictionary reading
-and its bytes match the downloaded inventory. Equivalent senses with the same
+The beta includes a clip when its source text and any supplied Pinyin resolve
+to one dictionary reading and its bytes match the recording inventory. Equivalent senses with the same
 reading do not create a pronunciation ambiguity; ordinary definitions are
 preferred over surname/variant-only entries. Unresolved readings, missing matches,
 and invalid/missing MP3s stay outside the playable catalog.

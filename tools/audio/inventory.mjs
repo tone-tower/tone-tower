@@ -6,7 +6,7 @@ const validURL = (value) => {
     return false;
   }
 };
-export function validateInventory(inventory, id, language = id) {
+export function validateInventory(inventory, id, language = id, { shtooka = false } = {}) {
   const seen = new Set();
   if (
     !inventory ||
@@ -19,11 +19,15 @@ export function validateInventory(inventory, id, language = id) {
   )
     throw Error('Invalid collection inventory');
   for (const row of inventory.recordings) {
+    const validId = shtooka
+      ? row?.source?.provider === 'shtooka' && /^shtooka-(?:congcong|tan)-[a-f0-9]{8}$/.test(row.id)
+      : /^commons-[1-9]\d*$/.test(row?.id || '');
     if (
       !row ||
       typeof row !== 'object' ||
       Array.isArray(row) ||
-      !/^commons-[1-9]\d*$/.test(row.id || '') ||
+      typeof row.id !== 'string' ||
+      !validId ||
       seen.has(row.id) ||
       row.language !== language ||
       row.audio?.file !== 'audio/' + id + '/' + row.id + '.mp3' ||
@@ -36,6 +40,8 @@ export function validateInventory(inventory, id, language = id) {
       row.audio.bytes < 1 ||
       typeof row.sourceText !== 'string' ||
       !row.sourceText.trim() ||
+      (row.sourcePinyin !== undefined &&
+        (typeof row.sourcePinyin !== 'string' || !row.sourcePinyin.trim())) ||
       !row.attribution?.author ||
       !row.attribution?.license ||
       !validURL(row.attribution?.licenseUrl) ||
