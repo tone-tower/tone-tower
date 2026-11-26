@@ -21,6 +21,8 @@ import path from 'node:path';
 import { atomicJSON } from '../lib/json.mjs';
 import { formatPinyin, parsePinyin } from '../../src/languages/pinyin.ts';
 import { loadShtooka } from '../audio/shtooka.mjs';
+import { loadMandarinHsk, withHskLabels } from './hsk.mjs';
+import { loadPracticeTiers, withPracticeTiers } from './practice-tiers.mjs';
 import { loadToneExamples, toneExampleForms, toneSource } from './tone-examples.mjs';
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -569,8 +571,12 @@ export async function buildMandarinCatalogUnlocked(root, { reviewedOnly = false 
   if (new Set(result.references.map((r) => r.tone)).size !== result.references.length)
     throw Error('Choose one reference per Mandarin tone.');
   result.availability = { ...coverage(result), mode: reviewedOnly ? 'reviewed' : 'beta', ...stats };
-  validateCatalog(result, mandarin, { publication: true });
-  return enrichCatalog(result, mandarin);
+  const tagged = withPracticeTiers(
+    withHskLabels(result, await loadMandarinHsk(root)),
+    await loadPracticeTiers(root),
+  );
+  validateCatalog(tagged, mandarin, { publication: true });
+  return enrichCatalog(tagged, mandarin);
 }
 
 const curate = (root, task) => withCurationLock(root, 'cmn', task);

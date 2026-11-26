@@ -89,6 +89,37 @@ async function loaded(page, url = '/mandarin/') {
 const noOverflow = async (page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
+for (const [destination, game] of [
+  ['tone', 'Tone Tower'],
+  ['rail', 'Skyrail'],
+]) {
+  test(`an Easy Mandarin adventure in ${game} uses the Easy vocabulary pool`, async ({ page }) => {
+    const easy = new Set(['ma1', 'mother']);
+    await page.route('**/catalogs/cmn.json', (route) =>
+      route.fulfill({
+        json: {
+          ...catalog,
+          entries: entries.map((entry) => ({
+            ...entry,
+            practiceTier: easy.has(entry.id) ? 'easy' : 'hard',
+          })),
+        },
+      }),
+    );
+    await loaded(page);
+    await page.locator('[data-mode-card][data-destination="' + destination + '"]').click();
+    await page
+      .locator(destination === 'tone' ? '[data-variant="easy"]' : '[data-difficulty="easy"]')
+      .click();
+    await page.locator('#start-adventure').click();
+    await expect(page.locator('#app')).toHaveAttribute('data-view', 'game');
+    await page.clock.runFor(2000);
+    await expect
+      .poll(() => page.evaluate(() => window.__audioPlays.at(-1)))
+      .toMatch(/\/(ma1|mother)\.mp3$/);
+  });
+}
+
 test('the selector centers the title and fits all three language cards in the viewport', async ({
   page,
 }) => {

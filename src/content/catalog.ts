@@ -48,9 +48,45 @@ export function validateCatalog(
       throw Error('Missing or duplicate catalog identity.');
   }
   const entryIds = new Set(entries.map((e) => e.id));
+  const hskSource = value.hskSource === undefined ? undefined : object(value.hskSource);
+  if (
+    hskSource &&
+    (profile.id !== 'cmn' ||
+      hskSource.scheme !== 'hsk-3.0' ||
+      !text(hskSource.edition) ||
+      !text(hskSource.attribution) ||
+      !text(hskSource.license) ||
+      !text(hskSource.snapshotDate) ||
+      !text(hskSource.snapshotSha256) ||
+      !/^[a-f0-9]{64}$/.test(hskSource.snapshotSha256) ||
+      !['url', 'downloadUrl', 'licenseUrl'].every((key) => webURL(hskSource[key])))
+  )
+    throw Error('Invalid catalog HSK source.');
   for (const entry of entries) {
     forms(entry.forms);
     if (typeof entry.gloss !== 'string') throw Error('Invalid gloss for ' + entry.id);
+    if (
+      entry.practiceTier !== undefined &&
+      (profile.id !== 'cmn' ||
+        typeof entry.practiceTier !== 'string' ||
+        !['easy', 'normal', 'hard'].includes(entry.practiceTier))
+    )
+      throw Error('Invalid vocabulary tier for ' + entry.id);
+    const membership = entry.metadata === undefined ? undefined : object(entry.metadata).hsk;
+    if (membership !== undefined) {
+      const { level, match, sourceRows } = object(membership);
+      if (
+        !hskSource ||
+        !text(level) ||
+        !/^(?:[1-6]|7-9)$/.test(level) ||
+        match !== 'form-and-pinyin' ||
+        !Array.isArray(sourceRows) ||
+        !sourceRows.length ||
+        new Set(sourceRows).size !== sourceRows.length ||
+        !sourceRows.every((row) => typeof row === 'number' && Number.isSafeInteger(row) && row > 0)
+      )
+        throw Error('Invalid HSK membership for ' + entry.id);
+    }
   }
   const byPronunciation = new Map(pronunciations.map((p) => [p.id, p]));
   for (const p of pronunciations) {

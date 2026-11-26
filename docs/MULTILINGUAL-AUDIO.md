@@ -13,7 +13,7 @@ pronunciation annotation. Curating recordings into exercises is a separate step.
 
 Use Commons for multiple speakers and word recordings. Consider audio-cmn as a
 second source for systematic isolated-syllable coverage. Keep those two exercise
-types distinct. Add HSK as independently sourced vocabulary metadata later.
+types distinct. Mandarin HSK membership is sourced independently from recording metadata.
 
 ## What is available
 
@@ -183,27 +183,108 @@ same-reading overlap before promising a certain number of voices per exercise.
 Do not require every word to have several speakers; retain useful single-speaker
 coverage and make the actual availability visible in internal reports.
 
-## HSK and later metadata
+## HSK 3.0 vocabulary metadata
 
-Attach curriculum membership to vocabulary entries, never to audio or a bare
-syllable. A proposed membership stores `scheme`, `edition`, `level`, `source`,
-`sourceEntryId`, `snapshotSha256`, `license` and `matchStatus`. Use strings for
-levels so a shared band such as `7-9` is representable. Several memberships may
-coexist; absence means unknown, not level zero.
+Tone Tower uses [Gushi's CC BY-SA 4.0 vocabulary export](https://gushichinese.com/hsk-3.0/downloads)
+of the November 2025 HSK examination syllabus. The catalog carries `hskSource`
+with the syllabus edition, data attribution and pinned export checksum.
+Vocabulary entries carry `metadata.hsk` with a string level, one-based Gushi
+export row numbers and the match method. Levels 1–6 are individual levels and
+`7-9` is the shared advanced band.
 
-The [official HSK page](https://www.chinesetest.cn/HSK) links the current exam
-syllabus. The [HSK University compilation](https://github.com/ayman-ezz/hsk-3.0-word-list)
-explicitly distinguishes its 2021 proficiency-standard list from the November
-2025 examination syllabus. The [profesorm/hsk30 collection](https://github.com/profesorm/hsk30)
-is another machine-readable exam-syllabus lead. These are candidates for later
-evaluation, not metadata already imported or independently checked here. Store
-the exact underlying edition instead of using an ambiguous `hskLevel` field.
+A match requires the exact simplified form and dictionary Pinyin, including its
+tone sequence. Conflicting source levels for the same spelling and reading stay
+untagged. An untagged entry has no resolved membership in this edition. The tags
+are available in the catalog for later exercise filters.
 
-Match written form and reading against the chosen source; ambiguous readings,
-variant mappings and sense-level differences require review. Keep enrichment
-provenance and licences separate from recording and dictionary licences. HSK is
-one curriculum, so other languages can later add their own independently sourced
-schemes without changing the recording schema.
+### Mandarin coverage as of 2026-11-26
+
+Playable entries count distinct Tone Tower vocabulary IDs with at least one
+playable recording. Syllabus coverage counts distinct Gushi export rows linked
+by those entries. A single vocabulary entry can link to multiple syllabus rows,
+and multiple vocabulary entries can link to the same row. Each level shows the
+rows introduced at that level.
+
+| HSK level           | Playable entries | Syllabus rows covered | Playable recordings |
+| ------------------- | ---------------: | --------------------: | ------------------: |
+| 1                   |              268 |             266 / 300 |                 640 |
+| 2                   |              162 |             163 / 200 |                 276 |
+| 3                   |              451 |             451 / 500 |                 806 |
+| 4                   |              833 |           832 / 1,000 |               1,514 |
+| 5                   |            1,334 |         1,336 / 1,600 |               1,561 |
+| 6                   |            1,361 |         1,363 / 1,800 |               1,844 |
+| 7–9                 |            2,664 |         2,666 / 5,600 |               3,262 |
+| **Tagged subtotal** |        **7,073** |    **7,077 / 11,000** |           **9,903** |
+| Untagged            |            2,014 |                     — |               2,178 |
+| **Catalog total**   |        **9,087** |                       |          **12,081** |
+
+Of the untagged entries, 1,879 have no exact simplified spelling in the import.
+Another 109 have a spelling match with a different dictionary reading, and 26
+have competing levels for the same spelling and reading. For example, 不客气
+has dictionary `bu4 ke4 qi5` in Tone Tower and `bú kèqi` in the syllabus.
+等 has matching readings at levels 2 and 4 in the export.
+
+唱歌 (`chàng gē`, `chang4 ge1`) is a Level 1 vocabulary entry in the 2021
+proficiency standard. The November 2025 exam syllabus uses 唱歌 in a Level 1
+leisure task and lists 唱 and 歌 individually in its Level 1 vocabulary table.
+The combined phrase has no row in the Gushi exam vocabulary export.
+[2021 proficiency standard](https://www.moe.gov.cn/jyb_xwfb/gzdt_gzdt/s5987/202103/W020210329527301787356.pdf)
+[November 2025 exam syllabus](https://download.chinesetest.cn/newhsk-site/Syllabus/H_DG_1110.pdf)
+
+### Vocabulary pools for Mandarin adventures
+
+Tower and Skyrail use each word's minimum practice tier alongside their
+existing recording eligibility rules. Free Practice and missed-question
+practice use the recordings selected by those activities. On resuming a saved
+adventure, the saved recording can finish and new draws use the difficulty's
+updated pool.
+
+| Difficulty     | Vocabulary pool                                           | Playable catalog entries |
+| -------------- | --------------------------------------------------------- | -----------------------: |
+| Easy           | HSK 1–3 plus words assigned to Easy                       |                    1,214 |
+| Normal         | Everything in Easy, HSK 4–6, and words assigned to Normal |                    5,688 |
+| Hard / Extreme | Full vocabulary pool                                      |                    9,087 |
+
+Practice tiers and November 2025 exam vocabulary labels are tracked separately.
+Of the 2,014 playable entries without a 2025 label, 333 received Easy, 946
+Normal, and 735 Hard. Hard includes words kept for the full pool because their
+usefulness at an earlier difficulty is less clear. Vocabulary difficulty and
+recording quality are evaluated independently.
+
+The practice-tier import checked each entry against NihaoLearn's exports of
+the 2021 proficiency standard and HSK 2.0 (2009). It records a level when a
+single level matches the simplified form and dictionary reading. When both
+sources match, the 2021 standard takes precedence. Its bands 1–3 map to Easy,
+4–6 to Normal, and 7–9 to Hard. With HSK 2.0 alone, levels 1–3 map to Easy, 4–5
+to Normal, and 6 to Hard. 唱歌 matches 2021 Level 1 and HSK 2.0 Level 2 and
+appears from Easy. [NihaoLearn exports](https://nihaolearn.com/resources)
+
+Of the 2,014 entries, 557 matched at least one older list. The other 1,457
+received individual editorial tier estimates. The source data in
+`data/content/cmn/practice-tiers.json` retains matches, editorial decisions
+and the checksums of both older downloads. New vocabulary with no tier evidence
+starts in Hard.
+
+### Rebuilding labels
+
+The source projection is `data/content/cmn/hsk.json`. To regenerate it, pass the
+pinned Gushi all-levels word JSON to the importer, then rebuild the catalog.
+
+```sh
+npm run mandarin:hsk -- --file path/to/hsk-3.0-words-all.json
+npm run catalog
+npm run mandarin:status
+```
+
+With a current generated catalog, regenerate the supplementary tiers using the
+pinned 2021 and HSK 2.0 downloads. The importer preserves editorial assignments
+whose vocabulary form and reading still match. To change decisions, pass
+`--assessments` with a JSON object of vocabulary IDs mapped to
+`{ "tier": "easy", "reason": "..." }` objects, then rebuild.
+
+```sh
+npm run mandarin:practice-tiers -- --file path/to/hsk-2021-all.json --legacy path/to/hsk-2.0-all.json
+```
 
 ## Original implementation sequence and remaining limits
 

@@ -1,5 +1,5 @@
 import { practiceSpelling } from '../../src/languages/jyutping.ts';
-import { cantonese } from '../../src/languages/profiles.ts';
+import { cantonese, mandarin } from '../../src/languages/profiles.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
@@ -25,6 +25,66 @@ const words = Array.from({ length: 240 }, (_, i) => {
 });
 const random = () => 0.3;
 const clear = (run) => run.answer(run.world === 'tone' ? run.word.tone : run.expected());
+
+test.each(['tone', 'tide'])(
+  'Mandarin %s adventures use cumulative vocabulary tiers',
+  (challenge) => {
+    const syllable = { text: '妈', transcription: 'ma1', tone: 1 };
+    const vocabulary = ['easy', 'normal', 'hard'].flatMap((tier) =>
+      [1, 2].map((length) => ({
+        id: tier + length,
+        text: syllable.text.repeat(length),
+        audio: tier + length + '.mp3',
+        syllables: Array.from({ length }, () => syllable),
+        practiceTier: tier,
+      })),
+    );
+    for (const [difficulty, tiers] of [
+      ['easy', ['easy']],
+      ['normal', ['easy', 'normal']],
+      ['hard', ['easy', 'normal', 'hard']],
+      ['extreme', ['easy', 'normal', 'hard']],
+    ]) {
+      const settings = {
+        challenge,
+        difficulty,
+        variant: challenge === 'tone' ? difficulty : 'full',
+      };
+      const run = createRun(settings, vocabulary, { profile: mandarin, random });
+      const draws = challenge === 'tone' ? tiers.length * 2 : tiers.length;
+      const selected = new Set();
+      for (let i = 0; i < draws; i++) {
+        selected.add(run.word.practiceTier);
+        assert.equal(clear(run).correct, true);
+        if (i + 1 < draws) run.next();
+      }
+      assert.deepEqual(selected, new Set(tiers));
+    }
+  },
+);
+
+test('resuming a Mandarin adventure keeps its old prompt and uses the tier for the next draw', () => {
+  const row = {
+    id: 'old',
+    text: '妈',
+    audio: 'old.mp3',
+    syllables: [{ text: '妈', transcription: 'ma1', tone: 1 }],
+  };
+  const input = { challenge: 'tone', variant: 'easy' };
+  const options = { profile: mandarin, random };
+  const snapshot = createRun(input, [row], options).snapshot();
+  const resumed = createRun(
+    snapshot.config,
+    [
+      { ...row, practiceTier: 'hard' },
+      { ...row, id: 'new', practiceTier: 'easy' },
+    ],
+    { ...options, snapshot },
+  );
+  assert.equal(resumed.word.id, 'old');
+  assert.equal(clear(resumed).correct, true);
+  assert.equal(resumed.next().id, 'new');
+});
 
 test('a restored landing keeps the exact result and recording selection history', () => {
   const options = { profile: cantonese, random, heartRandom: () => 1 };

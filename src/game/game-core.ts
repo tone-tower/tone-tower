@@ -313,7 +313,20 @@ export function createRun(
       reviewPrompts: undefined,
     };
   }
-  const pool = compatibleWords(config, words, profile);
+  const compatible = compatibleWords(config, words, profile);
+  const difficulty = config.challenge === 'tone' ? config.variant : config.difficulty;
+  const filterVocabulary =
+    profile.id === 'cmn' &&
+    !config.practice &&
+    (difficulty === 'easy' || difficulty === 'normal') &&
+    compatible.some((word) => word.practiceTier !== undefined);
+  const pool = filterVocabulary
+    ? compatible.filter(
+        (word) =>
+          word.practiceTier === 'easy' ||
+          (difficulty === 'normal' && word.practiceTier === 'normal'),
+      )
+    : compatible;
   if (!pool.length) throw Error('No recordings match this challenge.');
   if (
     config.challenge === 'tide' &&
@@ -329,7 +342,6 @@ export function createRun(
   const reviewRecordings = reviewPrompts && new Map(pool.map((word) => [word.id, word]));
   let skippedReviews = 0;
   const start = config.practice && config.format === 'rehearsal' ? config.start - 1 : 0;
-  const difficulty = config.challenge === 'tone' ? config.variant : config.difficulty;
   const maxLives =
     config.practice && config.lives === 'unlimited'
       ? null
@@ -670,7 +682,8 @@ export function createRun(
     run.next();
     return run;
   }
-  const recordings = new Map(pool.map((word) => [word.id, word]));
+  // A saved prompt and its history can predate vocabulary tier assignments.
+  const recordings = new Map(compatible.map((word) => [word.id, word]));
   const recording = recordings.get(snapshot.recordingId);
   const targetIndex = snapshot.targets[0];
   const tone = recording?.syllables[targetIndex]?.tone;
@@ -707,7 +720,7 @@ export function createRun(
   )
     throw Error('This saved run no longer matches the recording library.');
   used = new Set(snapshot.usedIds);
-  usedWords = new Set(pool.filter((word) => used.has(word.id)).map(wordIdentity));
+  usedWords = new Set(compatible.filter((word) => used.has(word.id)).map(wordIdentity));
   toneBag = [...snapshot.toneBag];
   skippedReviews = snapshot.skippedReviews;
   heartAhead = snapshot.heartAhead;
