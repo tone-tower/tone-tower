@@ -65,6 +65,11 @@ export async function loadCollection(root, id) {
     !Number.isInteger(policy?.maxWrittenCharacters) ||
     policy.maxWrittenCharacters < 1 ||
     policy.maxWrittenCharacters > 10 ||
+    (policy.terminalPunctuationSpeakers !== undefined &&
+      (!Array.isArray(policy.terminalPunctuationSpeakers) ||
+        policy.terminalPunctuationSpeakers.some(
+          (name) => typeof name !== 'string' || !name.trim(),
+        ))) ||
     !(policy.minDurationSeconds >= 0 && policy.maxDurationSeconds > policy.minDurationSeconds) ||
     !Number.isSafeInteger(policy.maxOriginalBytes) ||
     policy.maxOriginalBytes < 1 ||
@@ -294,6 +299,7 @@ export async function downloadCollection({
   collection = 'cmn',
   limit = Infinity,
   refresh = false,
+  speaker,
   retryReview = false,
   signal,
   log = console.log,
@@ -304,6 +310,8 @@ export async function downloadCollection({
 } = {}) {
   if (limit !== Infinity && (!Number.isSafeInteger(limit) || limit < 1))
     throw Error('Limit must be a positive integer');
+  if (speaker !== undefined && (typeof speaker !== 'string' || !speaker.trim()))
+    throw Error('Specify a credited speaker name');
   return withAudioLock(async () => {
     const { paths, config, inventory, review } = await loadCollection(root, collection);
     if (preflight)
@@ -314,7 +322,9 @@ export async function downloadCollection({
       }
     const request = providedRequest || requester(paths, signal, log);
     const discovery = await discover(paths, config, request, refresh, signal, log);
-    const candidates = balancedCandidates(discovery.items, config);
+    const candidates = balancedCandidates(discovery.items, config).filter(
+      (item) => !speaker || item.speakerLabel === speaker,
+    );
     const metadata = refresh ? {} : await readJSON(paths.metadata, {});
     if (retryReview)
       for (const id of Object.keys(review.recordings)) delete metadata[id.replace(/^commons-/, '')];
@@ -369,6 +379,11 @@ export async function downloadCollection({
             );
           row = inspectRecording(metadata[item.pageid], item, config);
         }
+        if (speaker && row.speaker?.name !== speaker)
+          throw new RecordingReview(
+            'attribution',
+            'Recording does not credit the selected speaker',
+          );
         // Repairs use the saved source version, not a newly changed pronunciation.
         log('Downloading ' + item.title);
         const result = await saveRecording({

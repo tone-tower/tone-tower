@@ -5,7 +5,7 @@ does not replace the licences of the material below.
 
 ## Human speech recordings
 
-Recordings come from Wikimedia Commons. Each recording keeps its own licence:
+Wikimedia Commons recordings each keep their own licence:
 CC BY-SA 4.0, CC BY 4.0 or CC0. The published catalog.json identifies its creator,
 source page, licence URL and conversion credit. The same information is available
 in the game's recording directory. The source inventory is data/audio/content.json.
@@ -26,6 +26,15 @@ data/audio/collections/cmn/recordings.json. Downloaded MP3s live in audio/cmn/.
 Accepted licences are CC0 1.0, CC BY 4.0 and CC BY-SA 4.0, as identified for each
 recording. Share-alike audio derivatives retain their indicated licence. The
 publication build includes only the clips referenced in its playable catalog; the application's MIT licence does not replace audio licences.
+
+The [Shtooka Mandarin collections](https://www.yojik.eu/audiocollections/audiocollections.html#cmn-balm-congcong)
+also supply recordings by Congcong, © 2010 Association Shtooka, under
+[CC BY 3.0 US](https://creativecommons.org/licenses/by/3.0/us/) and by Yue Tan,
+© 2009 Yue Tan, recorded by the University of Caen, under
+[CC BY-SA 3.0 US](https://creativecommons.org/licenses/by-sa/3.0/us/).
+The originals were converted from FLAC to MP3. The conversion preserves pitch
+and speed. Per-clip hashes, source Pinyin when available and attribution are in
+`data/audio/mandarin-shtooka.json`.
 
 ### Matched Mandarin tone examples
 

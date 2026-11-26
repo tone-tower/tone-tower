@@ -83,6 +83,45 @@ test('dictionary importer handles editions explicitly and retains alternate read
   assert.equal(parseCedict('花兒 花儿 [hua1 r5] /flower/', 'v1').length, 0);
 });
 
+test('source Pinyin selects a beta reading while preserving explicit corrections', async (t) => {
+  const { root, put, recordings } = await fixture(t);
+  const id = 'shtooka-tan-0123abcd';
+  const file = 'audio/cmn/' + id + '.mp3';
+  const bytes = Buffer.from('source-tagged fixture');
+  await put(file, bytes);
+  await put('data/audio/mandarin-shtooka.json', {
+    version: 1,
+    language: 'cmn',
+    collectionId: 'cmn',
+    recordings: [
+      {
+        ...recordings[6],
+        id,
+        sourcePinyin: 'háng',
+        source: { ...recordings[6].source, provider: 'shtooka' },
+        audio: { ...recordings[6].audio, file, bytes: bytes.length, sha256: digest(bytes) },
+      },
+    ],
+  });
+  await importDictionary(root, path.join(root, 'dictionary.txt'), 'v1');
+  await prepareMandarin(root);
+
+  const item = (await reviewQueue(root)).find((row) => row.recordingId === id);
+  const [walk, row] = item.candidates;
+  assert.equal(item.pronunciationId, row.pronunciationId);
+  const findRecording = async () =>
+    (await buildMandarinCatalog(root)).recordings.find((recording) => recording.id === id);
+  assert.equal((await findRecording()).toneEvidence.status, 'assumed');
+  assert.equal((await findRecording()).pronunciationId, row.pronunciationId);
+
+  await correctMandarin(root, {
+    recordingId: id,
+    pronunciationId: walk.pronunciationId,
+    reason: 'Fixture correction',
+  });
+  assert.equal((await findRecording()).pronunciationId, walk.pronunciationId);
+});
+
 test('dictionary matches remain unapproved; review import is validated and atomic', async (t) => {
   const f = await fixture(t),
     inventoryBefore = await readFile(

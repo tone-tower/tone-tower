@@ -44,6 +44,17 @@ const candidate = (pageid, speaker = 'Voice-' + pageid, text = '我') => ({
   pageid,
   title: 'File:LL-Q9192 (cmn)-' + speaker + '-' + text + '.wav',
 });
+
+test('selected speaker titles may omit a terminal punctuation mark with matching credits', () => {
+  const source = candidate(1, 'Luilui6666', '幾號？');
+  const matched = candidateFromTitle(source, sourceConfig);
+  assert.equal(matched.text, '幾號');
+  assert.equal(candidateFromTitle(candidate(1, 'Another speaker', '幾號？'), sourceConfig), null);
+  const page = sourcePage(source);
+  assert.throws(() => inspectRecording(page, matched, sourceConfig), /matching speaker credit/);
+  page.imageinfo[0].extmetadata.Artist.value = '<ul><li>Speaker: Luilui6666</li></ul>';
+  assert.equal(inspectRecording(page, matched, sourceConfig).sourceText, '幾號');
+});
 function sourcePage(item, bytes = originals[item.pageid - 1], overrides = {}) {
   return {
     pageid: item.pageid,

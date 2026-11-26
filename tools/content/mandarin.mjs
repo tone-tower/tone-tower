@@ -19,7 +19,8 @@ import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { atomicJSON } from '../lib/json.mjs';
-import { parsePinyin } from '../../src/languages/pinyin.ts';
+import { formatPinyin, parsePinyin } from '../../src/languages/pinyin.ts';
+import { loadShtooka } from '../audio/shtooka.mjs';
 import { loadToneExamples, toneExampleForms, toneSource } from './tone-examples.mjs';
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -48,7 +49,34 @@ async function archive(root) {
     language: 'cmn',
     recordings: [],
   });
-  return validateInventory(inventory, 'cmn', 'cmn').recordings;
+  return [
+    ...validateInventory(inventory, 'cmn', 'cmn').recordings,
+    ...(await loadShtooka(root)).recordings,
+  ];
+}
+
+export function readingsByForm(rows, forms) {
+  const index = new Map();
+  for (const row of rows)
+    for (const form of new Set(forms(row))) {
+      if (!index.has(form)) index.set(form, []);
+      index.get(form).push(row);
+    }
+  return index;
+}
+
+export function sourceMatchedReadings(candidates, sourcePinyin) {
+  if (sourcePinyin === undefined) return candidates;
+  const compact = (pinyin) =>
+    pinyin
+      .toLowerCase()
+      .normalize('NFC')
+      .replace(/[\s'’\-]/g, '');
+  const source = compact(sourcePinyin);
+  return candidates.filter(
+    (candidate) =>
+      compact(formatPinyin(candidate.syllables.map((s) => s.transcription).join(' '))) === source,
+  );
 }
 
 export function parseCedict(text, edition = 'v1') {
@@ -165,6 +193,8 @@ export async function mandarinReviewItems(root) {
   const pronunciations = (
     await json(path.join(directory(root), 'pronunciations.json'), { pronunciations: [] })
   ).pronunciations;
+  const byForm = readingsByForm(entries, (entry) => Object.values(entry.forms));
+  const byPronunciation = new Map(pronunciations.map((p) => [p.id, p]));
   const saved = await json(path.join(directory(root), 'annotations.json'), {
     version: 1,
     annotations: {},
@@ -181,16 +211,15 @@ export async function mandarinReviewItems(root) {
       speaker: recording.speaker?.name ?? 'Unidentified speaker',
       speakerId: recording.speaker?.id,
       source: recording.source.pageUrl,
+      ...(recording.sourcePinyin ? { sourcePinyin: recording.sourcePinyin } : {}),
       recordingSha256: recording.audio.sha256,
-      candidates: entries
-        .filter((e) => Object.values(e.forms).includes(recording.sourceText))
-        .map((entry) => ({
-          pronunciationId: entry.id,
-          forms: entry.forms,
-          gloss: entry.gloss,
-          dictionarySha256: entry.dictionarySource.sha256,
-          syllables: pronunciations.find((p) => p.id === entry.id)?.syllables ?? [],
-        })),
+      candidates: (byForm.get(recording.sourceText) ?? []).map((entry) => ({
+        pronunciationId: entry.id,
+        forms: entry.forms,
+        gloss: entry.gloss,
+        dictionarySha256: entry.dictionarySource.sha256,
+        syllables: byPronunciation.get(entry.id)?.syllables ?? [],
+      })),
       annotation: saved.annotations[recording.id] ?? null,
     };
     const patch = corrections.recordings[recording.id] ?? null;
@@ -200,11 +229,12 @@ export async function mandarinReviewItems(root) {
       legacy,
       source: recording.source.pageUrl,
       audio: recording.audio.file,
+      ...(recording.sourcePinyin ? { sourcePinyin: recording.sourcePinyin } : {}),
     });
     const candidate =
       item.candidates.find(
         (c) => c.pronunciationId === (patch?.pronunciationId ?? legacy?.pronunciationId),
-      ) ?? uniqueReading(item.candidates);
+      ) ?? uniqueReading(sourceMatchedReadings(item.candidates, item.sourcePinyin));
     item.pronunciationId = candidate?.pronunciationId;
     if (candidate) {
       const estimate = estimateMandarinTones(candidate, { forms: candidate.forms });
@@ -290,7 +320,7 @@ function validateCorrection(patch, item) {
     throw Error('Exclusion must be true or false.');
   const candidate = patch.pronunciationId
     ? item.candidates.find((c) => c.pronunciationId === patch.pronunciationId)
-    : uniqueReading(item.candidates);
+    : uniqueReading(sourceMatchedReadings(item.candidates, item.sourcePinyin));
   if (patch.pronunciationId && !candidate)
     throw Error('Unknown corrected pronunciation: ' + item.recordingId);
   if (
@@ -407,7 +437,9 @@ export async function buildMandarinCatalogUnlocked(root, { reviewedOnly = false 
         c.pronunciationId ===
         (decision?.pronunciationId ?? patch?.pronunciationId ?? annotation?.pronunciationId),
     );
-    if (!candidate) candidate = uniqueReading(item.candidates);
+    if (!candidate) {
+      candidate = uniqueReading(sourceMatchedReadings(item.candidates, item.sourcePinyin));
+    }
     if (!candidate) {
       stats[item.candidates.length ? 'ambiguous' : 'unmatched']++;
       continue;
@@ -469,7 +501,9 @@ export async function buildMandarinCatalogUnlocked(root, { reviewedOnly = false 
           : (patch?.reason ??
             (reviewed
               ? annotation.reason
-              : 'Source label, dictionary reading, and common tone sandhi')),
+              : row.sourcePinyin
+                ? 'Original source Pinyin, matching dictionary reading, and common tone sandhi'
+                : 'Source label, dictionary reading, and common tone sandhi')),
       },
       speakerId: row.speaker?.id,
       author: row.attribution.author,

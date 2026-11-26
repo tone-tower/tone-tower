@@ -36,10 +36,19 @@ export function candidateFromTitle(item, config) {
     if (legacy) match = [legacy[0], 'cmn', legacy[1], legacy[2], legacy[3]];
   }
   if (!match || match[1] !== config.language) return null;
-  const text = match[3].normalize('NFC');
+  const sourceText = match[3].normalize('NFC');
+  const text = config.selection.terminalPunctuationSpeakers?.includes(match[2])
+    ? sourceText.replace(/[!?！？]$/u, '')
+    : sourceText;
   if (!/^\p{Script=Han}+$/u.test(text) || [...text].length > config.selection.maxWrittenCharacters)
     return null;
-  return { pageid: item.pageid, title: item.title, text, speakerLabel: match[2] };
+  return {
+    pageid: item.pageid,
+    title: item.title,
+    text,
+    speakerLabel: match[2],
+    punctuationRemoved: text !== sourceText,
+  };
 }
 
 export function balancedCandidates(items, config) {
@@ -162,11 +171,14 @@ export function inspectRecording(page, candidate, config) {
   const authorHtml = meta.Artist?.value || '';
   const author = plainText(authorHtml);
   if (!author) review('attribution', 'Missing recording creator credit');
+  const speaker = creditedPerson(authorHtml, 'Speaker', pageUrl.href);
+  if (candidate.punctuationRemoved && speaker?.name !== candidate.speakerLabel)
+    review('attribution', 'A punctuated source title requires matching speaker credit');
   return {
     id: 'commons-' + candidate.pageid,
     language: config.language,
     sourceText: candidate.text,
-    speaker: creditedPerson(authorHtml, 'Speaker', pageUrl.href),
+    speaker,
     recorder: creditedPerson(authorHtml, 'Recorder', pageUrl.href),
     attribution: { author, license: license.id, licenseUrl: license.url },
     source: {
